@@ -1,0 +1,7 @@
+{
+  "name": "@o2vr/engine",
+  "version": "1.0.0",
+  "description": "High-performance modular 3D showroom engine with O2VR binary mesh support and lightmap baking pipeline",
+  "main": "index.js",
+  "type": "module"
+}

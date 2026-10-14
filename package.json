@@ -1,0 +1,17 @@
+{
+  "name": "webgl-virtual-showroom",
+  "version": "1.0.0",
+  "description": "1:1 Recreated MVP Meta / O2VR Web3D Virtual Showroom Engine & Application",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12"
+  }
+}
