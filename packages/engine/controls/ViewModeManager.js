@@ -17,9 +17,9 @@ export class ViewModeManager {
     this.events = eventEmitter;
 
     this.mode = VIEW_MODES.FIRST_PERSON; // Default mode
-    this.thirdPersonDistance = 2600; // Distance behind avatar in mm
-    this.thirdPersonHeight = 1750; // Head height offset in mm
-    this.minThirdPersonDistance = 600;
+    this.thirdPersonDistance = 4500; // Distance behind avatar in mm
+    this.thirdPersonHeight = 1500; // Focal height offset in mm
+    this.minThirdPersonDistance = 800;
 
     // Raycaster for SpringArm wall occlusion
     this.raycaster = new THREE.Raycaster();
@@ -67,9 +67,9 @@ export class ViewModeManager {
   updateThirdPerson(avatarPos, yaw, pitch) {
     if (this.mode !== VIEW_MODES.THIRD_PERSON) return;
 
-    // Head anchor point
-    const headPos = avatarPos.clone();
-    headPos.y += this.thirdPersonHeight;
+    // Focus target (chest height of character)
+    const focusTarget = avatarPos.clone();
+    focusTarget.y += this.thirdPersonHeight;
 
     // Ideal camera direction
     const cosPitch = Math.cos(pitch);
@@ -77,10 +77,10 @@ export class ViewModeManager {
     const sinYaw = Math.sin(yaw);
     const cosYaw = Math.cos(yaw);
 
-    // Camera offset behind character
+    // Camera offset behind character with slight elevation
     const offsetDir = new THREE.Vector3(
       sinYaw * cosPitch,
-      -sinPitch,
+      -sinPitch + 0.35,
       cosYaw * cosPitch
     ).normalize();
 
@@ -88,7 +88,7 @@ export class ViewModeManager {
 
     // SpringArm Camera Collision Detection (Prevent camera clipping into walls)
     if (this.collisionSystem && this.collisionSystem.colliObjects.length > 0) {
-      this.raycaster.set(headPos, offsetDir);
+      this.raycaster.set(focusTarget, offsetDir);
       this.raycaster.near = 100;
       this.raycaster.far = this.thirdPersonDistance;
 
@@ -99,7 +99,8 @@ export class ViewModeManager {
       }
     }
 
-    const targetCameraPos = headPos.clone().addScaledVector(offsetDir, targetDist);
+    const targetCameraPos = focusTarget.clone().addScaledVector(offsetDir, targetDist);
     this.camera.position.lerp(targetCameraPos, 0.25);
+    this.camera.lookAt(focusTarget);
   }
 }

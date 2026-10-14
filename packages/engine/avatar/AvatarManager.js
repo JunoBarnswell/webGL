@@ -34,8 +34,8 @@ export class AvatarManager {
         url,
         (gltf) => {
           this.model = gltf.scene;
-          // Scale to human proportions in showroom units (~1850mm tall)
-          this.model.scale.set(10.5, 10.5, 10.5);
+          // Scale to human proportions in showroom units (~1750mm tall)
+          this.model.scale.set(2500, 2500, 2500);
 
           // Enable shadows and proper materials
           this.model.traverse((child) => {
