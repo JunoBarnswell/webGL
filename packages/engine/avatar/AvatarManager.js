@@ -17,7 +17,7 @@ export class AvatarManager {
     this.position = new THREE.Vector3(-1846, 0, 726); // Default position
     this.rotation = 0; // Yaw angle in radians
     this.targetRotation = 0;
-    this.isVisible = true;
+    this.isVisible = false; // Hidden by default in 1st person mode
 
     // Movement state
     this.currentSpeed = 0; // 0 = idle, > 0 = walk, > threshold = run
@@ -34,8 +34,8 @@ export class AvatarManager {
         url,
         (gltf) => {
           this.model = gltf.scene;
-          // Scale to human proportions in showroom units (~1750mm tall)
-          this.model.scale.set(2500, 2500, 2500);
+          // Scale to standard human proportions in showroom units (1.806m -> ~1800mm tall)
+          this.model.scale.set(1000, 1000, 1000);
 
           // Enable shadows and proper materials
           this.model.traverse((child) => {
@@ -50,6 +50,7 @@ export class AvatarManager {
           });
 
           this.model.position.copy(this.position);
+          this.model.visible = this.isVisible;
           this.scene.add(this.model);
 
           // Setup Animation Mixer
@@ -121,6 +122,11 @@ export class AvatarManager {
     this.isVisible = visible;
     if (this.model) {
       this.model.visible = visible;
+      this.model.traverse((child) => {
+        if (child.isMesh) {
+          child.visible = visible;
+        }
+      });
     }
   }
 

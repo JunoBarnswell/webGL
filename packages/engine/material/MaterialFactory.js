@@ -16,7 +16,7 @@ export class MaterialFactory {
     this.baseUrl = url;
   }
 
-  async loadTexture(relativePath) {
+  async loadTexture(relativePath, isLinear = false) {
     if (!relativePath) return null;
     const fullPath = this.baseUrl ? `${this.baseUrl}/${relativePath}`.replace(/([^:]\/)\/+/g, '$1') : relativePath;
 
@@ -28,7 +28,7 @@ export class MaterialFactory {
       this.textureLoader.load(
         fullPath,
         (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
           this.textureCache.set(fullPath, tex);
@@ -37,6 +37,25 @@ export class MaterialFactory {
         undefined,
         () => resolve(null)
       );
+    });
+  }
+
+  /**
+   * Create automotive clearcoat PBR material
+   * @param {number|string} color
+   * @param {number} metalness
+   * @param {number} roughness
+   * @returns {THREE.MeshPhysicalMaterial}
+   */
+  static createCarPaintMaterial(color = 0x223344, metalness = 0.85, roughness = 0.12) {
+    return new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color),
+      metalness,
+      roughness,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      reflectivity: 0.9,
+      envMapIntensity: 1.5
     });
   }
 
@@ -50,7 +69,8 @@ export class MaterialFactory {
       return new THREE.MeshPhongMaterial({ color: 0xcccccc });
     }
 
-    const isStandard = def.type === 'MeshStandardMaterial';
+    const isPhysical = def.type === 'MeshPhysicalMaterial' || def.clearcoat !== undefined;
+    const isStandard = isPhysical || def.type === 'MeshStandardMaterial';
     const params = {
       color: def.color !== undefined ? def.color : 0xffffff,
       transparent: def.transparent || false,
@@ -61,7 +81,14 @@ export class MaterialFactory {
     };
 
     let material;
-    if (isStandard) {
+    if (isPhysical) {
+      params.roughness = def.roughness !== undefined ? def.roughness : 0.15;
+      params.metalness = def.metalness !== undefined ? def.metalness : 0.8;
+      params.clearcoat = def.clearcoat !== undefined ? def.clearcoat : 1.0;
+      params.clearcoatRoughness = def.clearcoatRoughness !== undefined ? def.clearcoatRoughness : 0.05;
+      params.envMapIntensity = def.envMapIntensity !== undefined ? def.envMapIntensity : 1.2;
+      material = new THREE.MeshPhysicalMaterial(params);
+    } else if (isStandard) {
       params.roughness = def.roughness !== undefined ? def.roughness : 0.5;
       params.metalness = def.metalness !== undefined ? def.metalness : 0.1;
       material = new THREE.MeshStandardMaterial(params);
@@ -74,7 +101,7 @@ export class MaterialFactory {
 
     // 1. Diffuse map
     if (def.map && def.map.name && !def.map.o2_default) {
-      const tex = await this.loadTexture(def.map.name);
+      const tex = await this.loadTexture(def.map.name, false);
       if (tex) {
         if (def.map.offset) tex.offset.set(def.map.offset.x, def.map.offset.y);
         if (def.map.repeat) tex.repeat.set(def.map.repeat.x, def.map.repeat.y);
@@ -82,12 +109,34 @@ export class MaterialFactory {
       }
     }
 
-    // 2. Baked Lightmap
+    // 2. ORM composite map (Red: AO, Green: Roughness, Blue: Metalness) - Blender glTF Standard
+    if (isStandard && def.ormMap && def.ormMap.name) {
+      const ormTex = await this.loadTexture(def.ormMap.name, true);
+      if (ormTex) {
+        material.aoMap = ormTex;
+        material.roughnessMap = ormTex;
+        material.metalnessMap = ormTex;
+        material.aoMapIntensity = def.ormMap.aoIntensity !== undefined ? def.ormMap.aoIntensity : 1.0;
+      }
+    }
+
+    // 3. Normal Map
+    if (isStandard && def.normalMap && def.normalMap.name) {
+      const normalTex = await this.loadTexture(def.normalMap.name, true);
+      if (normalTex) {
+        material.normalMap = normalTex;
+        if (def.normalScale) {
+          material.normalScale.set(def.normalScale.x || 1, def.normalScale.y || 1);
+        }
+      }
+    }
+
+    // 4. Baked Lightmap
     if (def.lightMap && def.lightMap.name) {
       await this.lightmapManager.applyLightmap(material, def.lightMap);
     }
 
-    // 3. Environment Reflection CubeMap
+    // 5. Environment Reflection CubeMap
     if (def.cube_info && def.cube_info.url) {
       const cubeTex = await this.envMapManager.loadCubeMap(def.cube_info.url);
       if (cubeTex) {
@@ -100,3 +149,4 @@ export class MaterialFactory {
     return material;
   }
 }
+

@@ -19,3 +19,7 @@ export { AvatarManager } from './avatar/AvatarManager.js';
 export { ViewModeManager, VIEW_MODES } from './controls/ViewModeManager.js';
 export { CruiseManager } from './business/CruiseManager.js';
 export { PanoramaSystem } from './business/PanoramaSystem.js';
+export { MathUtils, frameIndependentAlpha, smoothstep, normalizeAngleDiff } from './core/MathUtils.js';
+export { DisplayModeController } from './controls/DisplayModeController.js';
+export { HotspotSystem } from './business/HotspotSystem.js';
+export { ComponentMountSystem } from './business/ComponentMountSystem.js';

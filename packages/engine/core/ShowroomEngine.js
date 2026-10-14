@@ -15,6 +15,9 @@ import { AvatarManager } from '../avatar/AvatarManager.js';
 import { ViewModeManager, VIEW_MODES } from '../controls/ViewModeManager.js';
 import { CruiseManager } from '../business/CruiseManager.js';
 import { PanoramaSystem } from '../business/PanoramaSystem.js';
+import { DisplayModeController } from '../controls/DisplayModeController.js';
+import { HotspotSystem } from '../business/HotspotSystem.js';
+import { ComponentMountSystem } from '../business/ComponentMountSystem.js';
 
 /**
  * ShowroomEngine: Top-level unified facade for the 3D exhibition showroom
@@ -65,8 +68,14 @@ export class ShowroomEngine {
     // Advanced features: Avatar, ViewMode, Cruise, Panorama
     this.avatar = new AvatarManager(this.scene);
     this.viewMode = new ViewModeManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events);
-    this.cruise = new CruiseManager(this.camera, this.avatar, this.cameraController, this.events);
+    // Pass collisionSystem so CruiseManager can do collision-aware pathing
+    this.cruise = new CruiseManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events);
     this.panorama = new PanoramaSystem(this.renderer, this.scene, this.camera, this.cameraController, this.events);
+
+    // Automotive / Exhibition specialized systems
+    this.displayMode = new DisplayModeController(this.events);
+    this.hotspot = new HotspotSystem(this.camera, this.container, this.events);
+    this.componentMount = new ComponentMountSystem(this.scene, this.camera, this.events);
 
     this.artworkManager = null;
     this.meshMap = new Map();
@@ -74,13 +83,14 @@ export class ShowroomEngine {
     // 4. Render Loop
     this.renderLoop = new RenderLoop((delta) => {
       if (this.cruise.isPlaying) {
+        // During cruise: CruiseManager owns camera position & orientation
         this.cruise.update(delta);
         this.avatar.update(delta, 2500, false);
       } else {
-        this.cameraController.isThirdPerson = (this.viewMode.mode === VIEW_MODES.THIRD_PERSON);
+        // Normal roaming: CameraController advances characterPos & rotation
         this.cameraController.update(delta);
 
-        // Update avatar position and orientation
+        // Avatar orientation: face movement direction when walking, else face camera heading
         const avatarTargetYaw = this.cameraController.currentSpeed > 0
           ? this.cameraController.moveDirectionYaw
           : this.cameraController.yaw;
@@ -88,17 +98,26 @@ export class ShowroomEngine {
         this.avatar.setPose(this.cameraController.characterPos, avatarTargetYaw);
         this.avatar.update(delta, this.cameraController.currentSpeed, this.cameraController.keys.sprint);
 
-        // Update 3rd person camera if in 3rd person mode
+        // ViewModeManager owns ALL camera positioning:
         if (this.viewMode.mode === VIEW_MODES.THIRD_PERSON) {
+          // Third-person: camera arm behind avatar based on character heading
           this.viewMode.updateThirdPerson(
             this.cameraController.characterPos,
-            this.cameraController.yaw,
-            this.cameraController.pitch
+            this.cameraController.yaw  // character heading (not mouse pitch)
           );
+        } else {
+          // First-person: camera at exact eye level, rotation from mouse yaw/pitch
+          this.viewMode.updateFirstPerson(this.cameraController.characterPos);
         }
       }
 
+      // Update dynamic components animations
+      this.componentMount.update(delta);
+
       this.renderer.render(this.scene, this.camera);
+
+      // Project 3D hotspots to 2D DOM screen space
+      this.hotspot.update();
     });
 
     // 5. Handle Resize
@@ -147,6 +166,9 @@ export class ShowroomEngine {
 
     this.meshMap = meshMap;
     this.scene.add(root);
+
+    // Auto-register display mode layers (exterior shell vs interior chassis)
+    this.displayMode.autoRegisterFromScene(root);
 
     // Setup collision and floor clamping
     this.collisionSystem.setColliObjects(colliObjects);
@@ -247,12 +269,54 @@ export class ShowroomEngine {
     return this.panorama.export720Snapshot(width, height);
   }
 
+  // Display Mode (Immersive / Schematic X-Ray) API
+  toggleDisplayMode() {
+    this.displayMode.toggle();
+  }
+
+  setDisplayMode(mode) {
+    this.displayMode.setMode(mode);
+  }
+
+  getDisplayMode() {
+    return this.displayMode.mode;
+  }
+
+  // Hotspot API
+  addHotspot(hotspotDef) {
+    this.hotspot.add(hotspotDef);
+  }
+
+  removeHotspot(id) {
+    this.hotspot.remove(id);
+  }
+
+  clearHotspots() {
+    this.hotspot.clear();
+  }
+
+  // Component Mount API (Streaming glTF loading & assembly)
+  async mountComponent(componentDef, parentObject = null) {
+    return this.componentMount.mount(componentDef, parentObject);
+  }
+
+  unmountComponent(id) {
+    this.componentMount.unmount(id);
+  }
+
+  playComponentAnimation(id, animationIndex = 0) {
+    this.componentMount.playAnimation(id, animationIndex);
+  }
+
   dispose() {
     window.removeEventListener('resize', this._onResize);
     this.renderLoop.stop();
     this.cameraController.dispose();
     if (this.artworkManager) this.artworkManager.dispose();
     this.panorama.dispose();
+    this.displayMode.dispose();
+    this.hotspot.dispose();
+    this.componentMount.dispose();
     this.renderer.dispose();
     if (this.renderer.domElement && this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
@@ -260,3 +324,4 @@ export class ShowroomEngine {
     this.events.clear();
   }
 }
+
