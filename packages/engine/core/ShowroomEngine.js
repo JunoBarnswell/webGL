@@ -68,8 +68,8 @@ export class ShowroomEngine {
     // Advanced features: Avatar, ViewMode, Cruise, Panorama
     this.avatar = new AvatarManager(this.scene);
     this.viewMode = new ViewModeManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events);
-    // Pass collisionSystem so CruiseManager can do collision-aware pathing
-    this.cruise = new CruiseManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events);
+    // Pass collisionSystem and viewMode so CruiseManager can do collision-aware pathing and mode sync
+    this.cruise = new CruiseManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events, this.viewMode);
     this.panorama = new PanoramaSystem(this.renderer, this.scene, this.camera, this.cameraController, this.events);
 
     // Automotive / Exhibition specialized systems
@@ -83,9 +83,8 @@ export class ShowroomEngine {
     // 4. Render Loop
     this.renderLoop = new RenderLoop((delta) => {
       if (this.cruise.isPlaying) {
-        // During cruise: CruiseManager owns camera position & orientation
+        // During cruise: CruiseManager owns camera position & orientation (Plan A: pure exhibition tour)
         this.cruise.update(delta);
-        this.avatar.update(delta, 2500, false);
       } else {
         // Normal roaming: CameraController advances characterPos & rotation
         this.cameraController.update(delta);

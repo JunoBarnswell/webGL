@@ -71,6 +71,7 @@ export class CruiseControl {
     // Engine event subscriptions
     this.engine.on('cruiseStateChange', ({ isPlaying, progress, speed }) => {
       if (isPlaying) {
+        this.element.classList.add('cruise-active');
         this.mainToggleBtn.classList.add('hidden');
         this.playerPanel.classList.remove('hidden');
         this.playBtn.textContent = '⏸';
@@ -78,10 +79,12 @@ export class CruiseControl {
       } else {
         if (progress === 0) {
           // Stopped
+          this.element.classList.remove('cruise-active');
           this.mainToggleBtn.classList.remove('hidden');
           this.playerPanel.classList.add('hidden');
         } else {
           // Paused
+          this.element.classList.add('cruise-active');
           this.playBtn.textContent = '▶';
           this.statusText.textContent = '巡航已暂停 (按键或继续)';
         }

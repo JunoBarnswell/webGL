@@ -194,10 +194,10 @@ export class CameraController {
 
       if (t >= 1.0) {
         this.isTransitioning = false;
-        // Sync character foot position to end position minus eye height
+        // Sync character foot position to end position minus eye height (1720mm)
         this.characterPos.set(
           this.transitionEndPos.x,
-          this.transitionEndPos.y - 2000,
+          this.transitionEndPos.y - 1720,
           this.transitionEndPos.z
         );
         if (this.onTransitionComplete) {

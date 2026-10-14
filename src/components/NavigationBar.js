@@ -16,6 +16,17 @@ export class NavigationBar {
     this.engine.on('zoneChange', (zone) => {
       this.setActive(zone.key);
     });
+
+    // Smoothly fade out navigation bar during cruise tour, restore when cruise stops/exits
+    this.engine.on('cruiseStateChange', ({ isPlaying, progress }) => {
+      if (isPlaying) {
+        this.element.classList.add('nav-fade-out');
+      } else {
+        if (progress === 0) {
+          this.element.classList.remove('nav-fade-out');
+        }
+      }
+    });
   }
 
   _render() {
