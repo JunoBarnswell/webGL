@@ -33,3 +33,10 @@ dist-ssr
 ._*
 Thumbs.db
 ehthumbs.db
+.local/
+.tools/
+artifacts/
+**/bin/
+**/obj/
+**/wwwroot/
+*.user

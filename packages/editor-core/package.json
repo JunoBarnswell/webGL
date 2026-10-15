@@ -1,0 +1,1 @@
+{"name":"@studio/editor-core","private":true,"type":"module","exports":"./src/EditorSession.ts"}

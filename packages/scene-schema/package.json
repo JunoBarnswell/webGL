@@ -1,0 +1,6 @@
+{
+  "name": "@studio/scene-schema",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}
