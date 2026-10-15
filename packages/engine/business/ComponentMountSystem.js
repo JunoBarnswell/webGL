@@ -11,10 +11,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
  *  - 资源缓存与动态卸载管理
  */
 export class ComponentMountSystem {
-  constructor(scene, camera, events) {
+  constructor(scene, camera, events, resourceRegistry = null) {
     this.scene = scene;
     this.camera = camera;
     this.events = events;
+    this.resourceRegistry = resourceRegistry;
 
     this.loader = new GLTFLoader();
     this._cache = new Map();   // url -> gltfData (原模型克隆源)
@@ -88,6 +89,11 @@ export class ComponentMountSystem {
         }
       }
 
+      // 注册 GPU 资源引用计数，保护共享资源
+      if (this.resourceRegistry) {
+        this.resourceRegistry.retainHierarchy(group);
+      }
+
       this._mounted.set(def.id, {
         def,
         group,
@@ -105,7 +111,7 @@ export class ComponentMountSystem {
   }
 
   /**
-   * 卸载零件并释放网格几何体与材质资源
+   * 卸载零件并安全归还/释放网格几何体与材质资源
    * @param {string} id 
    */
   unmount(id) {
@@ -126,19 +132,12 @@ export class ComponentMountSystem {
       group.parent.remove(group);
     }
 
-    // 释放几何体与材质
-    group.traverse((obj) => {
-      if (obj.isMesh) {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) {
-            obj.material.forEach((m) => m.dispose());
-          } else {
-            obj.material.dispose();
-          }
-        }
-      }
-    });
+    // 通过引用计数安全管理几何体与材质生命周期
+    if (this.resourceRegistry) {
+      this.resourceRegistry.releaseHierarchy(group);
+    } else {
+      // 降级策略：仅当无共享引用时才清理（由外部管理）
+    }
 
     this._mounted.delete(id);
     this.events?.emit('componentUnmounted', { id });

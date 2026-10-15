@@ -58,6 +58,20 @@ export class CameraController {
     this.transitionEndTarget  = new THREE.Vector3();
     this.onTransitionComplete = null;
 
+    // 预分配复用数学对象（避免每帧产生 GC 垃圾回收与堆对象分配）
+    this._moveVector = new THREE.Vector3();
+    this._forwardDir = new THREE.Vector3();
+    this._rightDir = new THREE.Vector3();
+    this._worldMove = new THREE.Vector3();
+    this._deltaMove = new THREE.Vector3();
+    this._testFloorPos = new THREE.Vector3();
+    this._floorRaycaster = new THREE.Raycaster();
+    this._floorRaycaster.near = 1;
+    this._floorRaycaster.far = 8000;
+    this._downDirection = new THREE.Vector3(0, -1, 0);
+    this._curTransitionTarget = new THREE.Vector3();
+    this._dirVec = new THREE.Vector3();
+
     this._bindEvents();
   }
 
@@ -145,11 +159,12 @@ export class CameraController {
    */
   setView(posX, posY, posZ, targetX, targetY, targetZ) {
     this.camera.position.set(posX, posY, posZ);
-    const dir = new THREE.Vector3(
-      targetX - posX, targetY - posY, targetZ - posZ
-    ).normalize();
-    this.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
-    this.yaw   = Math.atan2(-dir.x, -dir.z);
+    this.characterPos.set(posX, posY - 1720, posZ);
+    this._forceFloorCheck = true;
+
+    this._dirVec.set(targetX - posX, targetY - posY, targetZ - posZ).normalize();
+    this.pitch = Math.asin(Math.max(-1, Math.min(1, this._dirVec.y)));
+    this.yaw   = Math.atan2(-this._dirVec.x, -this._dirVec.z);
     this._applyRotation();
   }
 
@@ -165,7 +180,7 @@ export class CameraController {
     this.transitionStartPos.copy(this.camera.position);
     this.transitionEndPos.copy(endPos);
 
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const forward = this._dirVec.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
     this.transitionStartTarget.copy(this.camera.position).add(forward.multiplyScalar(2000));
     this.transitionEndTarget.copy(endTarget);
   }
@@ -184,25 +199,32 @@ export class CameraController {
 
       this.camera.position.lerpVectors(this.transitionStartPos, this.transitionEndPos, ease);
 
-      const curTarget = new THREE.Vector3().lerpVectors(
+      // 同步推进 characterPos，保证过渡过程与结束时与相机保持严格的一致（减去眼高 1720mm）
+      this.characterPos.set(
+        this.camera.position.x,
+        this.camera.position.y - 1720,
+        this.camera.position.z
+      );
+
+      this._curTransitionTarget.lerpVectors(
         this.transitionStartTarget, this.transitionEndTarget, ease
       );
-      const dir = curTarget.clone().sub(this.camera.position).normalize();
-      this.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
-      this.yaw   = Math.atan2(-dir.x, -dir.z);
+      this._dirVec.subVectors(this._curTransitionTarget, this.camera.position).normalize();
+      this.pitch = Math.asin(Math.max(-1, Math.min(1, this._dirVec.y)));
+      this.yaw   = Math.atan2(-this._dirVec.x, -this._dirVec.z);
       this._applyRotation();
 
       if (t >= 1.0) {
         this.isTransitioning = false;
-        // Sync character foot position to end position minus eye height (1720mm)
         this.characterPos.set(
           this.transitionEndPos.x,
           this.transitionEndPos.y - 1720,
           this.transitionEndPos.z
         );
         if (this.onTransitionComplete) {
-          this.onTransitionComplete();
+          const cb = this.onTransitionComplete;
           this.onTransitionComplete = null;
+          cb();
         }
       }
       return;
@@ -210,45 +232,48 @@ export class CameraController {
 
     // ② Keyboard movement
     const speed = this.walkSpeed * (this.keys.sprint ? this.sprintMultiplier : 1.0);
-    const moveVector = new THREE.Vector3();
+    this._moveVector.set(0, 0, 0);
 
-    if (this.keys.forward)  moveVector.z -= 1;
-    if (this.keys.backward) moveVector.z += 1;
-    if (this.keys.left)     moveVector.x -= 1;
-    if (this.keys.right)    moveVector.x += 1;
+    if (this.keys.forward)  this._moveVector.z -= 1;
+    if (this.keys.backward) this._moveVector.z += 1;
+    if (this.keys.left)     this._moveVector.x -= 1;
+    if (this.keys.right)    this._moveVector.x += 1;
 
-    if (moveVector.lengthSq() > 0) {
-      moveVector.normalize();
+    let hasMoved = false;
+
+    if (this._moveVector.lengthSq() > 0) {
+      this._moveVector.normalize();
       this.currentSpeed = speed;
 
       // Project movement onto the horizontal plane using camera yaw only
-      const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-      const right   = new THREE.Vector3( Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+      this._forwardDir.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      this._rightDir.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
-      const worldMove = new THREE.Vector3()
-        .addScaledVector(forward, -moveVector.z)
-        .addScaledVector(right,    moveVector.x)
+      this._worldMove.set(0, 0, 0)
+        .addScaledVector(this._forwardDir, -this._moveVector.z)
+        .addScaledVector(this._rightDir,    this._moveVector.x)
         .normalize();
 
-      this.moveDirectionYaw = Math.atan2(worldMove.x, worldMove.z);
+      this.moveDirectionYaw = Math.atan2(this._worldMove.x, this._worldMove.z);
 
-      const deltaMove = worldMove.clone().multiplyScalar(speed * delta);
-      const safeMove  = this.collisionSystem
-        ? this.collisionSystem.validateMovement(this.characterPos, deltaMove)
-        : deltaMove;
+      this._deltaMove.copy(this._worldMove).multiplyScalar(speed * delta);
+      const safeMove = this.collisionSystem
+        ? this.collisionSystem.validateMovement(this.characterPos, this._deltaMove)
+        : this._deltaMove;
 
       this.characterPos.add(safeMove);
+      hasMoved = true;
     } else {
       this.currentSpeed = 0;
     }
 
     // ③ Floor clamping (keep feet on ground)
-    if (this.collisionSystem) {
-      // getFloorHeight returns floor_Y + EYE_HEIGHT internally; we only want floor Y
-      // characterPos.y tracks floor-level, so request from slightly above
-      const testPos = this.characterPos.clone();
-      testPos.y += 3000;
-      const hits = this._castDown(testPos);
+    // 状态驱动优化：仅在角色发生位移时执行地面射线检测，静止时完全跳过，大幅降低 CPU 开销
+    if (this.collisionSystem && (hasMoved || this._forceFloorCheck)) {
+      this._forceFloorCheck = false;
+      this._testFloorPos.copy(this.characterPos);
+      this._testFloorPos.y += 3000;
+      const hits = this._castDown(this._testFloorPos);
       if (hits !== null) {
         const targetFloorY = hits;
         this.characterPos.y += (targetFloorY - this.characterPos.y) * 0.15;
@@ -256,16 +281,11 @@ export class CameraController {
     }
   }
 
-  /** Cast downward from a point and return floor Y or null */
+  /** Cast downward from a point and return floor Y or null - 复用 Raycaster 消除 GC 内存抖动 */
   _castDown(fromPos) {
     if (!this.collisionSystem || this.collisionSystem.groundObjects.length === 0) return null;
-    const r = new THREE.Raycaster(
-      fromPos.clone(),
-      new THREE.Vector3(0, -1, 0),
-      1,
-      8000
-    );
-    const hits = r.intersectObjects(this.collisionSystem.groundObjects, true);
+    this._floorRaycaster.set(fromPos, this._downDirection);
+    const hits = this._floorRaycaster.intersectObjects(this.collisionSystem.groundObjects, true);
     return hits.length > 0 ? hits[0].point.y : null;
   }
 }

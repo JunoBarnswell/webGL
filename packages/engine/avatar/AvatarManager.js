@@ -160,4 +160,46 @@ export class AvatarManager {
       this.model.rotation.y = this.rotation;
     }
   }
+
+  dispose() {
+    if (this.mixer) {
+      this.mixer.stopAllAction();
+      this.mixer = null;
+    }
+    this.actions.clear();
+    this.animations = [];
+
+    if (this.model) {
+      this.model.traverse((child) => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => {
+                this._disposeMaterialTextures(m);
+                m.dispose();
+              });
+            } else {
+              this._disposeMaterialTextures(child.material);
+              child.material.dispose();
+            }
+          }
+        }
+      });
+      if (this.model.parent) {
+        this.model.parent.remove(this.model);
+      }
+      this.model = null;
+    }
+  }
+
+  _disposeMaterialTextures(mat) {
+    if (!mat) return;
+    for (const key of Object.keys(mat)) {
+      const val = mat[key];
+      if (val && val.isTexture && typeof val.dispose === 'function') {
+        val.dispose();
+      }
+    }
+  }
 }

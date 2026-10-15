@@ -18,6 +18,8 @@ import { PanoramaSystem } from '../business/PanoramaSystem.js';
 import { DisplayModeController } from '../controls/DisplayModeController.js';
 import { HotspotSystem } from '../business/HotspotSystem.js';
 import { ComponentMountSystem } from '../business/ComponentMountSystem.js';
+import { ResourceRegistry } from './ResourceRegistry.js';
+import { PerformanceMonitor } from './PerformanceMonitor.js';
 
 /**
  * ShowroomEngine: Top-level unified facade for the 3D exhibition showroom
@@ -50,6 +52,7 @@ export class ShowroomEngine {
     this._setupLighting();
 
     // 3. Subsystem instances
+    this.resourceRegistry = new ResourceRegistry();
     this.meshLoader = new O2vrMeshLoader();
     this.lightmapManager = new LightmapManager();
     this.envMapManager = new EnvironmentMap();
@@ -75,16 +78,26 @@ export class ShowroomEngine {
     // Automotive / Exhibition specialized systems
     this.displayMode = new DisplayModeController(this.events);
     this.hotspot = new HotspotSystem(this.camera, this.container, this.events);
-    this.componentMount = new ComponentMountSystem(this.scene, this.camera, this.events);
+    this.componentMount = new ComponentMountSystem(this.scene, this.camera, this.events, this.resourceRegistry);
 
     this.artworkManager = null;
     this.meshMap = new Map();
+
+    // 性能遥测监控系统
+    this.perfMonitor = new PerformanceMonitor(this.renderer, {
+      container: this.container,
+      visible: options.showPerf !== undefined ? options.showPerf : true
+    });
 
     // 4. Render Loop
     this.renderLoop = new RenderLoop((delta) => {
       if (this.cruise.isPlaying) {
         // During cruise: CruiseManager owns camera position & orientation (Plan A: pure exhibition tour)
         this.cruise.update(delta);
+      } else if (this.cameraController.isTransitioning) {
+        // 过渡飞行期间：CameraController 拥有相机与角色姿态的绝对控制权，避免被 ViewModeManager 覆盖
+        this.cameraController.update(delta);
+        this.avatar.setPose(this.cameraController.characterPos, this.cameraController.yaw);
       } else {
         // Normal roaming: CameraController advances characterPos & rotation
         this.cameraController.update(delta);
@@ -117,6 +130,9 @@ export class ShowroomEngine {
 
       // Project 3D hotspots to 2D DOM screen space
       this.hotspot.update();
+
+      // 实时遥测更新
+      this.perfMonitor.update();
     });
 
     // 5. Handle Resize
@@ -310,17 +326,76 @@ export class ShowroomEngine {
   dispose() {
     window.removeEventListener('resize', this._onResize);
     this.renderLoop.stop();
+
+    if (this.perfMonitor) {
+      this.perfMonitor.dispose();
+      this.perfMonitor = null;
+    }
+
     this.cameraController.dispose();
+    if (this.viewMode) this.viewMode.dispose();
     if (this.artworkManager) this.artworkManager.dispose();
     this.panorama.dispose();
     this.displayMode.dispose();
     this.hotspot.dispose();
     this.componentMount.dispose();
+    if (this.avatar) this.avatar.dispose();
+
+    // 深度释放场景树中的所有网格几何体、材质与贴图
+    this._disposeHierarchy(this.scene);
+
+    if (this.meshLoader) this.meshLoader.dispose?.();
+    if (this.lightmapManager) this.lightmapManager.dispose?.();
+    if (this.resourceRegistry) this.resourceRegistry.clear();
+
+    this.meshMap.clear();
+
     this.renderer.dispose();
     if (this.renderer.domElement && this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
     this.events.clear();
+  }
+
+  /**
+   * 递归释放 Object3D 节点下的所有 Geometry、Material 以及绑定的 Texture
+   * @private
+   */
+  _disposeHierarchy(root) {
+    if (!root) return;
+    root.traverse((node) => {
+      if (node.isMesh) {
+        if (node.geometry) {
+          node.geometry.dispose();
+        }
+        if (node.material) {
+          if (Array.isArray(node.material)) {
+            node.material.forEach((mat) => this._disposeMaterial(mat));
+          } else {
+            this._disposeMaterial(node.material);
+          }
+        }
+      }
+    });
+
+    while (root.children.length > 0) {
+      root.remove(root.children[0]);
+    }
+  }
+
+  /**
+   * 释放材质及其引用的所有纹理
+   * @private
+   */
+  _disposeMaterial(mat) {
+    if (!mat) return;
+    for (const key of Object.keys(mat)) {
+      const val = mat[key];
+      if (val && val.isTexture && typeof val.dispose === 'function') {
+        val.dispose();
+      }
+    }
+    mat.dispose();
   }
 }
 

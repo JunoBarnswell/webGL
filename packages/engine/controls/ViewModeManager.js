@@ -41,16 +41,29 @@ export class ViewModeManager {
     // Raycaster for SpringArm collision
     this.raycaster = new THREE.Raycaster();
 
+    // 预分配复用数学对象（避免 updateThirdPerson 每帧 GC）
+    this._focus = new THREE.Vector3();
+    this._armDir = new THREE.Vector3();
+    this._idealPos = new THREE.Vector3();
+    this._toIdeal = new THREE.Vector3();
+    this._targetCamPos = new THREE.Vector3();
+
     this.mode = VIEW_MODES.FIRST_PERSON;
     this.avatar?.setVisible(false);
+
+    this._onKeyDown = (e) => {
+      if (e.code === 'KeyV') this.toggle();
+    };
 
     this._bindKeyboard();
   }
 
   _bindKeyboard() {
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyV') this.toggle();
-    });
+    window.addEventListener('keydown', this._onKeyDown);
+  }
+
+  dispose() {
+    window.removeEventListener('keydown', this._onKeyDown);
   }
 
   // ------------------------------------------------------------------
@@ -105,29 +118,28 @@ export class ViewModeManager {
    */
   updateThirdPerson(avatarFeet, charYaw) {
     // Focus point: avatar chest area
-    const focus = avatarFeet.clone();
-    focus.y += this.FOCUS_HEIGHT;
+    this._focus.copy(avatarFeet);
+    this._focus.y += this.FOCUS_HEIGHT;
 
     // Camera arm direction: directly behind the character
-    // We use -yaw because the avatar faces the direction yaw points
-    const armDir = new THREE.Vector3(
-       Math.sin(charYaw),   // x – same formula as CameraController forward
+    this._armDir.set(
+      Math.sin(charYaw),
       0,
-       Math.cos(charYaw)    // z
+      Math.cos(charYaw)
     ).normalize();
 
     // Ideal camera position: behind and above
-    const idealPos = avatarFeet.clone();
-    idealPos.x += armDir.x * this.ARM_DISTANCE;
-    idealPos.z += armDir.z * this.ARM_DISTANCE;
-    idealPos.y  = avatarFeet.y + this.ARM_HEIGHT;
+    this._idealPos.copy(avatarFeet);
+    this._idealPos.x += this._armDir.x * this.ARM_DISTANCE;
+    this._idealPos.z += this._armDir.z * this.ARM_DISTANCE;
+    this._idealPos.y  = avatarFeet.y + this.ARM_HEIGHT;
 
     // SpringArm: cast from focus outward toward ideal camera to find wall
-    const toIdeal = idealPos.clone().sub(focus).normalize();
+    this._toIdeal.subVectors(this._idealPos, this._focus).normalize();
     let safeDist = this.ARM_DISTANCE;
 
     if (this.collisionSystem?.colliObjects?.length > 0) {
-      this.raycaster.set(focus, toIdeal);
+      this.raycaster.set(this._focus, this._toIdeal);
       this.raycaster.near = 100;
       this.raycaster.far  = this.ARM_DISTANCE + 500;
       const hits = this.raycaster.intersectObjects(this.collisionSystem.colliObjects, true);
@@ -141,15 +153,14 @@ export class ViewModeManager {
     this.currentArmDist += (safeDist - this.currentArmDist) * 0.15;
 
     // Final camera position along the arm
-    const targetCamPos = focus.clone().addScaledVector(toIdeal, this.currentArmDist);
-    targetCamPos.y = idealPos.y; // keep height constant
+    this._targetCamPos.copy(this._focus).addScaledVector(this._toIdeal, this.currentArmDist);
+    this._targetCamPos.y = this._idealPos.y; // keep height constant
 
     // Lerp camera position for silky smoothness
-    const alpha = 1 - Math.pow(1 - this.ARM_SMOOTH, 1); // each frame
-    this.camera.position.lerp(targetCamPos, 0.15);
+    this.camera.position.lerp(this._targetCamPos, 0.15);
 
     // Always look at focus
-    this.camera.lookAt(focus);
+    this.camera.lookAt(this._focus);
   }
 
   // Immediately snap the third-person camera without lerp (on mode switch)
@@ -158,16 +169,15 @@ export class ViewModeManager {
     const charPos = this.controller.characterPos;
     const yaw = this.controller.yaw;
 
-    const focus = charPos.clone();
-    focus.y += this.FOCUS_HEIGHT;
+    this._focus.copy(charPos);
+    this._focus.y += this.FOCUS_HEIGHT;
 
-    const armDir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-    const snapPos = charPos.clone()
-      .addScaledVector(armDir, this.ARM_DISTANCE);
-    snapPos.y = charPos.y + this.ARM_HEIGHT;
+    this._armDir.set(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+    this._targetCamPos.copy(charPos).addScaledVector(this._armDir, this.ARM_DISTANCE);
+    this._targetCamPos.y = charPos.y + this.ARM_HEIGHT;
 
-    this.camera.position.copy(snapPos);
-    this.camera.lookAt(focus);
+    this.camera.position.copy(this._targetCamPos);
+    this.camera.lookAt(this._focus);
     this.currentArmDist = this.ARM_DISTANCE;
   }
 }

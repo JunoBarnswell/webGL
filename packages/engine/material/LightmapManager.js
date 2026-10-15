@@ -64,4 +64,13 @@ export class LightmapManager {
       material.needsUpdate = true;
     }
   }
+
+  dispose() {
+    for (const [, texture] of this.cache) {
+      if (texture && typeof texture.dispose === 'function') {
+        texture.dispose();
+      }
+    }
+    this.cache.clear();
+  }
 }

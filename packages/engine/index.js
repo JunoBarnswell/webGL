@@ -23,3 +23,5 @@ export { MathUtils, frameIndependentAlpha, smoothstep, normalizeAngleDiff } from
 export { DisplayModeController } from './controls/DisplayModeController.js';
 export { HotspotSystem } from './business/HotspotSystem.js';
 export { ComponentMountSystem } from './business/ComponentMountSystem.js';
+export { ResourceRegistry } from './core/ResourceRegistry.js';
+export { PerformanceMonitor } from './core/PerformanceMonitor.js';

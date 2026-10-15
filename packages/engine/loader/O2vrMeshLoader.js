@@ -143,14 +143,23 @@ export class O2vrMeshLoader extends BaseMeshLoader {
   }
 
   /**
-   * Cached load from URL
+   * Cached load from URL - 直接返回共享几何体实例，消除无意义的 CPU 内存克隆开销
    */
   async load(url) {
     if (this.cache.has(url)) {
-      return this.cache.get(url).clone();
+      return this.cache.get(url);
     }
     const geometry = await super.load(url);
     this.cache.set(url, geometry);
-    return geometry.clone();
+    return geometry;
+  }
+
+  dispose() {
+    for (const [, geom] of this.cache) {
+      if (geom && typeof geom.dispose === 'function') {
+        geom.dispose();
+      }
+    }
+    this.cache.clear();
   }
 }
