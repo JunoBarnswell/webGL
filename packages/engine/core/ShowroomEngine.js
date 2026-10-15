@@ -1,457 +1,64 @@
 import * as THREE from 'three';
-import { EventEmitter } from './EventEmitter.js';
-import { RenderLoop } from './RenderLoop.js';
 import { FrameScheduler } from './FrameScheduler.js';
-import { O2vrMeshLoader } from '../loader/O2vrMeshLoader.js';
-import { SceneParser } from '../loader/SceneParser.js';
-import { LightmapManager } from '../material/LightmapManager.js';
-import { EnvironmentMap } from '../material/EnvironmentMap.js';
-import { MaterialFactory } from '../material/MaterialFactory.js';
-import { CollisionSystem } from '../controls/CollisionSystem.js';
-import { CameraController } from '../controls/CameraController.js';
-import { ArtworkManager } from '../business/ArtworkManager.js';
-import { ZoneGuideManager } from '../business/ZoneGuideManager.js';
-import { AudioSystem } from '../business/AudioSystem.js';
-import { AvatarManager } from '../avatar/AvatarManager.js';
-import { ViewModeManager, VIEW_MODES } from '../controls/ViewModeManager.js';
-import { CruiseManager } from '../business/CruiseManager.js';
-import { PanoramaSystem } from '../business/PanoramaSystem.js';
-import { DisplayModeController } from '../controls/DisplayModeController.js';
-import { HotspotSystem } from '../business/HotspotSystem.js';
-import { ComponentMountSystem } from '../business/ComponentMountSystem.js';
-import { ResourceRegistry } from './ResourceRegistry.js';
-import { PerformanceMonitor } from './PerformanceMonitor.js';
 import { AdaptiveQuality } from './AdaptiveQuality.js';
+import { PerformanceMonitor } from './PerformanceMonitor.js';
+import { ResourceRegistry } from './ResourceRegistry.js';
 
-/**
- * ShowroomEngine: Top-level unified facade for the 3D exhibition showroom
- */
+/** Device owner. Scene documents and all business semantics belong to SceneRuntime. */
 export class ShowroomEngine {
-  constructor(options = {}) {
-    this.container = options.container || document.body;
-    this.events = new EventEmitter();
-
-    // 1. Core Three.js setup
+  constructor({ container }) {
+    this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(options.backgroundColor || 0x111317);
-
-    const aspect = this.container.clientWidth / this.container.clientHeight || 1;
-    this.camera = new THREE.PerspectiveCamera(options.fov || 60, aspect, 10, options.maxDistance || 30000);
-    this.camera.position.set(-1846, 2000, 726); // Default entrance position
-
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: options.antialias !== undefined ? options.antialias : true,
-      powerPreference: 'high-performance'
-    });
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.camera = new THREE.PerspectiveCamera(60, 1, 10, 35000);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.container.appendChild(this.renderer.domElement);
-
-    // 2. Ambient & Directional Lighting
-    this._setupLighting();
-
-    // 3. Subsystem instances
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.domElement.tabIndex = 0;
+    this.renderer.domElement.setAttribute('aria-label', '三维场景视口');
+    container.appendChild(this.renderer.domElement);
     this.resourceRegistry = new ResourceRegistry();
-    this.meshLoader = new O2vrMeshLoader();
-    this.lightmapManager = new LightmapManager();
-    this.envMapManager = new EnvironmentMap();
-    this.materialFactory = new MaterialFactory(this.lightmapManager, this.envMapManager);
-    this.sceneParser = new SceneParser(this.meshLoader, this.materialFactory);
-
-    this.collisionSystem = new CollisionSystem();
-    if (options.collision !== undefined) {
-      this.collisionSystem.enabled = options.collision;
-    }
-
-    this.cameraController = new CameraController(this.camera, this.renderer.domElement, this.collisionSystem);
-    this.zoneGuide = new ZoneGuideManager(this.cameraController, this.events);
-    this.audio = new AudioSystem(options.bgmUrl || '', this.events);
-
-    // Advanced features: Avatar, ViewMode, Cruise, Panorama
-    this.avatar = new AvatarManager(this.scene);
-    this.viewMode = new ViewModeManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events);
-    // Pass collisionSystem and viewMode so CruiseManager can do collision-aware pathing and mode sync
-    this.cruise = new CruiseManager(this.camera, this.avatar, this.cameraController, this.collisionSystem, this.events, this.viewMode);
-    this.panorama = new PanoramaSystem(this.renderer, this.scene, this.camera, this.cameraController, this.events);
-
-    // Automotive / Exhibition specialized systems
-    this.displayMode = new DisplayModeController(this.events);
-    this.hotspot = new HotspotSystem(this.camera, this.container, this.events);
-    this.componentMount = new ComponentMountSystem(this.scene, this.camera, this.events, this.resourceRegistry);
-
-    this.artworkManager = null;
-    this.meshMap = new Map();
-
-    // 性能遥测监控系统
-    this.perfMonitor = new PerformanceMonitor(this.renderer, {
-      container: this.container,
-      visible: options.showPerf !== undefined ? options.showPerf : true
-    });
-
-    // 自适应渲染画质管理系统 (动态 Pixel Ratio 调节)
-    this.adaptiveQuality = new AdaptiveQuality(this.renderer, {
-      enabled: options.adaptiveQuality !== undefined ? options.adaptiveQuality : true
-    });
-
-    // 4. FrameScheduler (引擎级脏标记与按需渲染帧调度器)
-    this._lastCameraPos = new THREE.Vector3();
-    this._lastCameraQuat = new THREE.Quaternion();
-
+    this.updates = new Set();
+    this.renders = new Set();
+    this.adaptiveQuality = new AdaptiveQuality(this.renderer);
+    this.perfMonitor = new PerformanceMonitor(this.renderer,{container,visible:false});
     this.frameScheduler = new FrameScheduler({
-      onUpdate: (delta) => {
-        let hasActivity = false;
-
-        if (this.cruise.isPlaying) {
-          // 巡航模式：CruiseManager 拥有相机与角色位姿
-          this.cruise.update(delta);
-          hasActivity = true;
-        } else if (this.cameraController.isTransitioning) {
-          // 过渡飞行期间：CameraController 拥有相机与角色姿态的绝对控制权
-          this.cameraController.update(delta);
-          this.avatar.setPose(this.cameraController.characterPos, this.cameraController.yaw);
-          hasActivity = true;
-        } else {
-          // 正常漫游
-          this.cameraController.update(delta);
-
-          const avatarTargetYaw = this.cameraController.currentSpeed > 0
-            ? this.cameraController.moveDirectionYaw
-            : this.cameraController.yaw;
-
-          this.avatar.setPose(this.cameraController.characterPos, avatarTargetYaw);
-          this.avatar.update(delta, this.cameraController.currentSpeed, this.cameraController.keys.sprint);
-
-          if (this.viewMode.mode === VIEW_MODES.THIRD_PERSON) {
-            this.viewMode.updateThirdPerson(
-              this.cameraController.characterPos,
-              this.cameraController.yaw,
-              delta
-            );
-          } else {
-            this.viewMode.updateFirstPerson(this.cameraController.characterPos);
-          }
-
-          if (this.cameraController.currentSpeed > 0 || this.cameraController.isDragging) {
-            hasActivity = true;
-          }
-        }
-
-        // 检查相机位置或旋转是否发生位移变化
-        if (this.camera.position.distanceToSquared(this._lastCameraPos) > 1e-4 ||
-            Math.abs(this.camera.quaternion.dot(this._lastCameraQuat) - 1.0) > 1e-5) {
-          this._lastCameraPos.copy(this.camera.position);
-          this._lastCameraQuat.copy(this.camera.quaternion);
-          hasActivity = true;
-        }
-
-        // 推进动态零部件装配/拆解动画
-        if (this.componentMount.mixers.length > 0) {
-          this.componentMount.update(delta);
-          hasActivity = true;
-        }
-
-        return hasActivity;
+      onUpdate: delta => {
+        let active = false;
+        for (const update of this.updates) active = update(delta) || active;
+        return active;
       },
-      onRender: (delta) => {
+      onRender: () => {
         this.renderer.render(this.scene, this.camera);
-        this.hotspot.update();
-        this.perfMonitor.update();
+        for (const callback of this.renders) callback();
         this.adaptiveQuality.update(this.frameScheduler.fps);
+        this.perfMonitor.update();
       }
-    }, {
-      onDemand: options.onDemand !== undefined ? options.onDemand : true
     });
-
-    // 保持向后兼容 API
-    this.renderLoop = this.frameScheduler;
-
-    // 5. 事件唤醒监听（在用户交互时立即置位脏标记唤醒渲染管线）
-    this._wakeUpScheduler = () => this.frameScheduler.markDirty(5);
-    window.addEventListener('keydown', this._wakeUpScheduler);
-    this.container.addEventListener('pointerdown', this._wakeUpScheduler);
-    this.container.addEventListener('pointermove', this._wakeUpScheduler);
-    this.container.addEventListener('wheel', this._wakeUpScheduler, { passive: true });
-
-    // 6. Handle Resize
-    this._onResize = this._onResize.bind(this);
-    window.addEventListener('resize', this._onResize);
-
+    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver.observe(container);
+    this.resize();
     this.frameScheduler.start();
   }
-
-  /**
-   * 外部显式触发重绘（脏标记唤醒）
-   * @param {number} [frames=3]
-   */
-  requestRender(frames = 3) {
-    this.frameScheduler?.markDirty(frames);
-  }
-
-  _setupLighting() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-    this.scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xfff6ea, 0.5);
-    dirLight.position.set(5000, 10000, 5000);
-    this.scene.add(dirLight);
-  }
-
-  _onResize() {
-    if (!this.container || !this.renderer) return;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+  resize() {
+    const width = Math.max(1, this.container.clientWidth);
+    const height = Math.max(1, this.container.clientHeight);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.requestRender();
   }
-
-  /**
-   * Load entire showroom scene, avatar model and optional artwork manifest
-   */
-  async loadScene({ sceneUrl, baseUrl = '', manifestUrl = '', avatarUrl = '/model/avatar/character.glb' }) {
-    this.sceneParser.setBaseUrl(baseUrl);
-    this.lightmapManager.setBaseUrl(baseUrl);
-    this.envMapManager.setBaseUrl(baseUrl);
-    this.materialFactory.setBaseUrl(baseUrl);
-
-    this.events.emit('loadStart');
-
-    // 1. Parse and load 3D showroom scene
-    const { root, colliObjects, groundObjects, meshMap } = await this.sceneParser.parse(
-      sceneUrl,
-      (percent, loaded, total) => {
-        this.events.emit('progress', { percent, loaded, total });
-      }
-    );
-
-    this.meshMap = meshMap;
-    this.scene.add(root);
-
-    // Auto-register display mode layers (exterior shell vs interior chassis)
-    this.displayMode.autoRegisterFromScene(root);
-
-    // Setup collision and floor clamping
-    this.collisionSystem.setColliObjects(colliObjects);
-    this.collisionSystem.setGroundObjects(groundObjects);
-
-    // 2. Configure 3D Character Avatar (Lazy loaded on 3rd-person switch, saving ~2.93MB on initial load)
-    if (avatarUrl) {
-      this.avatar.setAvatarUrl(avatarUrl);
-      this.viewMode.setMode(VIEW_MODES.FIRST_PERSON);
-    }
-
-    // 3. Initialize ArtworkManager for dynamic mounting and raycast interactions
-    this.artworkManager = new ArtworkManager(this.meshMap, this.camera, this.renderer.domElement, this.events);
-
-    // 4. Load artwork manifest if provided
-    if (manifestUrl) {
-      try {
-        const res = await fetch(manifestUrl);
-        if (res.ok) {
-          const manifest = await res.json();
-          await this.artworkManager.loadManifest(manifest);
-        }
-      } catch (err) {
-        console.warn('Failed to load artwork manifest:', err);
-      }
-    }
-
-    this.events.emit('loadComplete');
-  }
-
-  // --- Public APIs ---
-
-  on(event, handler) {
-    return this.events.on(event, handler);
-  }
-
-  off(event, handler) {
-    this.events.off(event, handler);
-  }
-
-  flyToZone(zoneKey) {
-    this.zoneGuide.flyToZone(zoneKey);
-  }
-
-  getAllZones() {
-    return this.zoneGuide.getAllZones();
-  }
-
-  setCollision(enabled) {
-    this.collisionSystem.enabled = enabled;
-  }
-
-  toggleAudio() {
-    this.audio.toggle();
-  }
-
-  // View Mode API
-  toggleViewMode() {
-    this.viewMode.toggle();
-  }
-
-  getViewMode() {
-    return this.viewMode.mode;
-  }
-
-  // Cruise API
-  startCruise() {
-    this.cruise.start();
-  }
-
-  pauseCruise() {
-    this.cruise.pause();
-  }
-
-  toggleCruise() {
-    this.cruise.toggle();
-  }
-
-  setCruiseSpeed(speed) {
-    this.cruise.setSpeed(speed);
-  }
-
-  seekCruise(progress) {
-    this.cruise.seek(progress);
-  }
-
-  // 720 Panorama API
-  togglePanorama() {
-    this.panorama.togglePanoramaMode();
-  }
-
-  export720Panorama(width = 2048, height = 1024) {
-    return this.panorama.export720Snapshot(width, height);
-  }
-
-  // Display Mode (Immersive / Schematic X-Ray) API
-  toggleDisplayMode() {
-    this.displayMode.toggle();
-  }
-
-  setDisplayMode(mode) {
-    this.displayMode.setMode(mode);
-  }
-
-  getDisplayMode() {
-    return this.displayMode.mode;
-  }
-
-  // Hotspot API
-  addHotspot(hotspotDef) {
-    this.hotspot.add(hotspotDef);
-  }
-
-  removeHotspot(id) {
-    this.hotspot.remove(id);
-  }
-
-  clearHotspots() {
-    this.hotspot.clear();
-  }
-
-  // Component Mount API (Streaming glTF loading & assembly)
-  async mountComponent(componentDef, parentObject = null) {
-    return this.componentMount.mount(componentDef, parentObject);
-  }
-
-  unmountComponent(id) {
-    this.componentMount.unmount(id);
-  }
-
-  playComponentAnimation(id, animationIndex = 0) {
-    this.componentMount.playAnimation(id, animationIndex);
-  }
-
+  requestRender(frames = 3) { this.frameScheduler.markDirty(frames); }
+  onUpdate(callback) { this.updates.add(callback); return () => this.updates.delete(callback); }
+  onRender(callback) { this.renders.add(callback); return () => this.renders.delete(callback); }
   dispose() {
-    window.removeEventListener('resize', this._onResize);
-    if (this._wakeUpScheduler) {
-      window.removeEventListener('keydown', this._wakeUpScheduler);
-      this.container.removeEventListener('pointerdown', this._wakeUpScheduler);
-      this.container.removeEventListener('pointermove', this._wakeUpScheduler);
-      this.container.removeEventListener('wheel', this._wakeUpScheduler);
-    }
-
-    if (this.frameScheduler) {
-      this.frameScheduler.dispose();
-    }
-
-    if (this.perfMonitor) {
-      this.perfMonitor.dispose();
-      this.perfMonitor = null;
-    }
-
-    if (this.adaptiveQuality) {
-      this.adaptiveQuality.dispose();
-    }
-
-    this.cameraController.dispose();
-    if (this.viewMode) this.viewMode.dispose();
-    if (this.artworkManager) this.artworkManager.dispose();
-    this.panorama.dispose();
-    this.displayMode.dispose();
-    this.hotspot.dispose();
-    this.componentMount.dispose();
-    if (this.avatar) this.avatar.dispose();
-
-    // 深度释放场景树中的所有网格几何体、材质与贴图
-    this._disposeHierarchy(this.scene);
-
-    if (this.meshLoader) this.meshLoader.dispose?.();
-    if (this.lightmapManager) this.lightmapManager.dispose?.();
-    if (this.resourceRegistry) this.resourceRegistry.clear();
-
-    this.meshMap.clear();
-
+    this.resizeObserver.disconnect();
+    this.frameScheduler.dispose();
+    this.updates.clear(); this.renders.clear();
+    this.perfMonitor.dispose();
+    this.resourceRegistry.clear();
     this.renderer.dispose();
-    if (this.renderer.domElement && this.renderer.domElement.parentNode) {
-      this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
-    }
-    this.events.clear();
-  }
-
-  /**
-   * 递归释放 Object3D 节点下的所有 Geometry、Material 以及绑定的 Texture
-   * @private
-   */
-  _disposeHierarchy(root) {
-    if (!root) return;
-    root.traverse((node) => {
-      if (node.isMesh) {
-        if (node.geometry) {
-          node.geometry.dispose();
-        }
-        if (node.material) {
-          if (Array.isArray(node.material)) {
-            node.material.forEach((mat) => this._disposeMaterial(mat));
-          } else {
-            this._disposeMaterial(node.material);
-          }
-        }
-      }
-    });
-
-    while (root.children.length > 0) {
-      root.remove(root.children[0]);
-    }
-  }
-
-  /**
-   * 释放材质及其引用的所有纹理
-   * @private
-   */
-  _disposeMaterial(mat) {
-    if (!mat) return;
-    for (const key of Object.keys(mat)) {
-      const val = mat[key];
-      if (val && val.isTexture && typeof val.dispose === 'function') {
-        val.dispose();
-      }
-    }
-    mat.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer.domElement.remove();
   }
 }
-

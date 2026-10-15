@@ -45,10 +45,10 @@ export class PerformanceMonitor {
     this.domElement = document.createElement('div');
     this.domElement.id = 'perf-monitor-hud';
     Object.assign(this.domElement.style, {
-      position: 'fixed',
-      top: '12px',
+      position: 'absolute',
+      top: '57px',
       left: '12px',
-      zIndex: '99999',
+      zIndex: '12',
       backgroundColor: 'rgba(15, 23, 42, 0.85)',
       backdropFilter: 'blur(8px)',
       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -67,7 +67,7 @@ export class PerformanceMonitor {
 
     this.domElement.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; font-weight:600;">
-        <span style="color:#38bdf8;">⚡ ENGINE TELEMETRY</span>
+        <span style="color:#38bdf8;">性能统计</span>
         <span style="font-size:9px; color:#94a3b8;">F2 / ~ 开关</span>
       </div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px 12px;">
@@ -86,6 +86,7 @@ export class PerformanceMonitor {
   }
 
   _onKeyDown(e) {
+    if (['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName) || e.target?.isContentEditable) return;
     if (e.key === 'F2' || e.key === '`') {
       this.toggle();
     }

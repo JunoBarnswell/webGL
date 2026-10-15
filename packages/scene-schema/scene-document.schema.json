@@ -272,8 +272,7 @@
             "type": "array",
             "items": {
               "$ref": "#/$defs/action"
-            },
-            "minItems": 1
+            }
           }
         },
         "required": [
@@ -375,7 +374,7 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 0.000001
+                  "minimum": 1e-06
                 }
               },
               "required": [
@@ -471,7 +470,8 @@
                   "type": "string",
                   "title": "颜色",
                   "default": "#48cbb8",
-                  "x-editor": "color"
+                  "x-editor": "color",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
                 },
                 "content": {
                   "type": "string",
@@ -777,7 +777,8 @@
                   "type": "string",
                   "title": "颜色",
                   "default": "#ffffff",
-                  "x-editor": "color"
+                  "x-editor": "color",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
                 },
                 "intensity": {
                   "type": "number",
@@ -910,7 +911,7 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 0.000001
+                  "minimum": 1e-06
                 },
                 "idleClip": {
                   "type": "string",
@@ -1072,6 +1073,50 @@
                   "type": "boolean",
                   "title": "自动巡航",
                   "default": false
+                },
+                "stops": {
+                  "type": "array",
+                  "title": "沿线停靠",
+                  "default": [],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "progress": {
+                        "type": "number",
+                        "title": "路径进度",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0
+                      },
+                      "duration": {
+                        "type": "number",
+                        "title": "停靠秒数",
+                        "minimum": 0,
+                        "default": 3
+                      },
+                      "target": {
+                        "type": "array",
+                        "title": "观察目标",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "default": [
+                          0,
+                          2000,
+                          0
+                        ],
+                        "x-editor": "vector"
+                      }
+                    },
+                    "required": [
+                      "progress",
+                      "duration",
+                      "target"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -1079,7 +1124,8 @@
                 "closed",
                 "duration",
                 "speed",
-                "autoplay"
+                "autoplay",
+                "stops"
               ]
             }
           },
@@ -1221,12 +1267,28 @@
                   "default": 1024,
                   "minimum": 128,
                   "maximum": 4096
+                },
+                "position": {
+                  "type": "array",
+                  "title": "观察位置",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    0,
+                    2000,
+                    0
+                  ],
+                  "x-editor": "vector"
                 }
               },
               "required": [
                 "fov",
                 "width",
-                "height"
+                "height",
+                "position"
               ]
             }
           },
@@ -1720,6 +1782,33 @@
             "data"
           ],
           "title": "进入全景"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "PauseAnimation"
+            },
+            "targetId": {
+              "type": "string",
+              "title": "目标对象",
+              "default": "",
+              "x-reference": "entity"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "type",
+            "targetId",
+            "data"
+          ],
+          "title": "暂停动画"
         }
       ]
     },
@@ -1751,19 +1840,22 @@
           "type": "string",
           "title": "颜色",
           "default": "#ffffff",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "specular": {
           "type": "string",
           "title": "高光颜色",
           "default": "#111111",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "emissive": {
           "type": "string",
           "title": "自发光颜色",
           "default": "#000000",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "opacity": {
           "type": "number",
@@ -2441,6 +2533,156 @@
                 "flipY",
                 "colorSpace"
               ]
+            },
+            "roughnessMap": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "title": "纹理",
+                  "default": "",
+                  "x-reference": "asset"
+                },
+                "offset": {
+                  "type": "array",
+                  "title": "UV 偏移",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "default": [
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector"
+                },
+                "repeat": {
+                  "type": "array",
+                  "title": "UV 重复",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "default": [
+                    1,
+                    1
+                  ],
+                  "x-editor": "vector"
+                },
+                "rotation": {
+                  "type": "number",
+                  "title": "UV 旋转",
+                  "default": 0
+                },
+                "channel": {
+                  "type": "integer",
+                  "title": "UV 通道",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flipY": {
+                  "type": "boolean",
+                  "title": "翻转 Y",
+                  "default": true
+                },
+                "colorSpace": {
+                  "type": "string",
+                  "title": "色彩空间",
+                  "default": "srgb",
+                  "enum": [
+                    "srgb",
+                    "linear"
+                  ]
+                }
+              },
+              "required": [
+                "assetId",
+                "offset",
+                "repeat",
+                "rotation",
+                "channel",
+                "flipY",
+                "colorSpace"
+              ]
+            },
+            "metalnessMap": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "title": "纹理",
+                  "default": "",
+                  "x-reference": "asset"
+                },
+                "offset": {
+                  "type": "array",
+                  "title": "UV 偏移",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "default": [
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector"
+                },
+                "repeat": {
+                  "type": "array",
+                  "title": "UV 重复",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "default": [
+                    1,
+                    1
+                  ],
+                  "x-editor": "vector"
+                },
+                "rotation": {
+                  "type": "number",
+                  "title": "UV 旋转",
+                  "default": 0
+                },
+                "channel": {
+                  "type": "integer",
+                  "title": "UV 通道",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flipY": {
+                  "type": "boolean",
+                  "title": "翻转 Y",
+                  "default": true
+                },
+                "colorSpace": {
+                  "type": "string",
+                  "title": "色彩空间",
+                  "default": "srgb",
+                  "enum": [
+                    "srgb",
+                    "linear"
+                  ]
+                }
+              },
+              "required": [
+                "assetId",
+                "offset",
+                "repeat",
+                "rotation",
+                "channel",
+                "flipY",
+                "colorSpace"
+              ]
             }
           },
           "default": {}
@@ -2488,7 +2730,8 @@
           "type": "string",
           "title": "背景",
           "default": "#111317",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "exposure": {
           "type": "number",
@@ -2583,7 +2826,8 @@
           "type": "string",
           "title": "环境光颜色",
           "default": "#ffffff",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "ambientIntensity": {
           "type": "number",
@@ -2596,7 +2840,8 @@
           "type": "string",
           "title": "方向光颜色",
           "default": "#fff6ea",
-          "x-editor": "color"
+          "x-editor": "color",
+          "pattern": "^#[a-fA-F0-9]{6}$"
         },
         "sunIntensity": {
           "type": "number",
@@ -2634,6 +2879,71 @@
           "type": "boolean",
           "title": "性能面板",
           "default": false
+        },
+        "environmentAssetIds": {
+          "type": "array",
+          "title": "环境立方体六面资源",
+          "items": {
+            "type": "string",
+            "x-reference": "asset"
+          },
+          "default": []
+        },
+        "sprintMultiplier": {
+          "type": "number",
+          "title": "加速倍率",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "lookSensitivity": {
+          "type": "number",
+          "title": "观察灵敏度",
+          "default": 0.0025,
+          "minimum": 0.0001,
+          "maximum": 0.05
+        },
+        "pitchLimit": {
+          "type": "number",
+          "title": "俯仰角限制 °",
+          "default": 79.2,
+          "minimum": 1,
+          "maximum": 89
+        },
+        "thirdPersonDistance": {
+          "type": "number",
+          "title": "第三人称距离 mm",
+          "default": 3200,
+          "minimum": 100,
+          "maximum": 20000
+        },
+        "thirdPersonHeight": {
+          "type": "number",
+          "title": "第三人称高度 mm",
+          "default": 1850,
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "thirdPersonFocusHeight": {
+          "type": "number",
+          "title": "第三人称注视高度 mm",
+          "default": 1350,
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "thirdPersonMinDistance": {
+          "type": "number",
+          "title": "相机最小避障距离 mm",
+          "default": 600,
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "thirdPersonSmoothing": {
+          "type": "number",
+          "title": "相机跟随系数",
+          "default": 0.12,
+          "minimum": 0.01,
+          "maximum": 1
         }
       },
       "required": [
@@ -2656,7 +2966,16 @@
         "sunPosition",
         "onDemand",
         "adaptiveQuality",
-        "showStats"
+        "showStats",
+        "environmentAssetIds",
+        "sprintMultiplier",
+        "lookSensitivity",
+        "pitchLimit",
+        "thirdPersonDistance",
+        "thirdPersonHeight",
+        "thirdPersonFocusHeight",
+        "thirdPersonMinDistance",
+        "thirdPersonSmoothing"
       ]
     }
   }

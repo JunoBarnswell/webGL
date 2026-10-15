@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <AssemblyName>Studio.Api</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SqlSugarCoreNoDrive.Aot" Version="5.1.4.186" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
+    <RdXmlFile Include="rd.xml" />
+    <EmbeddedResource Include="../../packages/scene-schema/scene-document.schema.json" LogicalName="scene-document.schema.json" />
+    <Content Include="../migrations/*.sql" Link="migrations/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

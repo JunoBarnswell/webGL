@@ -1,0 +1,47 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using SqlSugar;
+
+namespace Studio;
+
+public record LoginRequest(string Username, string Password);
+public record LoginResponse(string Token, long ExpiresAt);
+public record TokenClaims(string Sub, string Iss, string Aud, long Exp);
+public record ProjectRequest(string Name, JsonElement Document);
+public record SaveRequest(long ExpectedRevision, JsonElement Document);
+public record RevisionRequest(long ExpectedRevision);
+public record DraftResponse(string ProjectId, string SceneId, long Revision, JsonElement Document, string? PublishedVersionId);
+public record ProjectResponse(string Id, string Name, string SceneId, long Revision, string? PublishedVersionId, string UpdatedAt);
+public record AssetResponse(string Id, string Name, string Kind, string Entry, string[] Files, string Sha256);
+public record AssetStatusResponse(AssetResponse Asset, string Status);
+public record VersionResponse(string Id, string SceneId, string CreatedAt, bool Published);
+public record ManifestResponse(int FormatVersion, string VersionId, string PublishedAt, JsonElement Document);
+public record PublishResponse(string VersionId, string PlayerUrl);
+public record HealthResponse(string Status, string Platform, string Storage);
+public record ErrorResponse(string Error, string[] Details);
+
+[SugarTable("Projects")]
+public class ProjectRow { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public string CreatedAt { get; set; } = ""; }
+[SugarTable("Scenes")]
+public class SceneRow { public string Id { get; set; } = ""; public string ProjectId { get; set; } = ""; public long Revision { get; set; } public string Document { get; set; } = ""; public string? PublishedVersionId { get; set; } public string UpdatedAt { get; set; } = ""; }
+[SugarTable("Assets")]
+public class AssetRow { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public string Kind { get; set; } = ""; public string Entry { get; set; } = ""; public string FilesJson { get; set; } = ""; public string Sha256 { get; set; } = ""; public string Status { get; set; } = ""; public string CreatedAt { get; set; } = ""; }
+[SugarTable("Versions")]
+public class VersionRow { public string Id { get; set; } = ""; public string SceneId { get; set; } = ""; public string Document { get; set; } = ""; public string ManifestKey { get; set; } = ""; public string CreatedAt { get; set; } = ""; public bool Published { get; set; } }
+public class CountRow { public int Value { get; set; } }
+public class IdRow { public string Id { get; set; } = ""; }
+public class ProjectListRow { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public string SceneId { get; set; } = ""; public long Revision { get; set; } public string? PublishedVersionId { get; set; } public string UpdatedAt { get; set; } = ""; }
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(LoginRequest))][JsonSerializable(typeof(LoginResponse))][JsonSerializable(typeof(TokenClaims))]
+[JsonSerializable(typeof(ProjectRequest))][JsonSerializable(typeof(SaveRequest))][JsonSerializable(typeof(RevisionRequest))]
+[JsonSerializable(typeof(DraftResponse))][JsonSerializable(typeof(ProjectResponse[]))]
+[JsonSerializable(typeof(AssetResponse))][JsonSerializable(typeof(AssetResponse[]))][JsonSerializable(typeof(AssetStatusResponse[]))]
+[JsonSerializable(typeof(VersionResponse))][JsonSerializable(typeof(VersionResponse[]))]
+[JsonSerializable(typeof(ManifestResponse))][JsonSerializable(typeof(PublishResponse))]
+[JsonSerializable(typeof(HealthResponse))][JsonSerializable(typeof(ErrorResponse))]
+[JsonSerializable(typeof(JsonElement))][JsonSerializable(typeof(string[]))]
+public partial class ApiJson : JsonSerializerContext { }
+
+public sealed class ApiException(int status, string message, params string[] details) : Exception(message)
+{ public int Status { get; } = status; public string[] Details { get; } = details; }

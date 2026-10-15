@@ -2,6 +2,7 @@ import { assertDocument, type ChangeSet, type SceneDocument } from '@studio/scen
 
 export interface EditorCommand { label: string; mutate(document: SceneDocument): void }
 interface HistoryEntry { label: string; before: SceneDocument; after: SceneDocument }
+function freeze<T>(value:T):T { if(value && typeof value==='object'){Object.freeze(value);for(const child of Object.values(value)) freeze(child);}return value; }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export function changesBetween(before: SceneDocument, after: SceneDocument): ChangeSet {
@@ -18,7 +19,7 @@ export class EditorSession {
   private undoEntries: HistoryEntry[] = [];
   private redoEntries: HistoryEntry[] = [];
   private listeners = new Set<(change: ChangeSet, label: string) => void>();
-  constructor(document: SceneDocument) { assertDocument(document); this.current = structuredClone(document); }
+  constructor(document: SceneDocument) { assertDocument(document); this.current = freeze(structuredClone(document)); }
   get document(): SceneDocument { return this.current; }
   get canUndo(): boolean { return this.undoEntries.length > 0; }
   get canRedo(): boolean { return this.redoEntries.length > 0; }
@@ -36,7 +37,9 @@ export class EditorSession {
   undo(): void { const entry = this.undoEntries.pop(); if (entry) { this.redoEntries.push(entry); this.commit(entry.before, `撤销 ${entry.label}`); } }
   redo(): void { const entry = this.redoEntries.pop(); if (entry) { this.undoEntries.push(entry); this.commit(entry.after, `重做 ${entry.label}`); } }
   private commit(document: SceneDocument, label: string): void {
-    const change = changesBetween(this.current, document); this.current = document;
+    const change = changesBetween(this.current, document); this.current = freeze(document);
     this.listeners.forEach(listener => listener(change, label));
   }
 }
+
+export * from './commands';
