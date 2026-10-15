@@ -31,49 +31,88 @@ export class ArtworkManager {
   dispose() {
     this.domElement.removeEventListener('pointermove', this._onPointerMove);
     this.domElement.removeEventListener('pointerdown', this._onPointerDown);
+
+    // 释放所有动态绑定的艺术品画框材质和纹理显存
+    for (const mesh of this.boundMeshes) {
+      if (mesh.material) {
+        if (mesh.material.map && typeof mesh.material.map.dispose === 'function') {
+          mesh.material.map.dispose();
+        }
+        mesh.material.dispose();
+      }
+    }
+    this.boundMeshes = [];
   }
 
   /**
    * Bind artworks to meshes from manifest map
+   * 采用受控并发（批次大小 4），避免 57 张外部大图瞬间击穿网络与 GPU 上传峰值
    * @param {object} manifest Object with { [uuid]: { name, url, preview, showbox } }
+   * @param {number} [concurrency=4]
    */
-  async loadManifest(manifest) {
+  async loadManifest(manifest, concurrency = 4) {
     this.manifest = manifest || {};
     this.boundMeshes = [];
 
     const entries = Object.entries(this.manifest);
+    const validTasks = [];
+
     for (const [uuid, artInfo] of entries) {
       const mesh = this.meshMap.get(uuid);
       if (mesh) {
         mesh.userData.artwork = artInfo;
         this.boundMeshes.push(mesh);
 
-        // Load artwork texture dynamically
-        if (artInfo.preview || artInfo.url) {
-          const imgUrl = artInfo.preview || artInfo.url;
-          this.textureLoader.load(
-            imgUrl,
-            (texture) => {
-              texture.colorSpace = THREE.SRGBColorSpace;
-              texture.generateMipmaps = true;
-              texture.minFilter = THREE.LinearMipmapLinearFilter;
-              texture.magFilter = THREE.LinearFilter;
-
-              if (mesh.material) {
-                // Clone material so individual paintings don't overwrite each other
-                mesh.material = mesh.material.clone();
-                mesh.material.map = texture;
-                mesh.material.needsUpdate = true;
-              }
-            },
-            undefined,
-            (err) => console.warn(`Failed to load artwork texture ${imgUrl}:`, err)
-          );
+        const imgUrl = artInfo.preview || artInfo.url;
+        if (imgUrl) {
+          validTasks.push({ mesh, imgUrl });
         }
       }
     }
 
+    // 4 路受控并发加载队列
+    const runWorker = async () => {
+      while (validTasks.length > 0) {
+        const item = validTasks.shift();
+        if (!item) break;
+        await this._loadSingleArtworkTexture(item.mesh, item.imgUrl);
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrency, validTasks.length); i++) {
+      workers.push(runWorker());
+    }
+
+    await Promise.all(workers);
     console.log(`[ArtworkManager] Successfully mounted ${this.boundMeshes.length} artworks onto 3D frames.`);
+  }
+
+  _loadSingleArtworkTexture(mesh, imgUrl) {
+    return new Promise((resolve) => {
+      this.textureLoader.load(
+        imgUrl,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.generateMipmaps = true;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+
+          if (mesh.material) {
+            // Clone material so individual paintings don't overwrite each other
+            mesh.material = mesh.material.clone();
+            mesh.material.map = texture;
+            mesh.material.needsUpdate = true;
+          }
+          resolve();
+        },
+        undefined,
+        (err) => {
+          console.warn(`Failed to load artwork texture ${imgUrl}:`, err);
+          resolve(); // 容错放行，不中断其它图片加载
+        }
+      );
+    });
   }
 
   _updateMouseCoords(e) {

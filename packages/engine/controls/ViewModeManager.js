@@ -67,16 +67,23 @@ export class ViewModeManager {
   }
 
   // ------------------------------------------------------------------
-  setMode(mode) {
+  async setMode(mode) {
     if (this.mode === mode) return;
     this.mode = mode;
 
     if (this.mode === VIEW_MODES.FIRST_PERSON) {
       // Hide avatar body so it doesn't obstruct first-person view
-      this.avatar.setVisible(false);
+      this.avatar?.setVisible(false);
     } else {
-      // Show avatar and immediately place camera so no jarring pop
-      this.avatar.setVisible(true);
+      // 切换第三人称：按需懒加载 Avatar 模型
+      if (this.avatar && !this.avatar.isLoaded && typeof this.avatar.ensureLoaded === 'function') {
+        try {
+          await this.avatar.ensureLoaded();
+        } catch (err) {
+          console.warn('[ViewModeManager] Lazy load avatar failed:', err);
+        }
+      }
+      this.avatar?.setVisible(true);
       this._snapThirdPersonCamera();
     }
 
@@ -116,7 +123,7 @@ export class ViewModeManager {
    * @param {THREE.Vector3} avatarFeet  – avatar feet position (y = floor)
    * @param {number}        charYaw     – character heading (radians, from CameraController)
    */
-  updateThirdPerson(avatarFeet, charYaw) {
+  updateThirdPerson(avatarFeet, charYaw, delta = 0.016) {
     // Focus point: avatar chest area
     this._focus.copy(avatarFeet);
     this._focus.y += this.FOCUS_HEIGHT;
@@ -149,15 +156,18 @@ export class ViewModeManager {
       }
     }
 
+    // 帧率无关指数阻尼因子 (基于 10.0 decay 速率，在 60Hz 与 144Hz 屏幕体验物理一致)
+    const dampFactor = 1 - Math.exp(-10.0 * Math.min(delta, 0.1));
+
     // Smooth arm length transition (avoids jitter on thin walls)
-    this.currentArmDist += (safeDist - this.currentArmDist) * 0.15;
+    this.currentArmDist += (safeDist - this.currentArmDist) * dampFactor;
 
     // Final camera position along the arm
     this._targetCamPos.copy(this._focus).addScaledVector(this._toIdeal, this.currentArmDist);
     this._targetCamPos.y = this._idealPos.y; // keep height constant
 
-    // Lerp camera position for silky smoothness
-    this.camera.position.lerp(this._targetCamPos, 0.15);
+    // 帧率无关平滑插值移动
+    this.camera.position.lerp(this._targetCamPos, dampFactor);
 
     // Always look at focus
     this.camera.lookAt(this._focus);

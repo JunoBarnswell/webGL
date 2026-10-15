@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EventEmitter } from './EventEmitter.js';
 import { RenderLoop } from './RenderLoop.js';
+import { FrameScheduler } from './FrameScheduler.js';
 import { O2vrMeshLoader } from '../loader/O2vrMeshLoader.js';
 import { SceneParser } from '../loader/SceneParser.js';
 import { LightmapManager } from '../material/LightmapManager.js';
@@ -20,6 +21,7 @@ import { HotspotSystem } from '../business/HotspotSystem.js';
 import { ComponentMountSystem } from '../business/ComponentMountSystem.js';
 import { ResourceRegistry } from './ResourceRegistry.js';
 import { PerformanceMonitor } from './PerformanceMonitor.js';
+import { AdaptiveQuality } from './AdaptiveQuality.js';
 
 /**
  * ShowroomEngine: Top-level unified facade for the 3D exhibition showroom
@@ -89,57 +91,103 @@ export class ShowroomEngine {
       visible: options.showPerf !== undefined ? options.showPerf : true
     });
 
-    // 4. Render Loop
-    this.renderLoop = new RenderLoop((delta) => {
-      if (this.cruise.isPlaying) {
-        // During cruise: CruiseManager owns camera position & orientation (Plan A: pure exhibition tour)
-        this.cruise.update(delta);
-      } else if (this.cameraController.isTransitioning) {
-        // 过渡飞行期间：CameraController 拥有相机与角色姿态的绝对控制权，避免被 ViewModeManager 覆盖
-        this.cameraController.update(delta);
-        this.avatar.setPose(this.cameraController.characterPos, this.cameraController.yaw);
-      } else {
-        // Normal roaming: CameraController advances characterPos & rotation
-        this.cameraController.update(delta);
-
-        // Avatar orientation: face movement direction when walking, else face camera heading
-        const avatarTargetYaw = this.cameraController.currentSpeed > 0
-          ? this.cameraController.moveDirectionYaw
-          : this.cameraController.yaw;
-
-        this.avatar.setPose(this.cameraController.characterPos, avatarTargetYaw);
-        this.avatar.update(delta, this.cameraController.currentSpeed, this.cameraController.keys.sprint);
-
-        // ViewModeManager owns ALL camera positioning:
-        if (this.viewMode.mode === VIEW_MODES.THIRD_PERSON) {
-          // Third-person: camera arm behind avatar based on character heading
-          this.viewMode.updateThirdPerson(
-            this.cameraController.characterPos,
-            this.cameraController.yaw  // character heading (not mouse pitch)
-          );
-        } else {
-          // First-person: camera at exact eye level, rotation from mouse yaw/pitch
-          this.viewMode.updateFirstPerson(this.cameraController.characterPos);
-        }
-      }
-
-      // Update dynamic components animations
-      this.componentMount.update(delta);
-
-      this.renderer.render(this.scene, this.camera);
-
-      // Project 3D hotspots to 2D DOM screen space
-      this.hotspot.update();
-
-      // 实时遥测更新
-      this.perfMonitor.update();
+    // 自适应渲染画质管理系统 (动态 Pixel Ratio 调节)
+    this.adaptiveQuality = new AdaptiveQuality(this.renderer, {
+      enabled: options.adaptiveQuality !== undefined ? options.adaptiveQuality : true
     });
 
-    // 5. Handle Resize
+    // 4. FrameScheduler (引擎级脏标记与按需渲染帧调度器)
+    this._lastCameraPos = new THREE.Vector3();
+    this._lastCameraQuat = new THREE.Quaternion();
+
+    this.frameScheduler = new FrameScheduler({
+      onUpdate: (delta) => {
+        let hasActivity = false;
+
+        if (this.cruise.isPlaying) {
+          // 巡航模式：CruiseManager 拥有相机与角色位姿
+          this.cruise.update(delta);
+          hasActivity = true;
+        } else if (this.cameraController.isTransitioning) {
+          // 过渡飞行期间：CameraController 拥有相机与角色姿态的绝对控制权
+          this.cameraController.update(delta);
+          this.avatar.setPose(this.cameraController.characterPos, this.cameraController.yaw);
+          hasActivity = true;
+        } else {
+          // 正常漫游
+          this.cameraController.update(delta);
+
+          const avatarTargetYaw = this.cameraController.currentSpeed > 0
+            ? this.cameraController.moveDirectionYaw
+            : this.cameraController.yaw;
+
+          this.avatar.setPose(this.cameraController.characterPos, avatarTargetYaw);
+          this.avatar.update(delta, this.cameraController.currentSpeed, this.cameraController.keys.sprint);
+
+          if (this.viewMode.mode === VIEW_MODES.THIRD_PERSON) {
+            this.viewMode.updateThirdPerson(
+              this.cameraController.characterPos,
+              this.cameraController.yaw,
+              delta
+            );
+          } else {
+            this.viewMode.updateFirstPerson(this.cameraController.characterPos);
+          }
+
+          if (this.cameraController.currentSpeed > 0 || this.cameraController.isDragging) {
+            hasActivity = true;
+          }
+        }
+
+        // 检查相机位置或旋转是否发生位移变化
+        if (this.camera.position.distanceToSquared(this._lastCameraPos) > 1e-4 ||
+            Math.abs(this.camera.quaternion.dot(this._lastCameraQuat) - 1.0) > 1e-5) {
+          this._lastCameraPos.copy(this.camera.position);
+          this._lastCameraQuat.copy(this.camera.quaternion);
+          hasActivity = true;
+        }
+
+        // 推进动态零部件装配/拆解动画
+        if (this.componentMount.mixers.length > 0) {
+          this.componentMount.update(delta);
+          hasActivity = true;
+        }
+
+        return hasActivity;
+      },
+      onRender: (delta) => {
+        this.renderer.render(this.scene, this.camera);
+        this.hotspot.update();
+        this.perfMonitor.update();
+        this.adaptiveQuality.update(this.frameScheduler.fps);
+      }
+    }, {
+      onDemand: options.onDemand !== undefined ? options.onDemand : true
+    });
+
+    // 保持向后兼容 API
+    this.renderLoop = this.frameScheduler;
+
+    // 5. 事件唤醒监听（在用户交互时立即置位脏标记唤醒渲染管线）
+    this._wakeUpScheduler = () => this.frameScheduler.markDirty(5);
+    window.addEventListener('keydown', this._wakeUpScheduler);
+    this.container.addEventListener('pointerdown', this._wakeUpScheduler);
+    this.container.addEventListener('pointermove', this._wakeUpScheduler);
+    this.container.addEventListener('wheel', this._wakeUpScheduler, { passive: true });
+
+    // 6. Handle Resize
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
 
-    this.renderLoop.start();
+    this.frameScheduler.start();
+  }
+
+  /**
+   * 外部显式触发重绘（脏标记唤醒）
+   * @param {number} [frames=3]
+   */
+  requestRender(frames = 3) {
+    this.frameScheduler?.markDirty(frames);
   }
 
   _setupLighting() {
@@ -189,15 +237,10 @@ export class ShowroomEngine {
     this.collisionSystem.setColliObjects(colliObjects);
     this.collisionSystem.setGroundObjects(groundObjects);
 
-    // 2. Load 3D Character Avatar
+    // 2. Configure 3D Character Avatar (Lazy loaded on 3rd-person switch, saving ~2.93MB on initial load)
     if (avatarUrl) {
-      try {
-        await this.avatar.load(avatarUrl);
-        // Default to first-person (avatar hidden)
-        this.viewMode.setMode(VIEW_MODES.FIRST_PERSON);
-      } catch (err) {
-        console.warn('[ShowroomEngine] Avatar load failed, continuing in pure roaming mode:', err);
-      }
+      this.avatar.setAvatarUrl(avatarUrl);
+      this.viewMode.setMode(VIEW_MODES.FIRST_PERSON);
     }
 
     // 3. Initialize ArtworkManager for dynamic mounting and raycast interactions
@@ -325,11 +368,24 @@ export class ShowroomEngine {
 
   dispose() {
     window.removeEventListener('resize', this._onResize);
-    this.renderLoop.stop();
+    if (this._wakeUpScheduler) {
+      window.removeEventListener('keydown', this._wakeUpScheduler);
+      this.container.removeEventListener('pointerdown', this._wakeUpScheduler);
+      this.container.removeEventListener('pointermove', this._wakeUpScheduler);
+      this.container.removeEventListener('wheel', this._wakeUpScheduler);
+    }
+
+    if (this.frameScheduler) {
+      this.frameScheduler.dispose();
+    }
 
     if (this.perfMonitor) {
       this.perfMonitor.dispose();
       this.perfMonitor = null;
+    }
+
+    if (this.adaptiveQuality) {
+      this.adaptiveQuality.dispose();
     }
 
     this.cameraController.dispose();

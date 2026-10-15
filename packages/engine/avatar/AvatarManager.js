@@ -21,6 +21,44 @@ export class AvatarManager {
 
     // Movement state
     this.currentSpeed = 0; // 0 = idle, > 0 = walk, > threshold = run
+
+    // 懒加载状态
+    this.avatarUrl = null;
+    this.isLoaded = false;
+    this.isLoading = false;
+    this._loadPromise = null;
+  }
+
+  /**
+   * 配置 Avatar 模型 URL 供按需懒加载
+   * @param {string} url 
+   */
+  setAvatarUrl(url) {
+    this.avatarUrl = url;
+  }
+
+  /**
+   * 确保 Avatar 模型已加载（按需触发）
+   */
+  async ensureLoaded() {
+    if (this.isLoaded) return this.model;
+    if (this._loadPromise) return this._loadPromise;
+    if (!this.avatarUrl) return null;
+
+    this.isLoading = true;
+    this._loadPromise = this.load(this.avatarUrl)
+      .then((model) => {
+        this.isLoaded = true;
+        this.isLoading = false;
+        return model;
+      })
+      .catch((err) => {
+        this.isLoading = false;
+        this._loadPromise = null;
+        throw err;
+      });
+
+    return this._loadPromise;
   }
 
   /**
@@ -77,11 +115,14 @@ export class AvatarManager {
           }
 
           console.log('[AvatarManager] 3D Human Avatar Loaded Successfully.');
+          this.isLoaded = true;
+          this.isLoading = false;
           resolve(this.model);
         },
         undefined,
         (err) => {
           console.warn('[AvatarManager] Failed to load avatar:', err);
+          this.isLoading = false;
           reject(err);
         }
       );
