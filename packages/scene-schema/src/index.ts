@@ -62,6 +62,7 @@ export function documentReferences(document: SceneDocument): { kind: string; id:
     const definition = componentDefinitions.find(item => item.type === component.type);
     if (definition) for (const [key, field] of Object.entries(definition.fields)) fieldReferences(component.data[key], field, visit);
   }
+  fieldReferences(document.settings as unknown as JsonValue, schema.$defs.settings as unknown as FieldSchema, visit);
   for (const material of document.materials) fieldReferences(material as unknown as JsonValue, schema.$defs.material as unknown as FieldSchema, visit);
   for (const behavior of document.behaviors) {
     if (behavior.sourceId) visit('entity', behavior.sourceId);
@@ -76,7 +77,7 @@ export function documentReferences(document: SceneDocument): { kind: string; id:
 
 export function validateDocument(value: unknown, forPublish = false): string[] {
   if (!validateShape(value)) return (validateShape.errors ?? []).slice(0, 20).map(error => `${error.instancePath || '/'} ${error.message}`);
-  const document = value as SceneDocument;
+  const document = value as unknown as SceneDocument;
   const errors: string[] = [];
   const groups = { entity: document.entities, asset: document.assets, material: document.materials, behavior: document.behaviors };
   const sets = Object.fromEntries(Object.entries(groups).map(([kind, items]) => [kind, new Set(items.map(item => item.id))]));
@@ -99,8 +100,10 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     if (entity.transform.scale.some(n => Math.abs(n) < 0.000001)) errors.push(`${entity.name} 缩放不可为零`);
     for (const component of entity.components) {
       if (forPublish && component.enabled && ['Mesh','Model','Avatar','Audio','Artwork'].includes(component.type) && !component.data.assetId) errors.push(`${entity.name}/${component.type} 尚未指定资源`);
+      if (component.type === 'ModelNode' && !component.enabled) errors.push(entity.name + ' 模型子节点身份不可禁用，请使用节点可见性');
+      if (component.type === 'ModelNode' && !entities.get(String(component.data.modelEntityId))?.components.some(item=>item.type==='Model'&&item.enabled)) errors.push(entity.name + ' 所属模型必须启用');
       if (component.type === 'ModelNode' && !entities.get(String(component.data.modelEntityId))?.components.some(item => item.type === 'Model')) errors.push(`${entity.name} 的模型实例引用无效`);
-      if (component.type === 'Animation' && forPublish && component.enabled && (!component.data.clip || !entities.get(String(component.data.modelEntityId))?.components.some(item => item.type === 'Model'))) errors.push(`${entity.name} 的动画配置不完整`);
+      if (component.type === 'Animation' && forPublish && component.enabled && (!component.data.clip || !entities.get(String(component.data.modelEntityId))?.components.some(item => item.type === 'Model' && item.enabled))) errors.push(`${entity.name} 的动画配置不完整`);
     }
   }
   for (const reference of documentReferences(document)) if (!sets[reference.kind]?.has(reference.id)) errors.push(`无效的 ${reference.kind} 引用 ${reference.id}`);
@@ -108,8 +111,28 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     if (!asset.files.includes(asset.entry)) errors.push(`${asset.name} 入口不在资源包中`);
     if (asset.files.some(path => path.startsWith('/') || path.includes('\\') || path.split('/').some(part => part === '..' || part === '.' || !part))) errors.push(`${asset.name} 包含非法文件路径`);
   }
+  for (const entity of document.entities) {
+    const renderers = entity.components.filter(c => ['Mesh','Model','ModelNode','Avatar'].includes(c.type));
+    if (renderers.length > 1) errors.push(entity.name + ' 只能有一个几何/模型/角色组件');
+    const binding = entity.components.find(c => c.type === 'ModelNode');
+    if (binding) {
+      const modelId = String(binding.data.modelEntityId);
+      const parent = entities.get(entity.parentId ?? '');
+      const parentBinding = parent?.components.find(c => c.type === 'ModelNode');
+      if (entity.parentId !== modelId && String(parentBinding?.data.modelEntityId ?? '') !== modelId) errors.push(entity.name + ' 必须属于同一模型实例的层级');
+    }
+    for (const component of entity.components) {
+      const kind = ({Mesh:'mesh',Model:'model',Avatar:'model',Audio:'audio',Artwork:'image'} as Record<string,string>)[component.type];
+      const asset = document.assets.find(a => a.id === component.data.assetId);
+      if (kind && asset && asset.kind !== kind && !(kind === 'image' && asset.kind === 'texture')) errors.push(entity.name + '/' + component.type + ' 资源类型不匹配');
+    }
+  }
+  const bindings = document.entities.flatMap(e => e.components.filter(c => c.type === 'ModelNode').map(c => String(c.data.modelEntityId) + ':' + String(c.data.nodeIndex)));
+  if (new Set(bindings).size !== bindings.length) errors.push('模型子节点索引重复绑定');
+  if (![0,6].includes(document.settings.environmentAssetIds.length) || document.materials.some(m => ![0,6].includes(m.envAssetIds.length))) errors.push('环境立方体必须提供完整六面资源');
   if (document.settings.near >= document.settings.far) errors.push('相机远裁剪面必须大于近裁剪面');
   if (forPublish) for (const behavior of document.behaviors) {
+    if (!behavior.actions.length) errors.push(`${behavior.name} 尚未配置动作`);
     if (behavior.event !== 'ready' && !behavior.sourceId) errors.push(`${behavior.name} 尚未指定事件源`);
     for (const action of behavior.actions) if (!['DisplayMode','ViewMode','OpenInfo'].includes(action.type) && !action.targetId) errors.push(`${behavior.name}/${action.type} 尚未指定目标`);
   }

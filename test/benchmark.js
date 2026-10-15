@@ -71,7 +71,7 @@ async function runBenchmarks() {
 
     // 模拟 10 个组件实例共享同一个 geometry
     for (let i = 0; i < 10; i++) {
-      registry.retain('shared_geo', mockGeometry);
+      registry.retain(mockGeometry);
     }
 
     if (registry.getRefCount(mockGeometry) !== 10) {
@@ -80,7 +80,7 @@ async function runBenchmarks() {
 
     // 释放 9 个实例，不应触发 dispose
     for (let i = 0; i < 9; i++) {
-      registry.release('shared_geo');
+      registry.release(mockGeometry);
     }
 
     if (disposedCount !== 0) {
@@ -88,7 +88,7 @@ async function runBenchmarks() {
     }
 
     // 释放最后一个实例，应触发底层 dispose
-    registry.release('shared_geo');
+    registry.release(mockGeometry);
     if (disposedCount === 1) {
       console.log(`  ✅ 通过: 引用计数精准归零，安全释放共享几何体，未发生过早销毁`);
       passed++;
@@ -99,7 +99,7 @@ async function runBenchmarks() {
     // 压力测试：批量注册与清理
     const t0 = performance.now();
     for (let i = 0; i < 5000; i++) {
-      registry.retain(`res_${i}`, { isBufferGeometry: true, dispose: () => {} });
+      registry.retain({ isBufferGeometry: true, dispose: () => {} });
     }
     registry.clear();
     const t1 = performance.now();
