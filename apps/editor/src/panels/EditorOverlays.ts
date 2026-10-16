@@ -1,50 +1,26 @@
 import * as THREE from 'three';
-import { getComponent,type SceneDocument } from '@studio/scene-schema';
+import { getComponent, type SceneDocument } from '@studio/scene-schema';
 import type { SceneRuntime } from '@studio/scene-runtime';
 import type { EditingPoint } from '../state/studio';
 
-export interface EditorOverlays { root:THREE.Group; handles:THREE.Mesh[]; update:()=>void; dispose:()=>void }
-export function createOverlays(runtime:SceneRuntime,document:SceneDocument,selected:string[]):EditorOverlays {
+export interface EditorOverlays { root:THREE.Group; handles:THREE.Mesh[]; update:(excluded?:THREE.Object3D)=>void; dispose:()=>void }
+export function createOverlays(runtime:SceneRuntime,document:SceneDocument,selected:string[],tourId:string):EditorOverlays{
   const root=new THREE.Group(),handles:THREE.Mesh[]=[],groups=new Map<string,THREE.Group>();
-  const sphere=new THREE.SphereGeometry(95,12,8);
-  const positionMaterial=new THREE.MeshBasicMaterial({color:0x6eddbd,depthTest:false});
-  const targetMaterial=new THREE.MeshBasicMaterial({color:0xe4bc6a,depthTest:false});
-  const marker=(group:THREE.Group,position:number[],point:EditingPoint)=>{
-    const object=new THREE.Mesh(sphere,point.property==='position'?positionMaterial:targetMaterial);
-    object.position.fromArray(position);object.renderOrder=1001;object.userData.editorHandle=point;group.add(object);handles.push(object);
-  };
-  for(const id of selected){
-    const entity=document.entities.find(e=>e.id===id);if(!entity)continue;
-    const group=new THREE.Group();group.matrixAutoUpdate=false;root.add(group);groups.set(id,group);
-    for(const type of ['Cruise','Zone']as const){
-      const component=getComponent(entity,type);if(!component)continue;
-      const collection=type==='Cruise'?'points':'views';
-      const points=component.data[collection] as {position:number[];target:number[]}[];
-      for(const [index,point]of points.entries())for(const property of ['position','target']as const)
-        marker(group,point[property],{entityId:id,type,collection,index,property});
-      if(type==='Cruise'&&points.length>=2){
-        const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3().fromArray(p.position)),Boolean(component.data.closed),'centripetal');
-        const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(384)),new THREE.LineBasicMaterial({color:0x63c9ad,depthTest:false,transparent:true,opacity:.7}));
-        line.renderOrder=1000;group.add(line);
-      }else{
-        const segments=points.flatMap(point=>[new THREE.Vector3().fromArray(point.position),new THREE.Vector3().fromArray(point.target)]);
-        group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segments),new THREE.LineBasicMaterial({color:0xdab76e,depthTest:false})));
-      }
-    }
-    const panorama=getComponent(entity,'Panorama');
-    if(panorama)marker(group,panorama.data.position as number[],{entityId:id,type:'Panorama',collection:null,index:0,property:'position'});
-    const trigger=getComponent(entity,'Trigger');
-    if(trigger){
-      const box=new THREE.BoxGeometry(1,1,1),geometry=new THREE.EdgesGeometry(box);box.dispose();
-      const wire=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0xc8a275,depthTest:false}));
-      wire.position.fromArray(trigger.data.offset as number[]);wire.scale.fromArray(trigger.data.size as number[]);wire.renderOrder=999;group.add(wire);
-    }
-  }
-  // These shared objects are retained even if no marker uses them; dispose their unused allocations now.
+  const sphere=new THREE.SphereGeometry(70,10,6),positionMaterial=new THREE.MeshBasicMaterial({color:0x6eddbd,depthTest:false}),targetMaterial=new THREE.MeshBasicMaterial({color:0xe4bc6a,depthTest:false});
+  const tour=document.tours.find(t=>t.id===tourId),viewIds=new Set(tour?.stops.map(s=>s.viewpointId)??[]);
+  for(const id of selected){const entity=document.entities.find(e=>e.id===id);if(!entity)continue;for(const value of getComponent(entity,'Zone')?.data.viewpointIds as string[]??[])viewIds.add(value);const panorama=getComponent(entity,'Panorama');if(panorama?.data.viewpointId)viewIds.add(String(panorama.data.viewpointId));}
+  for(const view of document.viewpoints.filter(v=>viewIds.has(v.id))){const group=new THREE.Group();group.matrixAutoUpdate=false;root.add(group);groups.set(view.id,group);for(const property of ['position','target']as const){const mesh=new THREE.Mesh(sphere,property==='position'?positionMaterial:targetMaterial);mesh.renderOrder=1001;mesh.userData.editorHandle={viewpointId:view.id,property} satisfies EditingPoint;group.add(mesh);handles.push(mesh);}}
+  const geometry=new THREE.BufferGeometry();const count=Math.max(2,(tour?.stops.length??0)*16);geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(count*3),3));const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:0x64d6b7,depthTest:false,transparent:true,opacity:.75}));line.renderOrder=1000;root.add(line);
+  const triggers=new Map<string,THREE.LineSegments>();
+  for(const id of selected){const entity=document.entities.find(e=>e.id===id),trigger=entity&&getComponent(entity,'Trigger');if(!trigger)continue;const box=new THREE.BoxGeometry(1,1,1),edges=new THREE.EdgesGeometry(box);box.dispose();const wire=new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0xdab76e,depthTest:false}));wire.matrixAutoUpdate=false;root.add(wire);triggers.set(id,wire);}
   if(!handles.length){sphere.dispose();positionMaterial.dispose();targetMaterial.dispose();}
-  else if(!handles.some(h=>(h.userData.editorHandle as EditingPoint).property==='target'))targetMaterial.dispose();
   runtime.engine.resourceRegistry.retainHierarchy(root);
-  const update=()=>{for(const [id,group]of groups){group.matrix.copy(runtime.getEntityFrame(id));group.matrixWorldNeedsUpdate=true;}};
-  update();
-  return {root,handles,update,dispose:()=>{root.removeFromParent();runtime.engine.resourceRegistry.releaseHierarchy(root);}};
+  const update=(excluded?:THREE.Object3D)=>{
+    const doc=runtime.document;if(!doc)return;
+    for(const mesh of handles){const point=mesh.userData.editorHandle as EditingPoint,view=doc.viewpoints.find(v=>v.id===point.viewpointId);if(!view)continue;const group=groups.get(view.id)!;group.matrix.copy(view.anchorId?runtime.getEntityFrame(view.anchorId):new THREE.Matrix4());group.matrixWorldNeedsUpdate=true;if(mesh!==excluded)mesh.position.fromArray(view[point.property]);}
+    const currentTour=doc.tours.find(t=>t.id===tourId);line.visible=Boolean(currentTour&&currentTour.stops.length>=2);
+    if(line.visible){const points=currentTour!.stops.map(s=>new THREE.Vector3().fromArray(runtime.resolveViewpoint(s.viewpointId).position)),curve=new THREE.CatmullRomCurve3(points,false,'centripetal'),attribute=geometry.getAttribute('position') as THREE.BufferAttribute;for(let i=0;i<count;i++){const p=curve.getPoint(i/(count-1));attribute.setXYZ(i,p.x,p.y,p.z);}attribute.needsUpdate=true;geometry.computeBoundingSphere();}
+    for(const [id,wire]of triggers){const entity=doc.entities.find(e=>e.id===id),trigger=entity&&getComponent(entity,'Trigger');if(trigger){wire.matrix.copy(runtime.getEntityFrame(id)).multiply(new THREE.Matrix4().compose(new THREE.Vector3().fromArray(trigger.data.offset as number[]),new THREE.Quaternion(),new THREE.Vector3().fromArray(trigger.data.size as number[])));wire.matrixWorldNeedsUpdate=true;}}
+  };
+  update();return {root,handles,update,dispose:()=>{root.removeFromParent();runtime.engine.resourceRegistry.releaseHierarchy(root);}};
 }

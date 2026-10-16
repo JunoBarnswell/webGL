@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Studio;
 
-// Deliberately implements the finite keyword set in our embedded v1 contract.
+// Deliberately implements the finite keyword set in our embedded document contract.
 // Schema changes are checked by the cross-language contract fixtures.
 public sealed class DocumentContract
 {
@@ -21,7 +21,7 @@ public sealed class DocumentContract
         Check(document, schema, "$", errors);
         if (errors.Count > 0) return errors.Take(30).ToArray();
         var groups = new Dictionary<string, HashSet<string>>();
-        foreach (var (kind, property) in new[] { ("entity", "entities"), ("asset", "assets"), ("material", "materials"), ("behavior", "behaviors") }) {
+        foreach (var (kind, property) in new[] { ("entity", "entities"), ("asset", "assets"), ("material", "materials"), ("behavior", "behaviors"), ("content", "contents"), ("viewpoint", "viewpoints"), ("tour", "tours"), ("variable", "variables") }) {
             var ids = new HashSet<string>();
             foreach (var item in document.GetProperty(property).EnumerateArray()) {
                 var id = Text(item, "id");
@@ -29,6 +29,9 @@ public sealed class DocumentContract
             }
             groups[kind] = ids;
         }
+        if (errors.Count > 0) return errors.Take(30).ToArray();
+        groups["ui"] = document.GetProperty("ui").GetProperty("nodes").EnumerateArray().Select(n=>Text(n,"id")).ToHashSet();
+        groups["layout"] = document.GetProperty("ui").GetProperty("layouts").EnumerateArray().Select(n=>Text(n,"id")).ToHashSet();
         var entities = document.GetProperty("entities").EnumerateArray().GroupBy(x => Text(x, "id")).ToDictionary(x => x.Key, x => x.First());
         foreach (var entity in entities.Values) {
             var id = Text(entity, "id"); var cursor = entity; var visited = new HashSet<string>();
@@ -45,7 +48,7 @@ public sealed class DocumentContract
             if (components.Select(x => Text(x, "type")).Distinct().Count() != components.Length) errors.Add(id + " 重复组件");
             foreach (var component in components) {
                 var type = Text(component, "type"); var data = component.GetProperty("data");
-                if (publish && component.GetProperty("enabled").GetBoolean() && new[] { "Mesh", "Model", "Avatar", "Audio", "Artwork" }.Contains(type) && Text(data, "assetId") == "") errors.Add(id + "/" + type + " 未指定资源");
+                if (publish && component.GetProperty("enabled").GetBoolean() && new[] { "Mesh", "Model", "Avatar", "Audio" }.Contains(type) && Text(data, "assetId") == "") errors.Add(id + "/" + type + " 未指定资源");
                 if (type == "ModelNode" || type == "Animation" && publish && component.GetProperty("enabled").GetBoolean()) {
                     if (!entities.TryGetValue(Text(data, "modelEntityId"), out var model) || !model.GetProperty("components").EnumerateArray().Any(c => Text(c, "type") == "Model")) errors.Add(id + " 模型实例引用无效");
                     if (type == "Animation" && publish && (Text(data, "clip") == "" || !entities.TryGetValue(Text(data,"modelEntityId"),out var owner) || !owner.GetProperty("components").EnumerateArray().Any(c => Text(c,"type") == "Model" && c.GetProperty("enabled").GetBoolean()))) errors.Add(id + " 动画配置不完整");
@@ -68,7 +71,7 @@ public sealed class DocumentContract
                     if(!sameParent)errors.Add(Text(entity,"name")+" 必须属于同一模型实例的层级");
                     if(!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
                 }
-                var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio","Artwork"=>"image",_=>""};
+                var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio",_=>""};
                 if(expected!="") {
                     var asset=document.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>Text(a,"id")==Text(data,"assetId"));
                     if(asset.ValueKind==JsonValueKind.Object&&Text(asset,"kind")!=expected&&!(expected=="image"&&Text(asset,"kind")=="texture"))errors.Add(Text(entity,"name")+"/"+type+" 资源类型不匹配");
@@ -84,11 +87,7 @@ public sealed class DocumentContract
         }
         var settings = document.GetProperty("settings");
         if (settings.GetProperty("near").GetDouble() >= settings.GetProperty("far").GetDouble()) errors.Add("近裁剪面必须小于远裁剪面");
-        if (publish) foreach (var behavior in document.GetProperty("behaviors").EnumerateArray()) {
-            if (behavior.GetProperty("actions").GetArrayLength() == 0) errors.Add(Text(behavior, "name") + " 未配置动作");
-            if (Text(behavior, "event") != "ready" && Text(behavior, "sourceId") == "") errors.Add(Text(behavior, "name") + " 未指定事件源");
-            foreach (var action in behavior.GetProperty("actions").EnumerateArray()) if (!new[] { "DisplayMode", "ViewMode", "OpenInfo" }.Contains(Text(action, "type")) && Text(action, "targetId") == "") errors.Add("动作未指定目标");
-        }
+        ExperienceContract.Validate(document, schema, groups, errors, publish);
         return errors.Distinct().Take(30).ToArray();
     }
     public void Assert(JsonElement document, bool publish = false) { var errors = Validate(document, publish); if (errors.Length > 0) throw new ApiException(422, "场景文档校验失败", errors); }
@@ -136,7 +135,10 @@ public sealed class DocumentContract
         var spec = Resolve(raw);
         if (value.ValueKind == JsonValueKind.String && spec.TryGetProperty("x-reference", out var kind)) yield return (kind.GetString()!, value.GetString()!);
         if (spec.TryGetProperty("oneOf", out var alternatives)) {
-            if (value.ValueKind == JsonValueKind.Object && value.TryGetProperty("type", out var type)) foreach (var alternative in alternatives.EnumerateArray()) if (alternative.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == type.GetString()) foreach (var reference in References(value, alternative)) yield return reference;
+            foreach (var alternative in alternatives.EnumerateArray()) {
+                var check = new List<string>(); Check(value, alternative, "$", check);
+                if (check.Count == 0) foreach (var reference in References(value, alternative)) yield return reference;
+            }
         } else if (value.ValueKind == JsonValueKind.Object && spec.TryGetProperty("properties", out var properties)) {
             foreach (var property in properties.EnumerateObject()) if (value.TryGetProperty(property.Name, out var child)) foreach (var reference in References(child, property.Value)) yield return reference;
         } else if (value.ValueKind == JsonValueKind.Array && spec.TryGetProperty("items", out var items)) foreach (var child in value.EnumerateArray()) foreach (var reference in References(child, items)) yield return reference;

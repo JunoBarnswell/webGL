@@ -13,6 +13,7 @@ export class Navigation {
   grounds: THREE.Object3D[] = [];
   settings!: SceneSettings;
   private keys = new Set<string>();
+  private movement={forward:0,right:0};
   private dragging = false;
   private ray = new THREE.Raycaster();
   private previousCamera=new THREE.Vector3();
@@ -27,7 +28,7 @@ export class Navigation {
       }
     }, { signal });
     canvas.addEventListener('keyup', event => { this.keys.delete(event.code); }, { signal });
-    canvas.addEventListener('blur', () => { this.keys.clear(); this.dragging = false; }, { signal });
+    canvas.addEventListener('blur', () => { this.keys.clear(); this.movement={forward:0,right:0}; this.dragging = false; }, { signal });
     canvas.addEventListener('pointerdown', event => {
       if (!this.enabled || event.button !== 0) return;
       this.dragging = true; canvas.focus(); canvas.setPointerCapture(event.pointerId);
@@ -43,6 +44,7 @@ export class Navigation {
       event.preventDefault(); camera.fov = THREE.MathUtils.clamp(camera.fov + event.deltaY * .02, 20, 110); camera.updateProjectionMatrix(); wake();
     }, { passive: false, signal });
   }
+  setMovement(forward:number,right:number):void { this.movement={forward:Math.max(-1,Math.min(1,forward)),right:Math.max(-1,Math.min(1,right))};if(forward||right)this.onInterrupt?.();this.wake(); }
   reset(settings: SceneSettings): void {
     this.settings = settings; this.eye.fromArray(settings.position); this.lookAt(new THREE.Vector3().fromArray(settings.target));
     this.viewMode = settings.viewMode; this.keys.clear(); this.speed = 0; this.pose();
@@ -69,8 +71,8 @@ export class Navigation {
   update(dt: number): boolean {
     if (!this.enabled) { this.speed = 0; return false; }
     this.previousCamera.copy(this.camera.position);
-    const forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
-    const right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
+    const forward = this.movement.forward + Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
+    const right = this.movement.right + Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
     this.sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
     this.speed = forward || right ? this.settings.moveSpeed * (this.sprint ? this.settings.sprintMultiplier : 1) : 0;
     if (this.speed) {
@@ -96,6 +98,6 @@ export class Navigation {
     }
     this.pose(dt); return Boolean(this.speed || this.dragging || this.camera.position.distanceToSquared(this.previousCamera)>.01);
   }
-  pause(): void { this.enabled = false; this.keys.clear(); this.dragging = false; }
+  pause(): void { this.enabled = false; this.keys.clear(); this.movement={forward:0,right:0}; this.dragging = false; }
   dispose(): void { this.pause(); this.controller.abort(); }
 }

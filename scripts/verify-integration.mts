@@ -19,7 +19,7 @@ const geometry=new THREE.BoxGeometry(1000,1000,1000);const content=new TextEncod
 const bundle=zipSync({'box.geometry.json':content},{level:0});
 const upload=await fetch(base+'/api/assets?'+new URLSearchParams({name:'验收几何体',kind:'mesh',entry:'box.geometry.json'}),{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/zip'},body:bundle});assert.equal(upload.status,200,await upload.clone().text());const asset=await upload.json();
 const retrieved=await fetch(base+'/api/assets/'+asset.id+'/files/box.geometry.json',{headers:{Authorization:'Bearer '+token}});assert.deepEqual(new Uint8Array(await retrieved.arrayBuffer()),content);pass('real MinIO upload, confirmation, SHA-256 identity and byte-exact download');
-const document=createDocument('Linux integration');document.assets.push(asset);const entity=createEntity('验收方块'),mesh=createComponent('Mesh'),material=createMaterial('验收材质');mesh.data.assetId=asset.id;mesh.data.materialId=material.id;entity.components.push(mesh);document.entities.push(entity);document.materials.push(material);
+const document=createDocument('Native integration');document.assets.push(asset);const entity=createEntity('验收方块'),mesh=createComponent('Mesh'),material=createMaterial('验收材质');mesh.data.assetId=asset.id;mesh.data.materialId=material.id;entity.components.push(mesh);document.entities.push(entity);document.materials.push(material);
 let draft=await api('/projects','POST',{name:document.name,document});const projectIds=[draft.projectId];const sceneId=draft.sceneId;
 try{
  const modified=structuredClone(draft.document) as SceneDocument;modified.name='并发修改';
@@ -36,9 +36,9 @@ try{
  publicManifest=await (await fetch(base+'/api/player/'+sceneId+'/manifest')).json();assert.equal(publicManifest.versionId,publication.versionId);pass('missing dependency blocks publication and retains old pointer');
  draft=await api('/scenes/'+sceneId+'/draft','PUT',{expectedRevision:draft.revision,document:{...draft.document,assets:[asset]}});
  if(process.env.STUDIO_FAULTS==='1'){
-   execFileSync('docker',['stop','webgl-studio-minio'],{stdio:'ignore'});
+   if(process.platform==='win32')execFileSync('powershell.exe',['-NoProfile','-File','scripts/minio-local.ps1','-Action','stop'],{stdio:'ignore'});else execFileSync('docker',['stop','webgl-studio-minio'],{stdio:'ignore'});
    try{await api('/scenes/'+sceneId+'/publish','POST',{expectedRevision:draft.revision},503);const previous=await (await fetch(base+'/api/player/'+sceneId+'/manifest')).json();assert.equal(previous.versionId,publication.versionId);pass('MinIO interruption retains previous publication');}
-   finally{execFileSync('docker',['start','webgl-studio-minio'],{stdio:'ignore'});}
+   finally{if(process.platform==='win32')execFileSync('powershell.exe',['-NoProfile','-File','scripts/minio-local.ps1','-Action','start'],{stdio:'ignore'});else execFileSync('docker',['start','webgl-studio-minio'],{stdio:'ignore'});}
    for(let i=0;i<30;i++){try{if((await fetch('http://127.0.0.1:19000/minio/health/live')).ok)break;}catch{/* MinIO is still starting. */}await new Promise(resolve=>setTimeout(resolve,500));}
  }
  await api('/assets/'+asset.id,'DELETE',undefined,409);pass('referenced asset deletion is rejected');

@@ -10,7 +10,7 @@ rm -rf artifacts/linux/wwwroot/editor artifacts/linux/wwwroot/player
 mkdir -p artifacts/linux/wwwroot/editor artifacts/linux/wwwroot/player
 cp -a apps/editor/dist/. artifacts/linux/wwwroot/editor/
 cp -a apps/player/dist/. artifacts/linux/wwwroot/player/
-cp docs/studio-v1-design.md artifacts/linux/ARCHITECTURE.md
+cp docs/studio-creation-design.md artifacts/linux/ARCHITECTURE.md
 cp docs/studio-product-design.md artifacts/linux/PRODUCT.md
 cp docs/acceptance/linux.md artifacts/linux/ACCEPTANCE.md
 cp docs/linux-delivery.md artifacts/linux/README.md
@@ -27,6 +27,6 @@ if [[ -d artifacts/acceptance ]]; then
 fi
 chmod -R a+rX artifacts/linux
 (cd artifacts/linux && find . -type f ! -name SHA256SUMS ! -name '*.dbg' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
-rm -f artifacts/webgl-studio-v1-linux-x64.zip
-(cd artifacts && zip -qr webgl-studio-v1-linux-x64.zip linux -x '*.dbg')
-printf '%s\n' "$studio_repo/artifacts/webgl-studio-v1-linux-x64.zip"
+rm -f artifacts/webgl-studio-linux-x64.zip
+(cd artifacts && zip -qr webgl-studio-linux-x64.zip linux -x '*.dbg')
+printf '%s\n' "$studio_repo/artifacts/webgl-studio-linux-x64.zip"

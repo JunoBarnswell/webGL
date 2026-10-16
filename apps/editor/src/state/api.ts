@@ -1,4 +1,4 @@
-import { zipSync } from 'fflate';
+import { runAssetTask } from '@studio/asset-pipeline';
 import type { SceneAsset, SceneDocument } from '@studio/scene-schema';
 import type { FileBundle } from '@studio/asset-pipeline';
 export interface CloudDraft { projectId: string; sceneId: string; revision: number; document: SceneDocument; publishedVersionId: string|null }
@@ -18,9 +18,14 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   }
   return response.status===204 ? undefined as T : response.json() as Promise<T>;
 }
-export async function upload(name: string, kind: SceneAsset['kind'], entry: string, files: FileBundle): Promise<SceneAsset> {
-  const body = zipSync(Object.fromEntries(files),{level:0});
-  return request('/assets?'+new URLSearchParams({name,kind,entry}),{method:'POST',body:body as Uint8Array<ArrayBuffer>,headers:{'Content-Type':'application/zip'}});
+export async function upload(name:string,kind:SceneAsset['kind'],entry:string,files:FileBundle,options:{signal?:AbortSignal;taskId?:string}={}):Promise<SceneAsset> {
+  const body=await runAssetTask<Uint8Array>('pack',[...files],{signal:options.signal});
+  const asset=await request<SceneAsset>('/assets?'+new URLSearchParams({name,kind,entry,...(options.taskId?{importTaskId:options.taskId}:{})}),{method:'POST',body:body as Uint8Array<ArrayBuffer>,headers:{'Content-Type':'application/zip'},signal:options.signal});
+  if(['image','texture'].includes(kind)&&/\.(png|jpe?g|webp)$/i.test(entry)&&!asset.preview){
+    const preview=await runAssetTask<{bytes:Uint8Array;width:number;height:number}>('thumbnail',files.get(entry),{signal:options.signal});
+    return request<SceneAsset>('/assets/'+asset.id+'/preview?'+new URLSearchParams({width:String(preview.width),height:String(preview.height)}),{method:'PUT',body:preview.bytes as Uint8Array<ArrayBuffer>,headers:{'Content-Type':'image/webp'},signal:options.signal});
+  }
+  return asset;
 }
 export async function download(path: string, name: string): Promise<void> {
   const response=await fetch('/api'+path,{headers:authHeaders()}); if(!response.ok) throw new Error('导出失败: HTTP '+response.status);

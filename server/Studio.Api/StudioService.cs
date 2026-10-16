@@ -128,7 +128,7 @@ public sealed class StudioService(Database database, DocumentContract contract, 
         }
         if (errors.Count > 0) throw new ApiException(422, "发布依赖校验失败", errors.ToArray());
         var versionId = Id(); var now = Now(); var key = "manifests/" + id + "/" + versionId + ".json";
-        var manifest = new ManifestResponse(1, versionId, now, draft.Document);
+        var manifest = new ManifestResponse( versionId, now, draft.Document);
         await objects.PutManifest(key, JsonSerializer.SerializeToUtf8Bytes(manifest, ApiJson.Default.ManifestResponse), ct);
         using var db = database.Open(); db.Ado.BeginTran();
         try {
@@ -158,8 +158,9 @@ public sealed class StudioService(Database database, DocumentContract contract, 
     }
     public void AuthorizeAsset(string sceneId, string versionId, string assetId)
     {
-        using var db = database.Open(); PublicVersion(db, Scene(db, sceneId), versionId);
-        if (db.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM Dependencies WHERE OwnerType='version' AND OwnerId=@version AND AssetId=@asset", P("version", versionId), P("asset", assetId))[0].Value != 1) throw new ApiException(404, "资源不属于发布版本");
+        using var db = database.Open();
+        var count=db.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM Scenes s JOIN Versions v ON v.SceneId=s.Id AND v.Published=1 JOIN Dependencies d ON d.OwnerType='version' AND d.OwnerId=v.Id WHERE s.Id=@scene AND s.PublishedVersionId IS NOT NULL AND v.Id=@version AND d.AssetId=@asset",P("scene",sceneId),P("version",versionId),P("asset",assetId))[0].Value;
+        if(count!=1)throw new ApiException(404,"资源不属于有效的公开版本");
     }
     public async Task Export(string projectId, Stream output, CancellationToken ct)
     {
@@ -168,7 +169,7 @@ public sealed class StudioService(Database database, DocumentContract contract, 
         await using (var stream = zip.CreateEntry("document.json").Open()) await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(row.Document), ct);
         foreach (var item in document.GetProperty("assets").EnumerateArray()) {
             var asset = objects.Get(DocumentContract.Text(item, "id"));
-            foreach (var file in asset.Files) { await using var stream = zip.CreateEntry("assets/" + asset.Id + "/" + file).Open(); await objects.CopyTo("assets/" + asset.Id + "/" + file, stream, ct); }
+            foreach (var file in asset.Files.Concat(asset.Preview is {} preview ? [preview.File] : Array.Empty<string>())) { await using var stream = zip.CreateEntry("assets/" + asset.Id + "/" + file).Open(); await objects.CopyTo("assets/" + asset.Id + "/" + file, stream, ct); }
         }
     }
     public async Task<DraftResponse> Import(Stream input, CancellationToken ct)
@@ -189,6 +190,7 @@ public sealed class StudioService(Database database, DocumentContract contract, 
                     }
                     await using var upload = File.OpenRead(assetPath); var stored = await objects.Upload(upload, DocumentContract.Text(item, "name"), DocumentContract.Text(item, "kind"), DocumentContract.Text(item, "entry"), ct);
                     if (stored.Id != id) throw new ApiException(422, "工程资源摘要不匹配: " + id);
+                    if(item.TryGetProperty("preview",out var preview)&&preview.ValueKind==JsonValueKind.Object){var file=DocumentContract.Text(preview,"file");if(!ObjectStore.ValidPath(file))throw new ApiException(422,"缩略图路径无效");var thumbnail=zip.GetEntry("assets/"+id+"/"+file)??throw new ApiException(422,"工程缩略图缺失");await using var content=thumbnail.Open();await objects.Preview(id,content,preview.GetProperty("width").GetInt32(),preview.GetProperty("height").GetInt32(),ct);}
                 } finally { File.Delete(assetPath); }
             }
             return Create(new(DocumentContract.Text(document, "name"), document));

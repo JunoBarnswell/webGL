@@ -1,5 +1,6 @@
+import { current } from 'immer';
 import * as THREE from 'three';
-import { componentDefinitions, createEntity, type Entity, type JsonValue, type SceneDocument, type FieldSchema } from '@studio/scene-schema';
+import { actionDefinitions, walkActions, componentDefinitions, createEntity, type Entity, type JsonValue, type SceneDocument, type FieldSchema } from '@studio/scene-schema';
 import type { EditorCommand } from './EditorSession';
 
 function walkReference(value: JsonValue, field: FieldSchema, remap: Map<string,string>): JsonValue {
@@ -21,7 +22,7 @@ export function duplicateEntities(selected: string[]): EditorCommand {
     for(const id of selected){const entity=doc.entities.find(e=>e.id===id);const node=entity?.components.find(c=>c.type==='ModelNode');if(node&&!selected.includes(String(node.data.modelEntityId)))throw new Error('请复制所属模型实例，以保留骨骼和动画关联');}
     const ids = descendants(doc,selected); const remap = new Map([...ids].map(id => [id,crypto.randomUUID()]));
     const copies = doc.entities.filter(e => ids.has(e.id)).map(entity => {
-      const copy = structuredClone(entity); copy.id = remap.get(entity.id)!; copy.name += ' 副本'; copy.legacyUuid = '';
+      const copy = structuredClone(current(entity)); copy.id = remap.get(entity.id)!; copy.name += ' 副本'; copy.legacyUuid = '';
       if (copy.parentId) copy.parentId = remap.get(copy.parentId) ?? copy.parentId;
       for (const component of copy.components) {
         const definition = componentDefinitions.find(d => d.type === component.type)!;
@@ -31,8 +32,8 @@ export function duplicateEntities(selected: string[]): EditorCommand {
     });
     doc.entities.push(...copies);
     for (const behavior of [...doc.behaviors]) if (ids.has(behavior.sourceId)) {
-      const copy = structuredClone(behavior); copy.id = crypto.randomUUID(); copy.sourceId = remap.get(copy.sourceId)!;
-      for (const action of copy.actions) action.targetId = remap.get(action.targetId) ?? action.targetId;
+      const copy = structuredClone(current(behavior)); copy.id = crypto.randomUUID(); copy.sourceId = remap.get(copy.sourceId)!;
+      walkActions(copy.actions,action=>{if(actionDefinitions.find(d=>d.type===action.type)?.target==='entity')action.targetId=remap.get(action.targetId)??action.targetId;});
       doc.behaviors.push(copy);
     }
   } };
@@ -40,7 +41,11 @@ export function duplicateEntities(selected: string[]): EditorCommand {
 export function deleteEntities(selected: string[]): EditorCommand {
   return { label: '删除节点', mutate: doc => {
     const ids = descendants(doc,selected); if(doc.entities.some(e=>ids.has(e.id)&&e.locked))throw new Error('包含锁定节点，请先解锁'); doc.entities = doc.entities.filter(entity => !ids.has(entity.id));
-    doc.behaviors = doc.behaviors.filter(b => !ids.has(b.sourceId)).map(b => ({ ...b, actions: b.actions.filter(a => !ids.has(a.targetId)) }));
+    const clean=(actions:typeof doc.behaviors[number]['actions']):typeof actions=>actions.filter(a=>!(actionDefinitions.find(d=>d.type===a.type)?.target==='entity'&&ids.has(a.targetId))).map(a=>({...a,...(a.then?{then:clean(a.then)}:{}),...(a.else?{else:clean(a.else)}:{})}));
+    doc.behaviors=doc.behaviors.filter(b=>b.sourceKind!=='entity'||!ids.has(b.sourceId)).map(b=>({...b,actions:clean(b.actions)}));
+    for(const content of doc.contents)if(ids.has(content.audioEntityId))content.audioEntityId='';
+    for(const node of doc.ui.nodes){if(['audioControls','animationControls','panoramaControls'].includes(node.kind)&&ids.has(node.targetId))node.targetId='';if(node.action)node.action=clean([node.action])[0]??null;}
+    for(const view of doc.viewpoints)if(ids.has(view.anchorId))throw new Error('对象仍被稳定视点引用，请先解除视点锚定');
     for (const entity of doc.entities) entity.components = entity.components.filter(c => !['ModelNode','Animation'].includes(c.type) || !ids.has(String(c.data.modelEntityId)));
   } };
 }

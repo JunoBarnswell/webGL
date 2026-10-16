@@ -1,42 +1,51 @@
-# WebGL Studio v1
+# WebGL Studio
 
-React / TypeScript / Vite / Zustand 编辑器，独立 Player，统一 Three.js 文档运行层，.NET 10 Native AOT API，SqlSugar / MySQL 8 / MinIO 持久化。
+面向作品、热点、导览、交互和 Player 界面的场景创作工作台。React / TypeScript / Vite / Zustand，统一 Three.js 场景运行层，.NET 10 Windows Native AOT API，SqlSugar / MySQL 协议数据库、真实 MinIO 和 IMemoryCache。
 
-导入真实展厅 → 可视化编辑 → 配置业务组件和事件动作 → 预览 → 云端保存 → 发布独立 Player。
+导入素材 → 搭建场景 → 编辑热点与导览 → 设计界面和交互 → 完整预览 → 保存与发布独立 Player。
 
-实现基线 main 5a9fdd2（包含用户原始基线 9942d73），分支 codex/webgl-studio-v1。Linux x64 为本次验收与交付平台，Windows 豁免。
+本次基线为 main `f1e4863`，开发分支 `codex/studio-creation-experience`。直接维护当前 SceneDocument 契约，不保留分代运行入口，不迁移既有展厅文档。
 
-## 目录
+## 工作台
 
-- apps/editor：中文五区 Dockview 工作台，命令编辑、恢复和发布。
-- apps/player：公开播放已发布版本，无编辑器、Gizmo 或编辑状态依赖。
-- packages/scene-schema：SceneDocument v1、组件/动作/属性 JSON Schema 与引用校验。
-- packages/editor-core：不可变事务、撤销重做、子树复制、删除与重组。
-- packages/scene-runtime：文档实例、增量同步、资源、导航和完整业务组件。
-- packages/engine：Three.js 设备、帧调度、质量、性能与资源引用计数。
-- packages/asset-pipeline：O2VR 导入和标准几何转换、glTF 节点映射；旧格式只存在于此边界。
-- server/Studio.Api：AOT Minimal APIs、JWT、草稿 CAS、版本、资源和发布事务。
-- server/migrations：版本化 SQL。
-- scripts / infrastructure：Linux 隔离服务、导入、集成验收与打包。
-- public：真实原始展厅及作品绑定，作为导入输入，不由 Player 直接读取。
+- 场景搭建：模型层级、选择、变换、材质、光照、环境与碰撞。
+- 热点内容：点击场景放置热点，作品和交互引用同一份内容资料。
+- 导览巡航：记录画面、排列视点、设置停留和移动，保留镜头与路径精调。
+- 事件交互：模板、条件组、顺序动作、分支、变量、等待与执行调试。
+- 界面设计：共享 DOM/CSS 画布设计菜单、业务控件和内容版式，支持桌面、平板、手机覆盖。
 
-## 使用与验收
+预览和公开 Player 共用 UI、业务调度与播放状态。停止预览会取消动作并恢复编辑相机和文档状态。资源库按需打开，窄窗口使用抽屉。
 
-见 docs/linux-delivery.md 的完整启动、配置和打包步骤。实际结果见 docs/acceptance/linux.md。统一语义与所有权设计见 docs/studio-v1-design.md。
+## 目录与所有权
 
-源码命令：
+| 目录 | 职责 |
+| --- | --- |
+| apps/editor | 五个任务工作区、二维画布、三维编辑工具、IndexedDB 恢复 |
+| apps/player | 公开加载不可变发布，使用共享 Player UI |
+| packages/scene-schema | 当前 JSON Schema、业务引用、内容、视点、规则、UI 定义 |
+| packages/editor-core | EditorCommand、结构共享、正反向变更、撤销重做 |
+| packages/scene-runtime | 加载、增量更新、运行会话、动作取消、巡航、媒体和资源所有权 |
+| packages/player-ui | 设计画布与播放共用的 DOM/CSS 渲染和业务控件 |
+| packages/asset-pipeline | Worker 解包、解析、缩略图与原始素材导入 |
+| packages/engine | Three.js 设备、帧调度、质量和性能设施 |
+| server/Studio.Api | AOT Minimal APIs、JWT、CAS 草稿、不可变版本、MinIO 和发布事务 |
+| server/migrations | 数据库结构 SQL；与场景文档分代无关 |
 
-    npm ci
-    bash scripts/services.sh build
-    bash scripts/services.sh up
-    bash scripts/package-linux.sh
-    bash scripts/start-linux.sh
-    NODE_USE_ENV_PROXY=1 npm run import:showroom
+## 本机启动与交付
 
-工作台地址 http://127.0.0.1:18080/editor/ 。登录凭据保存在本机 .local/config.json，文件权限 0600；数据、日志、缓存及凭据均被 Git 忽略。
+完整说明见 [Windows 启动与发布](docs/windows-delivery.md)，设计见 [统一架构](docs/studio-creation-design.md) 和 [创作流程](docs/studio-product-design.md)，结果见 [实际验收记录](docs/acceptance/windows.md)。
 
-前端验收：npm run typecheck、npm run lint、npm run build，以及真实浏览器 UAT；不新增前端自动化测试套件。域契约与后端工具验收：npm run verify:contracts、STUDIO_FAULTS=1 npm run verify:integration。
+```powershell
+npm ci
+npm run typecheck
+npm run lint
+npm run build
+.\scripts\package-windows.ps1 -SkipFrontend
+.\scripts\start-local.ps1 -ConfigPath .local/config.json -Port 18080
+```
 
-所有文档修改经过 EditorCommand；运行对象不进入持久化文档。云保存冲突返回 409 并保留本地事务。资产缺失阻止发布。发布首先写不可变 MinIO Manifest，再事务切换 MySQL 指针，失败保留上一版本。公开 Player 资源请求由数据库检查发布范围。
+本机数据库与 MinIO 服务须先运行。工作台地址为 `http://127.0.0.1:18080/editor/`。密码、连接配置、持久化数据和工具位于忽略目录，不进入 Git 或发布 ZIP。
 
-模型的子节点按 glTF node index 关联；复制整个模型实例保留骨骼与动画，子节点可选择、变换、重组和覆盖材质。多轨时间线、行为图、多人协作和多账号项目权限不在首版范围。
+所有编辑通过命令提交；播放会话不写工程。云端按 expectedRevision 保存，冲突返回 409 并保留当前窗口的本地事务；可恢复或另存。不可变 Manifest 先写入 MinIO，最后以数据库事务切换发布指针。缺失资源及未完成业务配置阻止发布。
+
+门禁为 typecheck、lint、build 和真实浏览器操作；不引入前端测试框架。`verify:experience` 检查命令与业务调度契约，`verify:contracts` 比较前后端契约，`verify:integration` 连接真实数据库和 MinIO。故障注入命令与结果见验收记录。

@@ -1,5 +1,5 @@
 # Studio 架构入口
 
-本轮统一设计见 [studio-v1-design.md](studio-v1-design.md)。
+统一设计见 [studio-creation-design.md](studio-creation-design.md)，产品流程见 [studio-product-design.md](studio-product-design.md)。
 
-用户最新约束优先：允许破坏性重构，无旧业务桥接层；先完成连贯实现，最后集中编译和真实验收。交付平台为 Linux x64 Native AOT，Windows 验收豁免。
+直接维护当前契约和运行链路，不迁移既有展厅。当前交付平台为 Windows x64 Native AOT，实际结果见 [Windows 验收](acceptance/windows.md)。Linux 文件仅保留既有平台脚本及历史验收证据。

@@ -55,7 +55,7 @@ public sealed class ObjectStore : IDisposable
     {
         foreach (var file in asset.Files) await client.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = "assets/" + asset.Id + "/" + file }, ct);
     }
-    public static AssetResponse ToAsset(AssetRow row) => new(row.Id, row.Name, row.Kind, row.Entry, JsonSerializer.Deserialize(row.FilesJson, ApiJson.Default.StringArray)!, row.Sha256);
+    public static AssetResponse ToAsset(AssetRow row) => new(row.Id, row.Name, row.Kind, row.Entry, JsonSerializer.Deserialize(row.FilesJson, ApiJson.Default.StringArray)!, row.Sha256, row.PreviewJson == null ? null : JsonSerializer.Deserialize(row.PreviewJson, ApiJson.Default.AssetPreview), row.ImportTaskId);
     public AssetResponse Get(string id)
     {
         if (cache.TryGetValue<AssetResponse>("asset:" + id, out var cached) && cached != null) return cached;
@@ -63,9 +63,11 @@ public sealed class ObjectStore : IDisposable
         var row = db.Ado.SqlQuery<AssetRow>("SELECT * FROM Assets WHERE Id=@id AND Status='Ready'", P("id", id)).SingleOrDefault() ?? throw new ApiException(404, "资源不存在或未就绪: " + id);
         var asset = ToAsset(row); cache.Set("asset:" + id, asset, new MemoryCacheEntryOptions { Size = row.FilesJson.Length + 1024, AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) }); return asset;
     }
-    public async Task<AssetResponse> Upload(Stream input, string name, string kind, string entry, CancellationToken ct)
+    public async Task<AssetResponse> Upload(Stream input, string name, string kind, string entry, CancellationToken ct, string? importTaskId = null)
     {
+        if (importTaskId != null && !System.Text.RegularExpressions.Regex.IsMatch(importTaskId,"^[a-zA-Z0-9_-]{1,100}$")) throw new ApiException(400,"导入任务 ID 无效");
         if (name.Length is < 1 or > 255 || !new[] { "mesh", "model", "image", "audio", "texture" }.Contains(kind) || !ValidPath(entry)) throw new ApiException(400, "资源名称、类型或入口无效");
+        if(importTaskId!=null){using var jobDb=database.Open();jobDb.Ado.ExecuteCommand("INSERT IGNORE INTO ImportJobs(Id) VALUES(@task)",P("task",importTaskId));if(jobDb.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM ImportJobs WHERE Id=@task AND Cancelled=1",P("task",importTaskId))[0].Value>0)throw new ApiException(409,"导入任务已取消");}
         var stage = Path.Combine(Path.GetTempPath(), "studio-upload-" + Id()); Directory.CreateDirectory(stage);
         try {
             var archivePath = Path.Combine(stage, "bundle.zip");
@@ -85,16 +87,32 @@ public sealed class ObjectStore : IDisposable
             }
             if (kind == "model") ValidateGltf(Path.Combine(stage, "files"), entry, files.Select(x => x.FullName).ToHashSet());
             var sha = Convert.ToHexStringLower(digest.GetHashAndReset()); var id = "a-" + sha;
-            var asset = new AssetResponse(id, name, kind, entry, files.Select(x => x.FullName).ToArray(), sha);
+            var asset = new AssetResponse(id, name, kind, entry, files.Select(x => x.FullName).ToArray(), sha, null, importTaskId);
             using (var db = database.Open()) {
                 var previous = db.Ado.SqlQuery<AssetRow>("SELECT * FROM Assets WHERE Id=@id", P("id", id)).SingleOrDefault();
                 if (previous?.Status == "Ready") return ToAsset(previous);
-                db.Ado.ExecuteCommand("INSERT IGNORE INTO Assets(Id,Name,Kind,Entry,FilesJson,Sha256,Status,CreatedAt) VALUES(@id,@name,@kind,@entry,@files,@sha,'Pending',@now)", P("id", id), P("name", name), P("kind", kind), P("entry", entry), P("files", JsonSerializer.Serialize(asset.Files, ApiJson.Default.StringArray)), P("sha", sha), P("now", Now()));
+                db.Ado.ExecuteCommand("INSERT IGNORE INTO Assets(Id,Name,Kind,Entry,FilesJson,Sha256,Status,CreatedAt,ImportTaskId) VALUES(@id,@name,@kind,@entry,@files,@sha,'Pending',@now,@task)", P("id", id), P("name", name), P("kind", kind), P("entry", entry), P("files", JsonSerializer.Serialize(asset.Files, ApiJson.Default.StringArray)), P("sha", sha), P("now", Now()), P("task", importTaskId));
             }
             foreach (var file in files) { await using var content = File.OpenRead(Path.Combine(stage, "files", file.FullName)); await Put("assets/" + id + "/" + file.FullName, content, Mime(file.FullName), hashes[file.FullName], ct); }
+            if(importTaskId!=null){using var jobDb=database.Open();if(jobDb.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM ImportJobs WHERE Id=@task AND Cancelled=1",P("task",importTaskId))[0].Value>0){await Delete(id,CancellationToken.None);throw new ApiException(409,"导入任务已取消");}}
             using (var db = database.Open()) db.Ado.ExecuteCommand("UPDATE Assets SET Status='Ready' WHERE Id=@id", P("id", id));
             cache.Remove("asset:" + id); return asset;
         } finally { Directory.Delete(stage, true); }
+    }
+    public async Task<AssetResponse> Preview(string id, Stream input, int width, int height, CancellationToken ct)
+    {
+        var asset=Get(id); if(!new[]{"image","texture"}.Contains(asset.Kind)||width is <1 or >256||height is <1 or >256)throw new ApiException(422,"缩略图参数无效");
+        using var bytes=new MemoryStream();await input.CopyToAsync(bytes,ct);var data=bytes.ToArray();
+        if(data.Length is <12 or >1048576 || Encoding.ASCII.GetString(data,0,4)!="RIFF" || Encoding.ASCII.GetString(data,8,4)!="WEBP")throw new ApiException(422,"缩略图必须为 WebP");
+        if(asset.Preview!=null)return asset;
+        bytes.Position=0;await Put("assets/"+id+"/_preview.webp",bytes,"image/webp",Convert.ToHexStringLower(SHA256.HashData(data)),ct);
+        var preview=new AssetPreview("_preview.webp",width,height);
+        using var db=database.Open();db.Ado.ExecuteCommand("UPDATE Assets SET PreviewJson=@preview WHERE Id=@id AND PreviewJson IS NULL",P("preview",JsonSerializer.Serialize(preview,ApiJson.Default.AssetPreview)),P("id",id));cache.Remove("asset:"+id);return Get(id);
+    }
+    public async Task CleanupImport(string taskId,CancellationToken ct)
+    {
+        using var db=database.Open();db.Ado.ExecuteCommand("INSERT INTO ImportJobs(Id,Cancelled) VALUES(@task,1) ON DUPLICATE KEY UPDATE Cancelled=1",P("task",taskId));var ids=db.Ado.SqlQuery<IdRow>("SELECT Id FROM Assets WHERE ImportTaskId=@task AND Id NOT IN(SELECT AssetId FROM Dependencies)",P("task",taskId));
+        foreach(var row in ids) { try { await Delete(row.Id,ct); } catch(ApiException error) when(error.Status==409) { /* A concurrent save acquired ownership. */ } }
     }
     public async Task<JsonElement> ModelDefinition(AssetResponse asset,CancellationToken ct)
     {
@@ -131,7 +149,7 @@ public sealed class ObjectStore : IDisposable
             db.Ado.ExecuteCommand("DELETE FROM Assets WHERE Id=@id", P("id", id)); db.Ado.CommitTran();
         } catch { db.Ado.RollbackTran(); throw; }
         cache.Remove("asset:" + id);
-        foreach (var file in ToAsset(row).Files) await client.DeleteObjectAsync(bucket, "assets/" + id + "/" + file, ct);
+        foreach (var file in ToAsset(row).Files.Concat(ToAsset(row).Preview is {} preview ? [preview.File] : Array.Empty<string>())) await client.DeleteObjectAsync(bucket, "assets/" + id + "/" + file, ct);
     }
     public void Dispose() => client.Dispose();
 }

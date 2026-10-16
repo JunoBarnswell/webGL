@@ -1,3 +1,4 @@
+import { current as draftValue } from 'immer';
 import * as THREE from 'three';
 import { componentDefinitions, createComponent, createMaterial, getComponent, materialFields, settingFields, type ComponentType, type Entity, type JsonValue, type FieldSchema } from '@studio/scene-schema';
 import { reparentEntity } from '@studio/editor-core';
@@ -17,14 +18,14 @@ export function Inspector(){
     const current=doc.entities.find(e=>e.id===entity?.id);const component=current?.components.find(c=>c.type===materialComponent?.type);if(!component)return;
     let target=doc.materials.find(m=>m.id===component.data.materialId);if(!target)return;
     const users=doc.entities.reduce((sum,e)=>sum+e.components.filter(c=>c.data.materialId===target!.id).length,0);
-    if(users>1){target=structuredClone(target);target.id=crypto.randomUUID();target.name+=' 副本';doc.materials.push(target);component.data.materialId=target.id;}
+    if(users>1){target=structuredClone(draftValue(target));target.id=crypto.randomUUID();target.name+=' 副本';doc.materials.push(target);component.data.materialId=target.id;}
     Object.assign(target,{[key]:value});
   }});
   const transform=entity?(transforms[entity.id]??entity.transform):undefined;
   const angles=transform?new THREE.Euler().setFromQuaternion(new THREE.Quaternion().fromArray(transform.rotation),'XYZ'):new THREE.Euler();
   return <section className="panel inspector"><div className="inspector-heading"><span className="section-kicker">{entity?'当前节点':'场景设置'}</span><h2>{entity?.name??document.name}</h2>{selected.length>1&&<p>已选择 {selected.length} 个节点，视口变换同时应用</p>}</div>
     <fieldset disabled={mode==='play'||Boolean(entity?.locked)}>
-    {!entity?<><label className="field"><span>场景名称</span><TextField label="场景名称" value={document.name} onChange={value=>command({label:'修改场景名称',mutate:doc=>{doc.name=value;}})}/></label><Fields fields={settingFields} value={document.settings as unknown as Record<string,JsonValue>} path="settings" onChange={(key,value)=>command({label:'修改场景设置',mutate:doc=>Object.assign(doc.settings,{[key]:value})})}/></>:<>
+    {!entity?<><button className="wide-button" disabled={!runtime} onClick={()=>{const pose=useStudio.getState().view?.pose();if(!pose||!runtime){useStudio.getState().set({message:'视口尚未就绪'});return;}const far=runtime.engine.camera.far;command({label:'记录初始视角',mutate:doc=>{Object.assign(doc.settings,pose,{far});}});}}>将当前画面设为初始视角</button><label className="field"><span>场景名称</span><TextField label="场景名称" value={document.name} onChange={value=>command({label:'修改场景名称',mutate:doc=>{doc.name=value;}})}/></label><Fields fields={settingFields} value={document.settings as unknown as Record<string,JsonValue>} path="settings" onChange={(key,value)=>command({label:'修改场景设置',mutate:doc=>Object.assign(doc.settings,{[key]:value})})}/></>:<>
       <label className="field"><span>名称</span><TextField label="节点名称" value={entity.name} onChange={value=>mutate('重命名节点',current=>{current.name=value;})}/></label>
       <label className="field"><span>父节点</span><select aria-label="父节点" value={entity.parentId??''} onChange={event=>command(reparentEntity(entity.id,event.target.value||null))}><option value="">场景根</option>{document.entities.filter(e=>e.id!==entity.id).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
       <details open><summary>局部变换 <small>mm / °</small></summary>
@@ -34,7 +35,9 @@ export function Inspector(){
       </details>
       {entity.components.map(component=>{
         const definition=componentDefinitions.find(d=>d.type===component.type)!;
+        const task=({Artwork:'content',Hotspot:'content',Cruise:'tour',Zone:'tour'}as const)[component.type as 'Artwork'|'Hotspot'|'Cruise'|'Zone'];
         return <details open key={component.type}><summary>{definition.title}<label className="component-enabled" onClick={event=>event.stopPropagation()}><input aria-label={definition.title+' 启用'} disabled={component.type==='ModelNode'} type="checkbox" checked={component.enabled} onChange={event=>mutate('切换组件',current=>{current.components.find(c=>c.type===component.type)!.enabled=event.target.checked;})}/></label></summary>
+          {task&&<button className="wide-button" onClick={()=>useStudio.getState().set({workspace:task})}>打开{task==='content'?'热点内容':'导览巡航'}工作区</button>}
           <Fields fields={definition.fields} value={component.data} path={component.type} onChange={(key,value)=>mutate('修改'+definition.title,current=>{current.components.find(c=>c.type===component.type)!.data[key]=value;})}/>
           {component.type==='Panorama'&&<button className="wide-button" onClick={()=>void useStudio.getState().run('导出全景',async()=>{if(runtime)saveBlob(await runtime.snapshot(entity.id),'panorama.png');})}>导出全景快照</button>}
           <button disabled={component.type==='ModelNode'} className="text-button danger" onClick={()=>mutate('移除组件',current=>{current.components=current.components.filter(c=>c.type!==component.type);})}>移除组件</button>
@@ -47,7 +50,7 @@ export function Inspector(){
         <p className="hint">修改时自动分离共享材质</p>
         <Fields fields={Object.fromEntries(Object.entries(materialFields).filter(([key])=>!['id','maps','envAssetIds'].includes(key)))} value={material as unknown as Record<string,JsonValue>} path="material" onChange={updateMaterial}/>
         {Object.entries(material.maps).map(([key,binding])=><details key={key} open><summary>{key}</summary>
-          <Field field={{type:'string',title:'贴图资源','x-reference':'asset'}} value={binding.assetId} path={'map.'+key} onChange={value=>updateMaterial('maps',{...material.maps,[key]:{...binding,assetId:String(value)}} as unknown as JsonValue)}/>
+          <Field field={{type:'string',title:'贴图资源','x-reference':'asset','x-asset-kind':'image'}} value={binding.assetId} path={'map.'+key} onChange={value=>updateMaterial('maps',{...material.maps,[key]:{...binding,assetId:String(value)}} as unknown as JsonValue)}/>
           {(['offset','repeat'] as const).map(property=><Field key={property} field={{...vectorField,title:property==='offset'?'偏移':'平铺'}} value={binding[property]} path={key+'.'+property} onChange={value=>updateMaterial('maps',{...material.maps,[key]:{...binding,[property]:value}} as unknown as JsonValue)}/>)}
           <button className="text-button danger" onClick={()=>{const maps={...material.maps};delete maps[key];updateMaterial('maps',maps as unknown as JsonValue);}}>移除贴图</button>
         </details>)}

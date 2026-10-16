@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createAction, createComponent, createDocument, createEntity, createMaterial, type Entity, type SceneAsset, type SceneDocument } from '@studio/scene-schema';
+import { createAction, createComponent, createDocument, createEntity, createMaterial, createContent, createBehavior, type Entity, type SceneAsset, type SceneDocument } from '@studio/scene-schema';
 import { O2vrGeometryDecoder } from './O2vrGeometryDecoder.js';
 
 export type FileBundle = Map<string, Uint8Array>;
@@ -81,12 +81,12 @@ export async function importO2vr(scene: LegacyNode, bindings: Record<string,Bind
     }
     const binding=bindings[node.uuid??''];
     if (binding) {
-      report.bindings++; const artwork=createComponent('Artwork');
-      const signed=edit.user_item_info?.[String(binding.resid)]?.url; const url=signed || binding.url;
-      try { artwork.data.assetId=(await asset(url,'image')).id; } catch(error) { artwork.data.assetId=(await missingAsset(url,'image',error)).id; }
-      artwork.data.title=binding.name; entity.components.push(artwork);
-      const action=createAction('OpenInfo'); action.data={title:binding.name,content:'',assetId:artwork.data.assetId};
-      document.behaviors.push({id:'artwork-'+entity.id,name:'查看 '+binding.name,event:'click',sourceId:entity.id,condition:{once:false,viewMode:'any',displayMode:'any'},actions:[action]});
+      report.bindings++;const artwork=createComponent('Artwork'),content=createContent(binding.name);content.id='content-'+entity.id;
+      const signed=edit.user_item_info?.[String(binding.resid)]?.url;const url=signed||binding.url;
+      try{content.imageAssetId=(await asset(url,'image')).id;}catch(error){content.imageAssetId=(await missingAsset(url,'image',error)).id;}
+      document.contents.push(content);artwork.data.contentId=content.id;entity.components.push(artwork);
+      const action=createAction('OpenContent');action.targetId=content.id;
+      const behavior=createBehavior('查看 '+binding.name);behavior.id='artwork-'+entity.id;behavior.sourceId=entity.id;behavior.actions=[action];document.behaviors.push(behavior);
     }
     document.entities.push(entity);
     for(const [index,child] of (node.children??[]).entries()) await visit(child,entity.id,isCollider,isGround,path+'-'+index);
@@ -94,17 +94,18 @@ export async function importO2vr(scene: LegacyNode, bindings: Record<string,Bind
   await visit(scene,null,false,false);
   document.settings.moveSpeed=3500; document.settings.eyeHeight=1720; document.settings.position=[-1846,1720,726]; document.settings.target=[-1846,1720,-274];
   const root=document.entities[0];
-  const zone=createComponent('Zone'); zone.data.views=[
-    {id:'entrance',name:'展厅入口',position:[-1846,2000,726],target:[-1778,2162,-1409]},
-    {id:'A',name:'A区 · 经典写实油画',position:[-11142,2000,-20020],target:[-13127,2137,-20227]},
-    {id:'B',name:'B区 · 印象派光影',position:[-13619,2000,-5834],target:[-15596,1912,-6126]},
-    {id:'C',name:'C区 · 当代浪漫表现',position:[4864,2000,25700],target:[4858,2249,23715]},
-    {id:'D',name:'D区 · 抽象意象空间',position:[-10323,2000,29875],target:[-10774,2123,27930]}
-  ]; root.components.push(zone);
+  const addView=(suffix:string,name:string,position:number[],target:number[])=>{const id='view-'+suffix;document.viewpoints.push({id,name,anchorId:root.id,position:position as [number,number,number],target:target as [number,number,number],fov:document.settings.fov,thumbnailAssetId:''});return id;};
+  const zone=createComponent('Zone');zone.data.viewpointIds=[
+    addView('entrance','展厅入口',[-1846,2000,726],[-1778,2162,-1409]),
+    addView('A','A区 · 经典写实油画',[-11142,2000,-20020],[-13127,2137,-20227]),
+    addView('B','B区 · 印象派光影',[-13619,2000,-5834],[-15596,1912,-6126]),
+    addView('C','C区 · 当代浪漫表现',[4864,2000,25700],[4858,2249,23715]),
+    addView('D','D区 · 抽象意象空间',[-10323,2000,29875],[-10774,2123,27930])
+  ];root.components.push(zone);
   const path=[[-1846,726],[-4500,-3000],[-8000,-11000],[-11142,-20020],[-13500,-13500],[-13619,-5834],[-10500,-4500],[-7000,-4000],[-4500,-1500],[-2000,1000],[-2000,8000],[-2000,15000],[-2000,22000],[0,24500],[2500,25200],[4864,25700],[2000,25000],[-1000,24600],[-4000,24600],[-6500,25180],[-8500,25300],[-10000,26800],[-10323,29875],[-10000,26800],[-8500,25300],[-6000,25180],[-3000,24500],[-2000,22000],[-2000,14000],[-1846,5000],[-1846,1500]];
-  const cruise=createComponent('Cruise'); cruise.data.points=path.map(([x,z],index)=>({position:[x,2000,z],target:[path[(index+1)%path.length][0],2000,path[(index+1)%path.length][1]],pause:0}));
-  cruise.data.stops=[{progress:.170,duration:3,target:[-13127,2137,-20227]},{progress:.280,duration:3,target:[-15596,1912,-6126]},{progress:.602,duration:3,target:[4858,2249,23715]},{progress:.742,duration:3,target:[-10774,2123,27930]}]; root.components.push(cruise);
-  const panorama=createComponent('Panorama'); panorama.data.position=[...document.settings.position]; root.components.push(panorama);
+  document.tours.push({id:'showroom-tour',name:'展厅导览',loop:false,speed:document.settings.moveSpeed,stops:path.map(([x,z],index)=>({id:'showroom-stop-'+index,viewpointId:addView('tour-'+index,'导览 '+(index+1),[x,2000,z],[path[Math.min(index+1,path.length-1)][0],2000,path[Math.min(index+1,path.length-1)][1]-1]),hold:[3,5,15,22].includes(index)?3:0,travel:0}))});
+  const cruise=createComponent('Cruise');cruise.data.tourId='showroom-tour';root.components.push(cruise);
+  const panorama=createComponent('Panorama');panorama.data.viewpointId=addView('panorama','全景观察点',[...document.settings.position],[...document.settings.target]);root.components.push(panorama);
   for (const [type,path,kind] of [['Audio','audio/bgm.mp3','audio'],['Avatar','model/avatar/character.glb','model']] as const) {
     const component=createComponent(type);
     try { component.data.assetId=(await asset(path,kind)).id; } catch(error) { component.data.assetId=(await missingAsset(path,kind,error)).id; }
@@ -151,3 +152,5 @@ export function modelEntities(asset: SceneAsset, metadata: ReturnType<typeof rea
   if(metadata.animations.length) {const animation=createComponent('Animation');animation.data.modelEntityId=root.id;animation.data.clip=metadata.animations[0];root.components.push(animation);}
   return entities;
 }
+
+export { runAssetTask } from './AssetWorker';

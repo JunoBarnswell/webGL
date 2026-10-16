@@ -12,22 +12,23 @@
     "dev:player": "npm run dev -w @studio/player",
     "build": "npm run build -w @studio/editor && npm run build -w @studio/player",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint apps packages/scene-schema packages/scene-runtime packages/editor-core packages/asset-pipeline scripts --max-warnings 0",
+    "lint": "eslint apps packages/scene-schema packages/scene-runtime packages/editor-core packages/asset-pipeline packages/player-ui scripts --max-warnings 0",
     "import:showroom": "tsx scripts/import-showroom.mts",
     "verify:integration": "tsx scripts/verify-integration.mts",
     "verify:contracts": "tsx scripts/verify-contracts.mts",
-    "package:linux": "bash scripts/package-linux.sh"
+    "package:linux": "bash scripts/package-linux.sh",
+    "verify:experience": "tsx scripts/verify-experience.mts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
-    "dockview-react": "^4.0.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "0.160.1",
     "zustand": "^5.0.0",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "immer": "11.1.21"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

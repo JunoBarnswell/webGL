@@ -1,3 +1,5 @@
+> 历史 Linux 交付记录；当前 Windows 说明与实际结果见 windows-delivery.md 和 acceptance/windows.md。
+
 # WebGL Studio v1 · Linux x64
 
 原生 API 使用 .NET 10 Native AOT。Editor、Player 在同一服务提供静态文件；MySQL 8、MinIO 为独立持久化服务。Windows 发布及 `.exe` 验收按用户要求豁免。

@@ -14,8 +14,12 @@ public sealed class Database(IConfiguration configuration)
     public void Migrate()
     {
         using var db = Open();
-        foreach (var path in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "migrations"), "*.sql").Order())
-            foreach (var sql in File.ReadAllText(path).Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                db.Ado.ExecuteCommand(sql);
+        db.Ado.ExecuteCommand("CREATE TABLE IF NOT EXISTS SchemaMigrations(Version INT PRIMARY KEY, AppliedAt VARCHAR(40) NOT NULL)");
+        foreach (var path in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "migrations"), "*.sql").Order()) {
+            var version = int.Parse(Path.GetFileName(path).Split('_')[0], System.Globalization.CultureInfo.InvariantCulture);
+            if (db.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM SchemaMigrations WHERE Version=@version", P("version", version))[0].Value != 0) continue;
+            foreach (var sql in File.ReadAllText(path).Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) db.Ado.ExecuteCommand(sql);
+            db.Ado.ExecuteCommand("INSERT INTO SchemaMigrations(Version,AppliedAt) VALUES(@version,@now)", P("version",version), P("now",Now()));
+        }
     }
 }

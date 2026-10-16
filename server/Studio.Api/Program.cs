@@ -35,7 +35,7 @@ app.Use(async (context, next) => {
 });
 app.UseRateLimiter();
 app.MapPost("/api/auth/login", (LoginRequest request, Authentication authentication) => Results.Json(authentication.Login(request), ApiJson.Default.LoginResponse)).RequireRateLimiting("login");
-app.MapGet("/api/health", (Database database) => { using var db = database.Open(); db.Ado.SqlQuery<CountRow>("SELECT 1 AS Value"); return Results.Json(new HealthResponse("ready", "linux-x64/native-aot", "mysql8/minio"), ApiJson.Default.HealthResponse); });
+app.MapGet("/api/health", (Database database) => { using var db = database.Open(); db.Ado.SqlQuery<CountRow>("SELECT 1 AS Value"); return Results.Json(new HealthResponse("ready", System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier + "/native-aot", "mysql/minio"), ApiJson.Default.HealthResponse); });
 app.MapGet("/api/projects", (StudioService service) => Results.Json(service.Projects(), ApiJson.Default.ProjectResponseArray));
 app.MapPost("/api/projects", (ProjectRequest request, StudioService service) => Results.Json(service.Create(request), ApiJson.Default.DraftResponse));
 app.MapPost("/api/projects/{id}/copy", (string id, StudioService service) => Results.Json(service.Copy(id), ApiJson.Default.DraftResponse));
@@ -55,10 +55,12 @@ app.MapPost("/api/scenes/{id}/versions/{version}/restore", (string id, string ve
 app.MapPost("/api/scenes/{id}/publish", async (string id, RevisionRequest request, StudioService service, CancellationToken ct) => Results.Json(await service.Publish(id, request.ExpectedRevision, ct), ApiJson.Default.PublishResponse));
 app.MapDelete("/api/scenes/{id}/publish", (string id, StudioService service) => { service.Unpublish(id); return Results.NoContent(); });
 app.MapGet("/api/assets", (Database database) => { using var db = database.Open(); return Results.Json(db.Ado.SqlQuery<AssetRow>("SELECT * FROM Assets ORDER BY CreatedAt DESC").Select(row => new AssetStatusResponse(ObjectStore.ToAsset(row), row.Status)).ToArray(), ApiJson.Default.AssetStatusResponseArray); });
-app.MapPost("/api/assets", async (HttpContext context, ObjectStore objects) => Results.Json(await objects.Upload(context.Request.Body, context.Request.Query["name"].ToString(), context.Request.Query["kind"].ToString(), context.Request.Query["entry"].ToString(), context.RequestAborted), ApiJson.Default.AssetResponse));
+app.MapPost("/api/assets", async (HttpContext context, ObjectStore objects) => Results.Json(await objects.Upload(context.Request.Body, context.Request.Query["name"].ToString(), context.Request.Query["kind"].ToString(), context.Request.Query["entry"].ToString(), context.RequestAborted, context.Request.Query["importTaskId"].FirstOrDefault()), ApiJson.Default.AssetResponse));
+app.MapPut("/api/assets/{id}/preview", async (string id, int width, int height, HttpContext context, ObjectStore objects) => Results.Json(await objects.Preview(id,context.Request.Body,width,height,context.RequestAborted),ApiJson.Default.AssetResponse));
+app.MapDelete("/api/imports/{taskId}",async(string taskId,ObjectStore objects,CancellationToken ct)=>{await objects.CleanupImport(taskId,ct);return Results.NoContent();});
 app.MapDelete("/api/assets/{id}", async (string id, ObjectStore objects, CancellationToken ct) => { await objects.Delete(id, ct); return Results.NoContent(); });
 static async Task FileResponse(string id, string path, HttpContext context, ObjectStore objects) {
-    var asset = objects.Get(id); if (!ObjectStore.ValidPath(path) || !asset.Files.Contains(path)) throw new ApiException(404, "资源文件不存在");
+    var asset = objects.Get(id); if (!ObjectStore.ValidPath(path) || !(asset.Files.Contains(path)||asset.Preview?.File==path)) throw new ApiException(404, "资源文件不存在");
     context.Response.ContentType = ObjectStore.Mime(path); context.Response.Headers.CacheControl = "private, max-age=0, must-revalidate";
     await objects.CopyTo("assets/" + id + "/" + path, context.Response.Body, context.RequestAborted);
 }

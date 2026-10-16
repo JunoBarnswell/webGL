@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { AssetScheduler, ResourceRegistry } from '@o2vr/engine';
+import { runAssetTask } from '@studio/asset-pipeline';
+import { assetBytes } from './AssetCache';
 import type { SceneAsset, SceneDocument, SceneMaterial } from '@studio/scene-schema';
 
 export interface AssetSource { url(assetId: string, file: string): string; headers?: () => HeadersInit }
@@ -17,6 +19,7 @@ export class AssetStore {
   private urls = new Set<string>();
   private blobUrls = new Map<string,Promise<string>>();
   private closed = false;
+  private cancellation=new AbortController();
   constructor(private document: SceneDocument, readonly source: AssetSource, private registry: ResourceRegistry) {}
   update(document: SceneDocument): void { this.document = document; }
   asset(id: string): SceneAsset {
@@ -34,9 +37,7 @@ export class AssetStore {
     let promise = this.bytes.get(key);
     if (!promise) {
       promise = this.scheduler.schedule(key, async (signal: AbortSignal) => {
-        const response = await fetch(this.source.url(asset.id, path), { headers: this.source.headers?.(), signal });
-        if (!response.ok) throw new Error(asset.name + ': HTTP ' + response.status);
-        return response.arrayBuffer();
+        return assetBytes(this.source,asset,path,signal);
       });
       this.bytes.set(key, promise);
     }
@@ -68,9 +69,12 @@ export class AssetStore {
   geometry(id: string): Promise<THREE.BufferGeometry> {
     let promise = this.geometries.get(id);
     if (!promise) {
-      promise = this.file(this.asset(id)).then(bytes => {
-        const geometry = new THREE.BufferGeometryLoader().parse(JSON.parse(new TextDecoder().decode(bytes)));
-        this.own(geometry); return geometry;
+      promise = this.file(this.asset(id)).then(async bytes => {
+        type Attribute={array:THREE.TypedArray;itemSize:number;normalized:boolean};
+        const data=await runAssetTask<{attributes:Record<string,Attribute>;index:Attribute|null;groups:{start:number;count:number;materialIndex?:number}[]}>('geometry',bytes,{signal:this.cancellation.signal});
+        if(this.closed)throw new DOMException('场景已关闭','AbortError');
+        const geometry=new THREE.BufferGeometry();for(const [name,a]of Object.entries(data.attributes))geometry.setAttribute(name,new THREE.BufferAttribute(a.array,a.itemSize,a.normalized));
+        if(data.index)geometry.setIndex(new THREE.BufferAttribute(data.index.array,data.index.itemSize,data.index.normalized));for(const group of data.groups)geometry.addGroup(group.start,group.count,group.materialIndex);this.own(geometry);return geometry;
       });
       this.geometries.set(id, promise);
     }
@@ -165,7 +169,7 @@ export class AssetStore {
     material.dispose();
   }
   close(): void {
-    this.closed = true; this.scheduler.dispose();
+    this.closed = true; this.cancellation.abort(); this.scheduler.dispose();
     for (const url of this.urls) URL.revokeObjectURL(url);
     this.urls.clear();
     for (const resource of this.owned) this.registry.release(resource);

@@ -1,10 +1,31 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
-    "strict": true, "skipLibCheck": true, "noEmit": true,
-    "allowJs": true, "checkJs": false, "resolveJsonModule": true,
-    "esModuleInterop": true, "allowImportingTsExtensions": true
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/scene-schema/**/*.ts", "packages/scene-runtime/**/*.ts", "packages/editor-core/**/*.ts", "packages/asset-pipeline/**/*.ts"]
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/scene-schema/**/*.ts",
+    "packages/scene-runtime/**/*.ts",
+    "packages/editor-core/**/*.ts",
+    "packages/asset-pipeline/**/*.ts",
+    "packages/player-ui/**/*.ts",
+    "packages/player-ui/**/*.tsx"
+  ]
 }

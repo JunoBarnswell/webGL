@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile,writeFile,mkdir } from 'node:fs/promises';
-import { createComponent,createDocument,createEntity,createMaterial,validateDocument,type SceneDocument } from '@studio/scene-schema';
+import { createUiNode,createAction,createContent,createComponent,createBehavior,createDocument,createEntity,createMaterial,validateDocument,type SceneDocument } from '@studio/scene-schema';
 import { EditorSession,addEntity,deleteEntities,duplicateEntities,reparentEntity } from '@studio/editor-core';
 const document=createDocument('契约验证');const first=createEntity('父节点'),child=createEntity('子节点',first.id);document.entities.push(first,child);
 const session=new EditorSession(document);const changes:string[]=[];session.subscribe((_change,label)=>changes.push(label));
@@ -15,25 +15,36 @@ const fixtures:{name:string;document:SceneDocument;valid:boolean}[]=[];
 const add=(name:string,mutate:(doc:SceneDocument)=>void,valid=false)=>{const doc=createDocument(name);mutate(doc);fixtures.push({name,document:doc,valid});};
 add('empty valid',()=>{},true);
 add('disabled render and animation',doc=>{const entity=createEntity();const model=createComponent('Model'),animation=createComponent('Animation');model.enabled=false;animation.enabled=false;entity.components.push(model,animation);doc.entities.push(entity);},true);
-add('unfinished behavior draft',doc=>{doc.behaviors.push({id:'unfinished',name:'未完成交互',event:'ready',sourceId:'',condition:{once:false,viewMode:'any',displayMode:'any'},actions:[]});},true);
+add('unfinished behavior draft',doc=>{doc.behaviors.push({...createBehavior('未完成交互'),event:'ready',sourceKind:'scene'});},true);
 add('unfinished animation draft',doc=>{const entity=createEntity();entity.components.push(createComponent('Animation'));doc.entities.push(entity);},true);
 add('all component defaults',doc=>{const entity=createEntity();entity.components.push(createComponent('Hotspot'),createComponent('Cruise'),createComponent('Zone'),createComponent('Panorama'),createComponent('Trigger'));doc.entities.push(entity);},true);
 add('cycle',doc=>{const e=createEntity();e.parentId=e.id;doc.entities.push(e);});
 add('unknown component',doc=>{const e=createEntity();e.components.push({type:'Unknown',enabled:true,data:{}} as never);doc.entities.push(e);});
 add('quaternion',doc=>{const e=createEntity();e.transform.rotation=[0,0,0,0];doc.entities.push(e);});
 add('zero scale',doc=>{const e=createEntity();e.transform.scale[0]=0;doc.entities.push(e);});
-add('missing asset reference',doc=>{const e=createEntity();const c=createComponent('Artwork');c.data.assetId='absent';e.components.push(c);doc.entities.push(e);});
+add('missing asset reference',doc=>{const e=createEntity();const c=createComponent('Artwork');c.data.contentId='absent';e.components.push(c);doc.entities.push(e);});
 add('texture reference',doc=>{const material=createMaterial();material.maps.map={assetId:'absent',offset:[0,0],repeat:[1,1],rotation:0,channel:0,flipY:true,colorSpace:'srgb'};doc.materials.push(material);});
 add('environment reference',doc=>{doc.settings.environmentAssetIds=['absent'];});
 add('duplicate id',doc=>{const e=createEntity();doc.entities.push(e,structuredClone(e));});
 add('bad path',doc=>{doc.assets.push({id:'asset',name:'bad',kind:'image',entry:'../bad',files:['../bad'],sha256:'0'.repeat(64)});});
 add('invalid color',doc=>{doc.settings.background='wrong';});
+add('shared content valid',doc=>{const entity=createEntity('热点');const content=createContent('介绍');doc.contents.push(content);const c=createComponent('Hotspot');c.data.contentId=content.id;entity.components.push(c);doc.entities.push(entity);const b=createBehavior();b.sourceId=entity.id;const a=createAction('OpenContent');a.targetId=content.id;b.actions=[a];doc.behaviors.push(b);},true);
+add('nested missing target',doc=>{const b=createBehavior();b.sourceKind='scene';b.event='ready';const a=createAction('If');a.then=[{...createAction('OpenContent'),targetId:'missing'}];b.actions=[a];doc.behaviors.push(b);});
+add('wrong variable initial',doc=>{doc.variables.push({id:'flag',name:'标记',type:'boolean',initial:1});});
+add('UI hierarchy cycle',doc=>{doc.ui.nodes[0].parentId=doc.ui.nodes[0].id;});
+add('UI invalid width',doc=>{doc.ui.nodes[0].style.width='wrong';});
+add('UI missing action target',doc=>{doc.ui.nodes[0].action={...createAction('ToggleUi'),targetId:'missing'};});
+add('UI cross layout parent',doc=>{doc.ui.nodes[0].parentId=doc.ui.nodes.find(n=>n.layoutId!==doc.ui.nodes[0].layoutId)!.id;});
+add('looping wait',doc=>{const b=createBehavior();b.sourceKind='scene';b.event='ready';doc.viewpoints.push({id:'a',name:'视点',anchorId:'',position:[0,0,0],target:[0,0,-1000],fov:60,thumbnailAssetId:''});doc.tours.push({id:'loop',name:'循环',stops:[{id:'stop',viewpointId:'a',hold:3,travel:0}],speed:1000,loop:true});b.actions=[{...createAction('StartCruise'),targetId:'loop',wait:true}];doc.behaviors.push(b);});
+add('unfinished UI image',doc=>{doc.ui.nodes.push(createUiNode('image','hud-default'));},true);
+add('unfinished material',doc=>{const material=createMaterial('未绑定贴图');material.maps.map={assetId:'',offset:[0,0],repeat:[1,1],rotation:0,channel:0,flipY:true,colorSpace:'srgb'};doc.materials.push(material);},true);
+add('UI image wrong asset kind',doc=>{doc.assets.push({id:'model',kind:'model',name:'不允许作为图片',entry:'model.glb',files:['model.glb'],sha256:'0'.repeat(64)});const node=createUiNode('image','hud-default');node.assetId='model';doc.ui.nodes.push(node);});
 for(const fixture of fixtures)assert.equal(validateDocument(fixture.document).length===0,fixture.valid,fixture.name);
 const config=JSON.parse(await readFile(new URL('../.local/config.json',import.meta.url),'utf8'));const base=process.env.STUDIO_API??'http://127.0.0.1:18080';
 const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:config.adminUser,password:config.adminPassword})});assert.equal(login.status,200);const token=(await login.json()).token;
 for(const fixture of fixtures){
  const response=await fetch(base+'/api/projects',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({name:fixture.name,document:fixture.document})});
- assert.equal(response.ok,fixture.valid,'API/TS contract divergence: '+fixture.name+' '+await response.clone().text());
+ assert.equal(response.status,fixture.valid?200:422,'API/TS contract divergence: '+fixture.name+' '+await response.clone().text());
  if(response.ok){
   const draft=await response.json();
   if(fixture.name.startsWith('unfinished')){

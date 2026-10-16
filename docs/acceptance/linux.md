@@ -1,3 +1,5 @@
+> 历史 Linux 交付记录；当前 Windows 说明与实际结果见 windows-delivery.md 和 acceptance/windows.md。
+
 # Linux v1 验收记录
 
 验收日期：2026-10-15，结构化记录时间为 UTC。实施分支 `codex/webgl-studio-v1`。用户确认的基线为 `5a9fdd2870ceec4afe680a43d2563574b953f97d`，包含原始基线 `9942d737ce8efcca20ba6534cce721c87b1d3d01`。

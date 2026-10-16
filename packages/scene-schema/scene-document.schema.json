@@ -1,12 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://webgl.studio/schema/scene-document-v1.json",
+  "$id": "https://webgl.studio/scene-document.schema.json",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": {
-      "const": 1
-    },
     "sceneId": {
       "type": "string",
       "title": "场景 ID",
@@ -64,6 +61,41 @@
           "sha256": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "title": "",
+                "default": ""
+              },
+              "width": {
+                "type": "number",
+                "title": "",
+                "default": 0,
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "height": {
+                "type": "number",
+                "title": "",
+                "default": 0,
+                "minimum": 1,
+                "maximum": 1000000
+              }
+            },
+            "required": [
+              "file",
+              "width",
+              "height"
+            ]
+          },
+          "importTaskId": {
+            "type": "string",
+            "title": "",
+            "default": ""
           }
         },
         "required": [
@@ -201,93 +233,42 @@
     "behaviors": {
       "type": "array",
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "行为 ID",
-            "default": ""
-          },
-          "name": {
-            "type": "string",
-            "title": "名称",
-            "default": "交互"
-          },
-          "event": {
-            "type": "string",
-            "title": "事件",
-            "default": "click",
-            "enum": [
-              "click",
-              "enter",
-              "leave",
-              "ready",
-              "animationEnd"
-            ]
-          },
-          "sourceId": {
-            "type": "string",
-            "title": "事件源",
-            "default": "",
-            "x-reference": "entity"
-          },
-          "condition": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "once": {
-                "type": "boolean",
-                "title": "仅一次",
-                "default": false
-              },
-              "viewMode": {
-                "type": "string",
-                "title": "视角条件",
-                "default": "any",
-                "enum": [
-                  "any",
-                  "first",
-                  "third"
-                ]
-              },
-              "displayMode": {
-                "type": "string",
-                "title": "展示条件",
-                "default": "any",
-                "enum": [
-                  "any",
-                  "solid",
-                  "xray"
-                ]
-              }
-            },
-            "required": [
-              "once",
-              "viewMode",
-              "displayMode"
-            ]
-          },
-          "actions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/action"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "event",
-          "sourceId",
-          "condition",
-          "actions"
-        ]
+        "$ref": "#/$defs/behavior"
       }
+    },
+    "contents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/content"
+      },
+      "default": []
+    },
+    "viewpoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/viewpoint"
+      },
+      "default": []
+    },
+    "tours": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tour"
+      },
+      "default": []
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/variable"
+      },
+      "default": []
+    },
+    "ui": {
+      "$ref": "#/$defs/ui"
     }
   },
   "required": [
-    "schemaVersion",
     "sceneId",
     "name",
     "units",
@@ -295,7 +276,12 @@
     "materials",
     "entities",
     "settings",
-    "behaviors"
+    "behaviors",
+    "contents",
+    "viewpoints",
+    "tours",
+    "variables",
+    "ui"
   ],
   "$defs": {
     "component": {
@@ -320,7 +306,8 @@
                   "type": "string",
                   "title": "网格资源",
                   "default": "",
-                  "x-reference": "asset"
+                  "x-reference": "asset",
+                  "x-asset-kind": "mesh"
                 },
                 "materialId": {
                   "type": "string",
@@ -362,7 +349,8 @@
                   "type": "string",
                   "title": "模型资源",
                   "default": "",
-                  "x-reference": "asset"
+                  "x-reference": "asset",
+                  "x-asset-kind": "model"
                 },
                 "materialId": {
                   "type": "string",
@@ -473,18 +461,40 @@
                   "x-editor": "color",
                   "pattern": "^#[a-fA-F0-9]{6}$"
                 },
-                "content": {
+                "contentId": {
                   "type": "string",
-                  "title": "介绍内容",
                   "default": "",
-                  "x-editor": "textarea"
+                  "title": "热点内容",
+                  "x-reference": "content"
+                },
+                "offset": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "size": {
+                  "type": "number",
+                  "title": "标记尺寸",
+                  "default": 14,
+                  "minimum": 8,
+                  "maximum": 64
                 }
               },
               "required": [
                 "label",
                 "icon",
                 "color",
-                "content"
+                "contentId",
+                "offset",
+                "size"
               ]
             }
           },
@@ -511,28 +521,15 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "assetId": {
+                "contentId": {
                   "type": "string",
-                  "title": "图片资源",
                   "default": "",
-                  "x-reference": "asset"
-                },
-                "title": {
-                  "type": "string",
-                  "title": "作品名称",
-                  "default": "作品"
-                },
-                "description": {
-                  "type": "string",
-                  "title": "作品介绍",
-                  "default": "",
-                  "x-editor": "textarea"
+                  "title": "作品资料",
+                  "x-reference": "content"
                 }
               },
               "required": [
-                "assetId",
-                "title",
-                "description"
+                "contentId"
               ]
             }
           },
@@ -837,7 +834,8 @@
                   "type": "string",
                   "title": "音频资源",
                   "default": "",
-                  "x-reference": "asset"
+                  "x-reference": "asset",
+                  "x-asset-kind": "audio"
                 },
                 "volume": {
                   "type": "number",
@@ -905,7 +903,8 @@
                   "type": "string",
                   "title": "角色模型",
                   "default": "",
-                  "x-reference": "asset"
+                  "x-reference": "asset",
+                  "x-asset-kind": "model"
                 },
                 "unitScale": {
                   "type": "number",
@@ -968,164 +967,21 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "points": {
-                  "type": "array",
-                  "title": "路径节点",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "position": {
-                        "type": "array",
-                        "title": "位置",
-                        "items": {
-                          "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "default": [
-                          0,
-                          0,
-                          0
-                        ],
-                        "x-editor": "vector"
-                      },
-                      "target": {
-                        "type": "array",
-                        "title": "朝向目标",
-                        "items": {
-                          "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "default": [
-                          0,
-                          2000,
-                          -1000
-                        ],
-                        "x-editor": "vector"
-                      },
-                      "pause": {
-                        "type": "number",
-                        "title": "停留秒数",
-                        "default": 0,
-                        "minimum": 0,
-                        "maximum": 3600
-                      }
-                    },
-                    "required": [
-                      "position",
-                      "target",
-                      "pause"
-                    ]
-                  },
-                  "minItems": 2,
-                  "default": [
-                    {
-                      "position": [
-                        0,
-                        2000,
-                        0
-                      ],
-                      "target": [
-                        0,
-                        2000,
-                        -1000
-                      ],
-                      "pause": 0
-                    },
-                    {
-                      "position": [
-                        3000,
-                        2000,
-                        0
-                      ],
-                      "target": [
-                        3000,
-                        2000,
-                        -1000
-                      ],
-                      "pause": 0
-                    }
-                  ],
-                  "x-editor": "route"
-                },
-                "closed": {
-                  "type": "boolean",
-                  "title": "闭合路线",
-                  "default": true
-                },
-                "duration": {
-                  "type": "number",
-                  "title": "单圈秒数",
-                  "default": 65,
-                  "minimum": 1,
-                  "maximum": 86400
-                },
-                "speed": {
-                  "type": "number",
-                  "title": "速度倍率",
-                  "default": 1,
-                  "minimum": 0.05,
-                  "maximum": 20
+                "tourId": {
+                  "type": "string",
+                  "default": "",
+                  "title": "导览路线",
+                  "x-reference": "tour"
                 },
                 "autoplay": {
                   "type": "boolean",
-                  "title": "自动巡航",
+                  "title": "进入时自动播放",
                   "default": false
-                },
-                "stops": {
-                  "type": "array",
-                  "title": "沿线停靠",
-                  "default": [],
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "progress": {
-                        "type": "number",
-                        "title": "路径进度",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "default": 0
-                      },
-                      "duration": {
-                        "type": "number",
-                        "title": "停靠秒数",
-                        "minimum": 0,
-                        "default": 3
-                      },
-                      "target": {
-                        "type": "array",
-                        "title": "观察目标",
-                        "items": {
-                          "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "default": [
-                          0,
-                          2000,
-                          0
-                        ],
-                        "x-editor": "vector"
-                      }
-                    },
-                    "required": [
-                      "progress",
-                      "duration",
-                      "target"
-                    ]
-                  }
                 }
               },
               "required": [
-                "points",
-                "closed",
-                "duration",
-                "speed",
-                "autoplay",
-                "stops"
+                "tourId",
+                "autoplay"
               ]
             }
           },
@@ -1152,74 +1008,26 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "views": {
+                "viewpointIds": {
                   "type": "array",
-                  "title": "视点列表",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "title": "标识",
-                        "default": ""
-                      },
-                      "name": {
-                        "type": "string",
-                        "title": "名称",
-                        "default": ""
-                      },
-                      "position": {
-                        "type": "array",
-                        "title": "位置",
-                        "items": {
-                          "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "default": [
-                          0,
-                          0,
-                          0
-                        ],
-                        "x-editor": "vector"
-                      },
-                      "target": {
-                        "type": "array",
-                        "title": "目标",
-                        "items": {
-                          "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3,
-                        "default": [
-                          0,
-                          0,
-                          0
-                        ],
-                        "x-editor": "vector"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "name",
-                      "position",
-                      "target"
-                    ]
+                    "type": "string",
+                    "default": "",
+                    "title": "视点",
+                    "x-reference": "viewpoint"
                   },
-                  "default": [],
-                  "x-editor": "views"
+                  "default": []
                 },
                 "duration": {
                   "type": "number",
-                  "title": "切换秒数",
+                  "title": "过渡秒数",
                   "default": 1.5,
-                  "minimum": 0.05,
-                  "maximum": 60
+                  "minimum": 0.1,
+                  "maximum": 600
                 }
               },
               "required": [
-                "views",
+                "viewpointIds",
                 "duration"
               ]
             }
@@ -1247,12 +1055,11 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "fov": {
-                  "type": "number",
-                  "title": "全景 FOV",
-                  "default": 75,
-                  "minimum": 10,
-                  "maximum": 120
+                "viewpointId": {
+                  "type": "string",
+                  "default": "",
+                  "title": "全景视点",
+                  "x-reference": "viewpoint"
                 },
                 "width": {
                   "type": "integer",
@@ -1267,28 +1074,12 @@
                   "default": 1024,
                   "minimum": 128,
                   "maximum": 4096
-                },
-                "position": {
-                  "type": "array",
-                  "title": "观察位置",
-                  "items": {
-                    "type": "number"
-                  },
-                  "minItems": 3,
-                  "maxItems": 3,
-                  "default": [
-                    0,
-                    2000,
-                    0
-                  ],
-                  "x-editor": "vector"
                 }
               },
               "required": [
-                "fov",
+                "viewpointId",
                 "width",
-                "height",
-                "position"
+                "height"
               ]
             }
           },
@@ -1368,14 +1159,23 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
             "type": {
               "const": "Show"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
               "default": "",
+              "title": "目标",
               "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1385,24 +1185,37 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "显示对象"
+          "title": "显示对象",
+          "x-target": "entity",
+          "x-components": []
         },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
             "type": {
               "const": "Hide"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
               "default": "",
+              "title": "目标",
               "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1412,24 +1225,37 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "隐藏对象"
+          "title": "隐藏对象",
+          "x-target": "entity",
+          "x-components": []
         },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
             "type": {
               "const": "Toggle"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
               "default": "",
+              "title": "目标",
               "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1439,24 +1265,36 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "切换可见"
+          "title": "切换显隐",
+          "x-target": "entity",
+          "x-components": []
         },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
             "type": {
               "const": "DisplayMode"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
+              "title": "",
+              "default": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1464,12 +1302,12 @@
               "properties": {
                 "mode": {
                   "type": "string",
-                  "title": "模式",
-                  "default": "xray",
                   "enum": [
                     "solid",
                     "xray"
-                  ]
+                  ],
+                  "title": "模式",
+                  "default": "solid"
                 }
               },
               "required": [
@@ -1478,24 +1316,88 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "展示模式"
+          "title": "展示分层",
+          "x-target": "",
+          "x-components": []
         },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "ViewMode"
+            },
+            "targetId": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "first",
+                    "third"
+                  ],
+                  "title": "模式",
+                  "default": "first"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "观察模式",
+          "x-target": "",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
             "type": {
               "const": "PlayAnimation"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
               "default": "",
+              "title": "目标",
               "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1503,7 +1405,7 @@
               "properties": {
                 "clip": {
                   "type": "string",
-                  "title": "动画名称",
+                  "title": "动画片段",
                   "default": ""
                 },
                 "loop": {
@@ -1519,282 +1421,40 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "播放动画"
+          "title": "播放动画",
+          "x-target": "entity",
+          "x-components": [
+            "Animation",
+            "Avatar"
+          ]
         },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "type": {
-              "const": "PlayAudio"
-            },
-            "targetId": {
+            "id": {
               "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
             },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {},
-              "required": []
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "播放音频"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "StopAudio"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {},
-              "required": []
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "停止音频"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "FlyTo"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "viewId": {
-                  "type": "string",
-                  "title": "视点标识",
-                  "default": ""
-                }
-              },
-              "required": [
-                "viewId"
-              ]
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "切换视点"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "OpenInfo"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "title": {
-                  "type": "string",
-                  "title": "标题",
-                  "default": "介绍"
-                },
-                "content": {
-                  "type": "string",
-                  "title": "内容",
-                  "default": "",
-                  "x-editor": "textarea"
-                },
-                "assetId": {
-                  "type": "string",
-                  "title": "图片",
-                  "default": "",
-                  "x-reference": "asset"
-                }
-              },
-              "required": [
-                "title",
-                "content",
-                "assetId"
-              ]
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "显示介绍"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "StartCruise"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {},
-              "required": []
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "开始巡航"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "PauseCruise"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {},
-              "required": []
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "暂停巡航"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "ViewMode"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "mode": {
-                  "type": "string",
-                  "title": "视角",
-                  "default": "first",
-                  "enum": [
-                    "first",
-                    "third"
-                  ]
-                }
-              },
-              "required": [
-                "mode"
-              ]
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "视角模式"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "type": {
-              "const": "Panorama"
-            },
-            "targetId": {
-              "type": "string",
-              "title": "目标对象",
-              "default": "",
-              "x-reference": "entity"
-            },
-            "data": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {},
-              "required": []
-            }
-          },
-          "required": [
-            "type",
-            "targetId",
-            "data"
-          ],
-          "title": "进入全景"
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
             "type": {
               "const": "PauseAnimation"
             },
             "targetId": {
               "type": "string",
-              "title": "目标对象",
               "default": "",
+              "title": "目标",
               "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
             },
             "data": {
               "type": "object",
@@ -1804,11 +1464,817 @@
             }
           },
           "required": [
+            "id",
             "type",
             "targetId",
+            "wait",
             "data"
           ],
-          "title": "暂停动画"
+          "title": "暂停动画",
+          "x-target": "entity",
+          "x-components": [
+            "Animation",
+            "Avatar"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "PlayAudio"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "播放音频",
+          "x-target": "entity",
+          "x-components": [
+            "Audio"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "StopAudio"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "停止音频",
+          "x-target": "entity",
+          "x-components": [
+            "Audio"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "SetVolume"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "volume": {
+                  "type": "number",
+                  "title": "音量",
+                  "default": 0.8,
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "volume"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "设置音量",
+          "x-target": "entity",
+          "x-components": [
+            "Audio"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "FlyTo"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "viewpoint"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "title": "移动秒数",
+                  "default": 1.5,
+                  "minimum": 0.1,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "duration"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "移动到视点",
+          "x-target": "viewpoint",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "OpenContent"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "content"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "打开内容",
+          "x-target": "content",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "CloseContent"
+            },
+            "targetId": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "关闭内容",
+          "x-target": "",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "StartCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "播放巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "PauseCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "暂停巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "ResumeCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "继续巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "StopCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "停止巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "ReplayCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "重播巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "SeekCruise"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "tour"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "progress": {
+                  "type": "number",
+                  "title": "进度",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "progress"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "定位巡航",
+          "x-target": "tour",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "EnterPanorama"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "进入全景",
+          "x-target": "entity",
+          "x-components": [
+            "Panorama"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "CapturePanorama"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "导出全景",
+          "x-target": "entity",
+          "x-components": [
+            "Panorama"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "SetVariable"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "variable"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
+                  "title": "值",
+                  "default": false
+                }
+              },
+              "required": [
+                "value"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "设置变量",
+          "x-target": "variable",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "ToggleUi"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "ui"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "切换界面元素",
+          "x-target": "ui",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "Delay"
+            },
+            "targetId": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "seconds": {
+                  "type": "number",
+                  "title": "秒数",
+                  "default": 1,
+                  "minimum": 0,
+                  "maximum": 3600
+                }
+              },
+              "required": [
+                "seconds"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "等待",
+          "x-target": "",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "If"
+            },
+            "targetId": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            },
+            "condition": {
+              "$ref": "#/$defs/condition"
+            },
+            "then": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/action"
+              },
+              "default": []
+            },
+            "else": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/action"
+              },
+              "default": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data",
+            "condition",
+            "then",
+            "else"
+          ],
+          "title": "条件分支",
+          "x-target": "",
+          "x-components": []
         }
       ]
     },
@@ -2977,6 +3443,1095 @@
         "thirdPersonMinDistance",
         "thirdPersonSmoothing"
       ]
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "title": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "imageAssetId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "asset"
+        },
+        "audioEntityId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "entity"
+        },
+        "layoutId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "layout"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "title",
+        "body",
+        "imageAssetId",
+        "audioEntityId",
+        "layoutId"
+      ]
+    },
+    "viewpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "anchorId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "entity"
+        },
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "target": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "fov": {
+          "type": "number",
+          "title": "",
+          "default": 60,
+          "minimum": 10,
+          "maximum": 150
+        },
+        "thumbnailAssetId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "asset"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "anchorId",
+        "position",
+        "target",
+        "fov",
+        "thumbnailAssetId"
+      ]
+    },
+    "tourStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "viewpointId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "viewpoint"
+        },
+        "hold": {
+          "type": "number",
+          "title": "",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "travel": {
+          "type": "number",
+          "title": "",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 3600
+        }
+      },
+      "required": [
+        "id",
+        "viewpointId",
+        "hold",
+        "travel"
+      ]
+    },
+    "tour": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "stops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tourStop"
+          },
+          "default": []
+        },
+        "loop": {
+          "type": "boolean",
+          "title": "",
+          "default": false
+        },
+        "speed": {
+          "type": "number",
+          "title": "",
+          "default": 1500,
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "stops",
+        "loop",
+        "speed"
+      ]
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "boolean",
+            "number",
+            "string"
+          ],
+          "title": "",
+          "default": "boolean"
+        },
+        "initial": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "initial"
+      ]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "all"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "default": []
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "any"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "default": []
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "compare"
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "variable",
+                "runtime"
+              ],
+              "title": "",
+              "default": "variable"
+            },
+            "key": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "operator": {
+              "type": "string",
+              "enum": [
+                "eq",
+                "neq",
+                "gt",
+                "gte",
+                "lt",
+                "lte",
+                "contains"
+              ],
+              "title": "",
+              "default": "eq"
+            },
+            "value": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "source",
+            "key",
+            "operator",
+            "value"
+          ]
+        }
+      ]
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "enabled": {
+          "type": "boolean",
+          "title": "",
+          "default": true
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "click",
+            "hover",
+            "enter",
+            "leave",
+            "ready",
+            "animationEnd",
+            "mediaEnd",
+            "viewpointArrive",
+            "tourEnd",
+            "variableChange",
+            "uiClick",
+            "uiChange",
+            "key"
+          ],
+          "title": "",
+          "default": "click"
+        },
+        "sourceKind": {
+          "type": "string",
+          "enum": [
+            "entity",
+            "scene",
+            "ui",
+            "viewpoint",
+            "tour",
+            "variable",
+            "key"
+          ],
+          "title": "",
+          "default": "entity"
+        },
+        "sourceId": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "once": {
+          "type": "boolean",
+          "title": "",
+          "default": false
+        },
+        "concurrency": {
+          "type": "string",
+          "enum": [
+            "ignore",
+            "restart",
+            "queue"
+          ],
+          "title": "",
+          "default": "ignore"
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "enabled",
+        "event",
+        "sourceKind",
+        "sourceId",
+        "once",
+        "concurrency",
+        "condition",
+        "actions"
+      ]
+    },
+    "uiStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "height": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "zIndex": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "title": "",
+          "default": "var(--player-text)"
+        },
+        "background": {
+          "type": "string",
+          "title": "",
+          "default": "transparent"
+        },
+        "fontSize": {
+          "type": "number",
+          "title": "",
+          "default": 14,
+          "minimum": 8,
+          "maximum": 200
+        },
+        "fontFamily": {
+          "type": "string",
+          "title": "",
+          "default": "inherit"
+        },
+        "fontWeight": {
+          "type": "number",
+          "title": "",
+          "default": 400,
+          "minimum": 100,
+          "maximum": 900
+        },
+        "textAlign": {
+          "type": "string",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "",
+          "default": "left"
+        },
+        "borderColor": {
+          "type": "string",
+          "title": "",
+          "default": "transparent"
+        },
+        "borderWidth": {
+          "type": "number",
+          "title": "",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 50
+        },
+        "borderRadius": {
+          "type": "number",
+          "title": "",
+          "default": 8,
+          "minimum": 0,
+          "maximum": 999
+        },
+        "shadow": {
+          "type": "string",
+          "title": "",
+          "default": "none"
+        },
+        "opacity": {
+          "type": "number",
+          "title": "",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "padding": {
+          "type": "number",
+          "title": "",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 300
+        },
+        "gap": {
+          "type": "number",
+          "title": "",
+          "default": 8,
+          "minimum": 0,
+          "maximum": 300
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "free",
+            "row",
+            "column"
+          ],
+          "title": "",
+          "default": "free"
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "stretch"
+          ],
+          "title": "",
+          "default": "start"
+        },
+        "justify": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "space-between"
+          ],
+          "title": "",
+          "default": "start"
+        },
+        "objectFit": {
+          "type": "string",
+          "enum": [
+            "cover",
+            "contain"
+          ],
+          "title": "",
+          "default": "cover"
+        },
+        "overflow": {
+          "type": "string",
+          "enum": [
+            "visible",
+            "hidden",
+            "auto"
+          ],
+          "title": "",
+          "default": "visible"
+        },
+        "anchor": {
+          "type": "string",
+          "enum": [
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+            "center",
+            "stretch"
+          ],
+          "title": "",
+          "default": "top-left"
+        },
+        "animation": {
+          "type": "string",
+          "enum": [
+            "none",
+            "fade",
+            "slide",
+            "pulse"
+          ],
+          "title": "",
+          "default": "none"
+        },
+        "hidden": {
+          "type": "boolean",
+          "title": "",
+          "default": false
+        },
+        "position": {
+          "type": "string",
+          "enum": [
+            "flow",
+            "absolute"
+          ],
+          "default": "absolute"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "rotation",
+        "zIndex",
+        "color",
+        "background",
+        "fontSize",
+        "fontFamily",
+        "fontWeight",
+        "textAlign",
+        "borderColor",
+        "borderWidth",
+        "borderRadius",
+        "shadow",
+        "opacity",
+        "padding",
+        "gap",
+        "layout",
+        "align",
+        "justify",
+        "objectFit",
+        "overflow",
+        "anchor",
+        "animation",
+        "hidden",
+        "position"
+      ]
+    },
+    "uiStyleOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "height": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "zIndex": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "title": "",
+          "default": "var(--player-text)"
+        },
+        "background": {
+          "type": "string",
+          "title": "",
+          "default": "transparent"
+        },
+        "fontSize": {
+          "type": "number",
+          "title": "",
+          "default": 14,
+          "minimum": 8,
+          "maximum": 200
+        },
+        "fontFamily": {
+          "type": "string",
+          "title": "",
+          "default": "inherit"
+        },
+        "fontWeight": {
+          "type": "number",
+          "title": "",
+          "default": 400,
+          "minimum": 100,
+          "maximum": 900
+        },
+        "textAlign": {
+          "type": "string",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "",
+          "default": "left"
+        },
+        "borderColor": {
+          "type": "string",
+          "title": "",
+          "default": "transparent"
+        },
+        "borderWidth": {
+          "type": "number",
+          "title": "",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 50
+        },
+        "borderRadius": {
+          "type": "number",
+          "title": "",
+          "default": 8,
+          "minimum": 0,
+          "maximum": 999
+        },
+        "shadow": {
+          "type": "string",
+          "title": "",
+          "default": "none"
+        },
+        "opacity": {
+          "type": "number",
+          "title": "",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "padding": {
+          "type": "number",
+          "title": "",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 300
+        },
+        "gap": {
+          "type": "number",
+          "title": "",
+          "default": 8,
+          "minimum": 0,
+          "maximum": 300
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "free",
+            "row",
+            "column"
+          ],
+          "title": "",
+          "default": "free"
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "stretch"
+          ],
+          "title": "",
+          "default": "start"
+        },
+        "justify": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "space-between"
+          ],
+          "title": "",
+          "default": "start"
+        },
+        "objectFit": {
+          "type": "string",
+          "enum": [
+            "cover",
+            "contain"
+          ],
+          "title": "",
+          "default": "cover"
+        },
+        "overflow": {
+          "type": "string",
+          "enum": [
+            "visible",
+            "hidden",
+            "auto"
+          ],
+          "title": "",
+          "default": "visible"
+        },
+        "anchor": {
+          "type": "string",
+          "enum": [
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+            "center",
+            "stretch"
+          ],
+          "title": "",
+          "default": "top-left"
+        },
+        "animation": {
+          "type": "string",
+          "enum": [
+            "none",
+            "fade",
+            "slide",
+            "pulse"
+          ],
+          "title": "",
+          "default": "none"
+        },
+        "hidden": {
+          "type": "boolean",
+          "title": "",
+          "default": false
+        },
+        "position": {
+          "type": "string",
+          "enum": [
+            "flow",
+            "absolute"
+          ],
+          "default": "absolute"
+        }
+      },
+      "required": []
+    },
+    "uiLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "hud",
+            "content",
+            "entry",
+            "loading"
+          ],
+          "title": "",
+          "default": "hud"
+        },
+        "width": {
+          "type": "number",
+          "title": "",
+          "default": 1440,
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "height": {
+          "type": "number",
+          "title": "",
+          "default": 900,
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "modal",
+            "sidebar",
+            "card"
+          ],
+          "title": "",
+          "default": "modal"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "scope",
+        "width",
+        "height",
+        "presentation"
+      ]
+    },
+    "uiNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "image",
+            "icon",
+            "shape",
+            "container",
+            "button",
+            "list",
+            "slider",
+            "toggle",
+            "tourControls",
+            "viewpointList",
+            "audioControls",
+            "animationControls",
+            "viewMode",
+            "displayMode",
+            "panoramaControls",
+            "movement",
+            "loading",
+            "entry"
+          ],
+          "title": "",
+          "default": "text"
+        },
+        "layoutId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "layout"
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-reference": "ui"
+        },
+        "text": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "assetId": {
+          "type": "string",
+          "default": "",
+          "title": "",
+          "x-reference": "asset"
+        },
+        "targetId": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        },
+        "binding": {
+          "type": "string",
+          "enum": [
+            "",
+            "scene.name",
+            "content.title",
+            "content.body",
+            "content.image",
+            "content.audio",
+            "runtime.viewMode",
+            "runtime.displayMode",
+            "runtime.tourName",
+            "runtime.progress"
+          ],
+          "title": "",
+          "default": ""
+        },
+        "style": {
+          "$ref": "#/$defs/uiStyle"
+        },
+        "tablet": {
+          "$ref": "#/$defs/uiStyleOverride"
+        },
+        "mobile": {
+          "$ref": "#/$defs/uiStyleOverride"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/action"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "layoutId",
+        "parentId",
+        "text",
+        "assetId",
+        "targetId",
+        "binding",
+        "style",
+        "tablet",
+        "mobile",
+        "action"
+      ]
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layouts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uiLayout"
+          },
+          "default": []
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uiNode"
+          },
+          "default": []
+        },
+        "theme": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "accent": {
+              "type": "string",
+              "title": "",
+              "default": "#64d6b7"
+            },
+            "background": {
+              "type": "string",
+              "title": "",
+              "default": "#15202b"
+            },
+            "text": {
+              "type": "string",
+              "title": "",
+              "default": "#eff6fa"
+            },
+            "fontFamily": {
+              "type": "string",
+              "title": "",
+              "default": "Inter, Microsoft YaHei, sans-serif"
+            }
+          },
+          "required": [
+            "accent",
+            "background",
+            "text",
+            "fontFamily"
+          ]
+        }
+      },
+      "required": [
+        "layouts",
+        "nodes",
+        "theme"
+      ]
     }
-  }
+  },
+  "title": "WebGL Studio SceneDocument"
 }

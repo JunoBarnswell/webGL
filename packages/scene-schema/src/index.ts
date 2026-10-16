@@ -1,7 +1,11 @@
 import Ajv from 'ajv';
 import schema from '../scene-document.schema.json';
-import type { ActionType, BehaviorAction, ComponentDefinition, ComponentType, Entity, FieldSchema, JsonValue, SceneComponent, SceneDocument, SceneMaterial, SceneSettings } from './types';
+import { createUiDocument } from './ui';
+import { experienceReferences, validateExperience } from './experience-validation';
+import type { ActionDefinition, Behavior, ActionType, BehaviorAction, ComponentDefinition, ComponentType, Entity, FieldSchema, JsonValue, SceneComponent, SceneDocument, SceneMaterial, SceneSettings } from './types';
 export type * from './types';
+export * from './ui';
+export { walkActions, conditionReferences } from './experience-validation';
 export { schema as documentSchema };
 
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -11,7 +15,10 @@ export const componentDefinitions: ComponentDefinition[] = schema.$defs.componen
   title: item.title,
   fields: item.properties.data.properties as unknown as Record<string, FieldSchema>
 }));
-export const actionDefinitions = schema.$defs.action.oneOf.map(item => ({ type: item.properties.type.const as ActionType, title: item.title, fields: item.properties.data.properties as unknown as Record<string, FieldSchema> }));
+export const actionDefinitions: ActionDefinition[] = schema.$defs.action.oneOf.map(item => ({
+  type:item.properties.type.const as ActionType,title:item.title,fields:item.properties.data.properties as unknown as Record<string,FieldSchema>,
+  target:item['x-target'] as ActionDefinition['target'],components:item['x-components']
+}));
 export const materialFields = schema.$defs.material.properties as unknown as Record<string, FieldSchema>;
 export const settingFields = schema.$defs.settings.properties as unknown as Record<string, FieldSchema>;
 
@@ -28,7 +35,7 @@ export function createComponent(type: ComponentType): SceneComponent {
 export function createAction(type: ActionType): BehaviorAction {
   const definition = actionDefinitions.find(item => item.type === type);
   if (!definition) throw new Error(`未知动作 ${type}`);
-  return { type, targetId: '', data: fieldDefaults(definition.fields) };
+  return { id:crypto.randomUUID(), type, targetId:'', wait:type==='FlyTo', data:fieldDefaults(definition.fields), ...(type==='If'?{condition:{type:'all' as const,conditions:[]},then:[],else:[]}:{} ) };
 }
 
 export function createMaterial(name = '材质'): SceneMaterial {
@@ -40,7 +47,7 @@ export function createEntity(name = '节点', parentId: string | null = null): E
 }
 
 export function createDocument(name = '未命名场景'): SceneDocument {
-  return { schemaVersion: 1, sceneId: crypto.randomUUID(), name, units: 'mm', assets: [], entities: [], materials: [], behaviors: [], settings: fieldDefaults(settingFields) as unknown as SceneSettings };
+  return { contents:[], viewpoints:[], tours:[], variables:[], ui:createUiDocument(), sceneId: crypto.randomUUID(), name, units: 'mm', assets: [], entities: [], materials: [], behaviors: [], settings: fieldDefaults(settingFields) as unknown as SceneSettings };
 }
 
 export function getComponent(entity: Entity, type: ComponentType): SceneComponent | undefined {
@@ -64,14 +71,7 @@ export function documentReferences(document: SceneDocument): { kind: string; id:
   }
   fieldReferences(document.settings as unknown as JsonValue, schema.$defs.settings as unknown as FieldSchema, visit);
   for (const material of document.materials) fieldReferences(material as unknown as JsonValue, schema.$defs.material as unknown as FieldSchema, visit);
-  for (const behavior of document.behaviors) {
-    if (behavior.sourceId) visit('entity', behavior.sourceId);
-    for (const action of behavior.actions) {
-      if (action.targetId) visit('entity', action.targetId);
-      const definition = actionDefinitions.find(item => item.type === action.type);
-      if (definition) for (const [key, field] of Object.entries(definition.fields)) fieldReferences(action.data[key], field, visit);
-    }
-  }
+  experienceReferences(document,actionDefinitions,visit);
   return references;
 }
 
@@ -79,7 +79,7 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
   if (!validateShape(value)) return (validateShape.errors ?? []).slice(0, 20).map(error => `${error.instancePath || '/'} ${error.message}`);
   const document = value as unknown as SceneDocument;
   const errors: string[] = [];
-  const groups = { entity: document.entities, asset: document.assets, material: document.materials, behavior: document.behaviors };
+  const groups = { entity: document.entities, asset: document.assets, material: document.materials, behavior: document.behaviors,content:document.contents,viewpoint:document.viewpoints,tour:document.tours,variable:document.variables,ui:document.ui.nodes,layout:document.ui.layouts };
   const sets = Object.fromEntries(Object.entries(groups).map(([kind, items]) => [kind, new Set(items.map(item => item.id))]));
   for (const [kind, items] of Object.entries(groups)) {
     if (sets[kind].size !== items.length) errors.push(`${kind} ID 重复`);
@@ -99,7 +99,7 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     if (Math.abs(q.reduce((sum, n) => sum + n*n, 0) - 1) > 0.001) errors.push(`${entity.name} 四元数未归一化`);
     if (entity.transform.scale.some(n => Math.abs(n) < 0.000001)) errors.push(`${entity.name} 缩放不可为零`);
     for (const component of entity.components) {
-      if (forPublish && component.enabled && ['Mesh','Model','Avatar','Audio','Artwork'].includes(component.type) && !component.data.assetId) errors.push(`${entity.name}/${component.type} 尚未指定资源`);
+      if (forPublish && component.enabled && ['Mesh','Model','Avatar','Audio'].includes(component.type) && !component.data.assetId) errors.push(`${entity.name}/${component.type} 尚未指定资源`);
       if (component.type === 'ModelNode' && !component.enabled) errors.push(entity.name + ' 模型子节点身份不可禁用，请使用节点可见性');
       if (component.type === 'ModelNode' && !entities.get(String(component.data.modelEntityId))?.components.some(item=>item.type==='Model'&&item.enabled)) errors.push(entity.name + ' 所属模型必须启用');
       if (component.type === 'ModelNode' && !entities.get(String(component.data.modelEntityId))?.components.some(item => item.type === 'Model')) errors.push(`${entity.name} 的模型实例引用无效`);
@@ -122,7 +122,7 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
       if (entity.parentId !== modelId && String(parentBinding?.data.modelEntityId ?? '') !== modelId) errors.push(entity.name + ' 必须属于同一模型实例的层级');
     }
     for (const component of entity.components) {
-      const kind = ({Mesh:'mesh',Model:'model',Avatar:'model',Audio:'audio',Artwork:'image'} as Record<string,string>)[component.type];
+      const kind = ({Mesh:'mesh',Model:'model',Avatar:'model',Audio:'audio'} as Record<string,string>)[component.type];
       const asset = document.assets.find(a => a.id === component.data.assetId);
       if (kind && asset && asset.kind !== kind && !(kind === 'image' && asset.kind === 'texture')) errors.push(entity.name + '/' + component.type + ' 资源类型不匹配');
     }
@@ -131,15 +131,15 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
   if (new Set(bindings).size !== bindings.length) errors.push('模型子节点索引重复绑定');
   if (![0,6].includes(document.settings.environmentAssetIds.length) || document.materials.some(m => ![0,6].includes(m.envAssetIds.length))) errors.push('环境立方体必须提供完整六面资源');
   if (document.settings.near >= document.settings.far) errors.push('相机远裁剪面必须大于近裁剪面');
-  if (forPublish) for (const behavior of document.behaviors) {
-    if (!behavior.actions.length) errors.push(`${behavior.name} 尚未配置动作`);
-    if (behavior.event !== 'ready' && !behavior.sourceId) errors.push(`${behavior.name} 尚未指定事件源`);
-    for (const action of behavior.actions) if (!['DisplayMode','ViewMode','OpenInfo'].includes(action.type) && !action.targetId) errors.push(`${behavior.name}/${action.type} 尚未指定目标`);
-  }
+  errors.push(...validateExperience(document,actionDefinitions,forPublish));
   return [...new Set(errors)];
 }
 
 export function assertDocument(value: unknown, forPublish = false): asserts value is SceneDocument {
   const errors = validateDocument(value, forPublish);
   if (errors.length) throw new Error(errors.join('\n'));
+}
+
+export function createBehavior(name='新交互'): Behavior {
+  return {id:crypto.randomUUID(),name,enabled:true,event:'click',sourceKind:'entity',sourceId:'',once:false,concurrency:'ignore',condition:{type:'all',conditions:[]},actions:[]};
 }
