@@ -45,8 +45,35 @@ public static class ConfigurationVisuals {
             void Fail(string message,string field="")=>checks.Add(new("visual","fail","error",message,field,owner,sceneId,[]));
             var selected=new List<Mapping>();
             foreach(var group in A(data,"groups")){var id=T(group,"id");if(T(group,"control")=="number")foreach(var mapping in A(group,"visuals"))selected.Add(new(mapping,id,"",mapping.TryGetProperty("priority",out var priority)?priority.GetDouble():0,solved.NumericValues[id],T(group,"numericUnit")));else foreach(var option in A(group,"options").Where(o=>solved.Selections[id].Contains(T(o,"id"))))foreach(var mapping in A(option,"visuals"))selected.Add(new(mapping,id,T(option,"id"),mapping.TryGetProperty("priority",out var priority)?priority.GetDouble():0,null,""));}
+            var authoredMappings=A(data,"groups").SelectMany(group=>A(group,"visuals").Concat(A(group,"options").SelectMany(option=>A(option,"visuals")))).ToArray();
+            foreach(var mapping in authoredMappings.Where(m=>T(m,"operation")=="variant")){
+                var target=T(mapping,"targetId");var assets=new HashSet<string>();
+                if(entities.TryGetValue(target,out var targetEntity)){var node=Component(targetEntity,"ModelNode");var modelId=node.ValueKind==JsonValueKind.Object?T(node.GetProperty("data"),"modelEntityId"):target;if(entities.TryGetValue(modelId,out var modelEntity)){var model=Component(modelEntity,"Model");if(model.ValueKind==JsonValueKind.Object)assets.Add(T(model.GetProperty("data"),"assetId"));}}
+                foreach(var part in authoredMappings.Where(m=>T(m,"operation")=="swapPart"&&Under(target,T(m,"targetId"))))assets.Add(T(part,"assetId"));
+                var found=false;foreach(var asset in assets){var model=await definition(asset);if(model.TryGetProperty("extensions",out var extensions)&&extensions.TryGetProperty("KHR_materials_variants",out var variants)&&A(variants,"variants").Any(v=>T(v,"name")==T(mapping,"variant")))found=true;}
+                if(!found)Fail("所有可选来源模型均缺少配置的材质变体："+T(mapping,"variant"));
+            }
             var slots=new Dictionary<string,Mapping>();foreach(var grouping in selected.Where(m=>T(m.Spec,"operation")=="swapPart").GroupBy(m=>T(m.Spec,"targetId"))){var ordered=grouping.OrderByDescending(m=>m.Priority).ToArray();if(ordered.Where(m=>m.Priority==ordered[0].Priority).Select(m=>T(m.Spec,"assetId")).Distinct().Count()>1){Fail("同优先级部件映射冲突："+grouping.Key);continue;}slots[grouping.Key]=ordered[0];}
             foreach(var a in slots.Keys)foreach(var b in slots.Keys)if(a!=b&&Under(a,b))Fail("配置部件槽位重叠："+a+" / "+b);
+            var channels=new Dictionary<string,List<(double Priority,string Signature,string Id)>>();
+            void Candidate(Mapping mapping,string key,string signature){var rows=channels.GetValueOrDefault(key)??[];rows.Add((mapping.Priority,signature,T(mapping.Spec,"id")));channels[key]=rows;}
+            foreach(var mapping in selected){var spec=mapping.Spec;var operation=T(spec,"operation");var target=T(spec,"targetId");var numeric=mapping.Number;var binding=numeric!=null&&spec.TryGetProperty("numericBinding",out var configured)?configured:default;
+                try{
+                    double Value(string property){var factor=binding.ValueKind==JsonValueKind.Object?binding.GetProperty("factor").GetDouble():1;var offset=binding.ValueKind==JsonValueKind.Object?binding.GetProperty("offset").GetDouble():0;var raw=numeric!.Value*factor+offset;var unit=mapping.Unit;var targetUnit=property=="position"?"mm":property=="rotation"?"rad":"1";if(unit=="")unit=targetUnit=="rad"?"deg":targetUnit;if(targetUnit=="1"&&binding.ValueKind==JsonValueKind.Object&&binding.TryGetProperty("reference",out var reference)&&reference.GetDouble()>0)return raw/reference.GetDouble();return Units.Convert(raw,unit,targetUnit);}
+                    var mode=binding.ValueKind==JsonValueKind.Object?T(binding,"mode"):"set";
+                    if(operation is "color" or "opacity"){
+                        var value=operation=="color"?T(spec,"value"):Units.NumberText(numeric!=null?Value("opacity")+(mode=="add"?Units.Number(T(spec,"value")):0):Units.Number(T(spec,"value")));
+                        if(operation=="opacity"&&(Units.Number(value)<0||Units.Number(value)>1))Fail("数值透明度不在 0～1："+T(spec,"id"));
+                        foreach(var candidate in entities.Values.Where(e=>Under(T(e,"id"),target)&&new[]{"Mesh","Model","ModelNode"}.Any(type=>Component(e,type).ValueKind==JsonValueKind.Object)))Candidate(mapping,T(candidate,"id")+":"+operation,value);
+                    }else if(operation=="visibility")Candidate(mapping,target+":visibility",T(spec,"value"));
+                    else if(operation=="camera"){var camera=spec.GetProperty("camera");Candidate(mapping,"camera",string.Join(",",A(camera,"position").Concat(A(camera,"target")).Select(value=>Units.NumberText(value.GetDouble())))+":"+Units.NumberText(camera.GetProperty("fov").GetDouble()));}
+                    else if(operation=="transform"){
+                        if(numeric!=null&&binding.ValueKind==JsonValueKind.Object){var property=T(binding,"property");var value=Value(property);var axis=T(binding,"axis");if(property=="rotation"){var quaternion=new double[]{0,0,0,Math.Cos(value/2)};quaternion[axis=="x"?0:axis=="y"?1:2]=Math.Sin(value/2);Candidate(mapping,target+":rotation",mode+":"+string.Join(",",quaternion.Select(Units.NumberText)));}else foreach(var dimension in axis=="all"?new[]{0,1,2}:new[]{axis=="x"?0:axis=="y"?1:2})Candidate(mapping,target+":"+property+":"+dimension,mode+":"+Units.NumberText(value));}
+                        else {var transform=spec.GetProperty("transform");foreach(var property in new[]{"position","scale"})for(var axis=0;axis<3;axis++)Candidate(mapping,target+":"+property+":"+axis,"set:"+Units.NumberText(transform.GetProperty(property)[axis].GetDouble()));Candidate(mapping,target+":rotation","set:"+string.Join(",",transform.GetProperty("rotation").EnumerateArray().Select(value=>Units.NumberText(value.GetDouble()))));}
+                    }
+                }catch(Exception error)when(error is ApiException or FormatException){Fail(error.Message);}
+            }
+            foreach(var(key,rows)in channels){var priority=rows.Max(row=>row.Priority);var active=rows.Where(row=>row.Priority==priority).ToArray();if(active.Select(row=>row.Signature).Distinct().Count()>1)Fail("同优先级视觉映射冲突："+key+"；"+string.Join(" ↔ ",active.Select(row=>row.Id)));}
             var candidates=new Dictionary<string,List<(int Material,double Priority,string Mapping,string Variant)>>();var globalVariants=new Dictionary<string,string>();
             foreach(var mapping in selected.Where(m=>T(m.Spec,"operation")=="variant")) {
                 var spec=mapping.Spec;var target=T(spec,"targetId");var variant=T(spec,"variant");var field="/entities/"+Array.FindIndex(A(document,"entities"),e=>T(e,"id")==owner)+"/components";

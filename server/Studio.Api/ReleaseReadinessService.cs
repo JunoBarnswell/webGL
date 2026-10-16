@@ -3,7 +3,7 @@ using static Studio.Database;
 namespace Studio;
 public record ReadinessCheck(string Code,string Status,string Severity,string Message,string Path,string OwnerId,string SceneId,string[] Details);
 public record ReleaseReadinessReport(string SubjectKind,string SubjectId,string CheckedAt,bool Ready,int ErrorCount,int WarningCount,ReadinessCheck[] Checks);
-public sealed class ReleaseReadinessService(DocumentContract contract,LibraryService library,ObjectStore objects,SemanticService semantics)
+public sealed class ReleaseReadinessService(DocumentContract contract,LibraryService library,ObjectStore objects,SemanticService semantics,ProcessingService processing)
 {
     public static ReleaseReadinessReport Summarize(string kind,string id,IEnumerable<ReadinessCheck> entries) {
         var checks=entries.ToArray();var errors=checks.Count(c=>c.Status!="pass"&&c.Severity=="error");
@@ -41,7 +41,7 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
         var policy=document.GetProperty("settings").TryGetProperty("releasePolicy",out var configured)?configured:default;
         var requiredBudget=policy.ValueKind==JsonValueKind.Object&&DocumentContract.Text(policy,"budget")=="required";
         var requiredHardware=policy.ValueKind==JsonValueKind.Object&&DocumentContract.Text(policy,"hardware")=="required";
-        Add("budget","unverified","尚需与资产处理预算报告核对","/settings/releasePolicy/budget",severity:requiredBudget?"error":"warning");
+        checks.AddRange(processing.BudgetChecks(document,sceneId,requiredBudget,contract.ReferenceEdges(document).Where(edge=>edge.Kind=="asset"&&!edge.Path.StartsWith("/settings/processingReports/",StringComparison.Ordinal)).Select(edge=>edge.Id).ToHashSet()));
         Add("hardware","unverified","尚无与本模型、画质和设备绑定的硬件测量证据","/settings/evidenceAssetIds",severity:requiredHardware?"error":"warning");
         return Summarize("scene",sceneId,checks);
     }
@@ -71,7 +71,7 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
                 }catch(ApiException error){Fail(error.Message);}catch(KeyNotFoundException){Fail("视觉绑定的来源对象不存在");}
             }
         }
-        var visualChecks=await ConfigurationVisuals.Check(document,sceneId,Definition);checks.AddRange(visualChecks);failures+=visualChecks.Count(c=>c.Severity=="error");
+        try{var visualChecks=await ConfigurationVisuals.Check(document,sceneId,Definition);checks.AddRange(visualChecks);failures+=visualChecks.Count(c=>c.Severity=="error");}catch(ApiException error){failures++;checks.Add(new("visual","fail","error",error.Message,"","",sceneId,error.Details??[]));}
         if(failures==0)checks.Add(new("visual","pass","info","模型节点、动画与材质变体绑定通过","","",sceneId,[]));
     }
 }

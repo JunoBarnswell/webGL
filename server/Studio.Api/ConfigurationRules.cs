@@ -44,7 +44,7 @@ public static class ConfigurationRules
             if(group.Control=="number"&&(!double.IsFinite(group.Low)||!double.IsFinite(group.High)||group.Low>group.High||!double.IsFinite(group.Step)||group.Step<=0))errors.Add("数值范围或步长无效："+group.Name);
         }
         foreach(var rule in rules) {
-            if(!byId.TryGetValue(rule.ToGroup,out var target)||(!(rule.Type is "count" or "range")&&!target.Options.Any(o=>T(o,"id")==rule.ToOption))||(rule.FromGroup!=""&&(!byId.TryGetValue(rule.FromGroup,out var source)||!source.Options.Any(o=>T(o,"id")==rule.FromOption))))errors.Add("规则引用选项不存在："+rule.Id);
+            if(!byId.TryGetValue(rule.ToGroup,out var target)||(!(rule.Type is "count" or "range")&&!target.Options.Any(o=>T(o,"id")==rule.ToOption))||(rule.FromGroup!=""&&(!byId.TryGetValue(rule.FromGroup,out var source)||source.Control=="number"||!source.Options.Any(o=>T(o,"id")==rule.FromOption))))errors.Add("规则引用选项不存在："+rule.Id);
             if(!double.IsFinite(rule.Priority)||!new[]{"require","implies","exclude","default","count","range","bundle"}.Contains(rule.Type))errors.Add("规则类型或优先级无效："+rule.Id);
             if((rule.Type is "count" or "range")&&(!double.IsFinite(rule.Minimum)||!double.IsFinite(rule.Maximum)||rule.Minimum>rule.Maximum))errors.Add("规则范围无效："+rule.Id);
             if(rule.Type=="count"&&(byId.GetValueOrDefault(rule.ToGroup)?.Control=="number"||rule.Minimum!=Math.Truncate(rule.Minimum)||rule.Maximum!=Math.Truncate(rule.Maximum)||rule.Minimum<0))errors.Add("数量规则需要非负整数和选项属性："+rule.Id);

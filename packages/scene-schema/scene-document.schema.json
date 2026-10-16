@@ -8737,6 +8737,29 @@
             "x-reference": "asset"
           },
           "default": []
+        },
+        "processingReports": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "jobId"
+            ],
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "x-reference": "asset"
+              },
+              "jobId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Immutable completed processing ledger id; verified against the pinned asset at release."
+              }
+            }
+          }
         }
       },
       "required": [

@@ -71,7 +71,7 @@ public sealed class SemanticService(Database database,ObjectStore objects)
       if(file=="semantic-model.json") {
        var metadata=JsonNode.Parse(bytes)!.AsObject();var classes=metadata["classes"] as JsonArray??new JsonArray();var existing=classes.FirstOrDefault(c=>c?["id"]?.GetValue<string>()==request.ClassId);if(existing!=null)classes.Remove(existing);
        var fields=new JsonArray(request.Fields.Select(field=>{var node=JsonNode.Parse(field.GetRawText())!.AsObject();if(!node.ContainsKey("precision"))node["precision"]=3;return (JsonNode)node;}).ToArray());
-       var targetClass=existing?.DeepClone().AsObject()??new JsonObject{["id"]=request.ClassId,["code"]=request.ClassId,["name"]=request.ClassId,["parentId"]=""};targetClass["fields"]=fields;classes.Add(targetClass);metadata["classes"]=classes;metadata["sourceDatasetId"]=id;bytes=Encoding.UTF8.GetBytes(metadata.ToJsonString());
+       var targetClass=existing?.DeepClone().AsObject()??new JsonObject{["id"]=request.ClassId,["code"]=request.ClassId,["name"]=request.ClassId,["parentId"]=""};targetClass["fields"]=fields;classes.Add((JsonNode)targetClass);metadata["classes"]=classes;metadata["sourceDatasetId"]=id;bytes=Encoding.UTF8.GetBytes(metadata.ToJsonString());
       }
       await using var entry=zip.CreateEntry(file).Open();await entry.WriteAsync(bytes,ct);
      }

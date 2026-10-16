@@ -118,14 +118,18 @@ public sealed class ObjectStore : IDisposable
     }
     public async Task<JsonElement> ModelDefinition(AssetResponse asset,CancellationToken ct)
     {
-        var bytes=await Read("assets/"+asset.Id+"/"+asset.Entry,ct);
+        var key="model-definition:"+asset.Sha256+":"+asset.Entry;
+        if(cache.TryGetValue<JsonElement>(key,out var cached))return cached;
+        var objectKey="assets/"+asset.Id+"/"+asset.Entry;
+        async Task<byte[]> Range(long start,long end){using var response=await client.GetObjectAsync(new GetObjectRequest{BucketName=bucket,Key=objectKey,ByteRange=new ByteRange(start,end)},ct);using var memory=new MemoryStream();await response.ResponseStream.CopyToAsync(memory,ct);if(memory.Length!=end-start+1)throw new ApiException(422,"模型 JSON 范围长度不一致");return memory.ToArray();}
+        byte[] bytes;
         if(asset.Entry.EndsWith(".glb",StringComparison.OrdinalIgnoreCase)){
-            if(bytes.Length<20)throw new ApiException(422,"GLB 文件头无效");
-            var length=BitConverter.ToInt32(bytes,12);if(length<2||length>bytes.Length-20)throw new ApiException(422,"GLB JSON 区块无效");
-            bytes=bytes.AsSpan(20,length).ToArray();
-        }
-        return JsonDocument.Parse(bytes).RootElement.Clone();
+            var header=await Range(0,19);if(BitConverter.ToUInt32(header,0)!=0x46546c67||BitConverter.ToUInt32(header,4)!=2||BitConverter.ToUInt32(header,16)!=0x4e4f534a)throw new ApiException(422,"GLB 2 JSON 文件头无效");
+            var length=BitConverter.ToUInt32(header,12);if(length<2||length>64*1024*1024||length+20>BitConverter.ToUInt32(header,8))throw new ApiException(422,"GLB JSON 区块无效或超过 64 MiB 解析预算");bytes=await Range(20,19+length);
+        }else{var metadata=await client.GetObjectMetadataAsync(bucket,objectKey,ct);if(metadata.ContentLength>64*1024*1024)throw new ApiException(413,"glTF JSON 超过 64 MiB 解析预算");bytes=await Read(objectKey,ct);}
+        try{using var parsed=JsonDocument.Parse(bytes);var definition=parsed.RootElement.Clone();cache.Set(key,definition,new MemoryCacheEntryOptions{Size=bytes.Length,AbsoluteExpirationRelativeToNow=TimeSpan.FromMinutes(10)});return definition;}catch(JsonException){throw new ApiException(422,"模型 JSON 无效");}
     }
+
     private static void ValidateGltf(string root, string entry, HashSet<string> files)
     {
         byte[] bytes = File.ReadAllBytes(Path.Combine(root, entry));

@@ -422,7 +422,7 @@ const mapped = mapProperties(
       required: true,
       sourcePath: "length",
       sourceUnit: "m",
-      emptyPolicy: "error",
+      emptyPolicy: "reject",
       defaultValue: "",
     },
   ],
@@ -789,6 +789,8 @@ graph.floors = [
     calibrated: true,
     north: 0,
     mmPerPixel: 100,
+    imageWidth: 32,
+    imageHeight: 16,
   },
 ];
 node.floorId = "ground";
@@ -1016,7 +1018,7 @@ const field = {
   sourcePath: "length",
   precision: 2,
   required: true,
-  emptyPolicy: "error",
+  emptyPolicy: "reject",
   defaultValue: "",
 };
 const preflight = await api("/semantics/" + semantic.id + "/map", "POST", {

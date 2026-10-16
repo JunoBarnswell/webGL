@@ -19,7 +19,8 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
     [comparison, setComparison] = useState<Comparison | null>(null),
     [wipe, setWipe] = useState(50),
     [textureBudget, setTextureBudget] = useState(256),
-    [triangleBudget, setTriangleBudget] = useState(2000000);
+    [triangleBudget, setTriangleBudget] = useState(2000000),
+    [encodedBudget, setEncodedBudget] = useState(256);
   const assets = props.document.assets.filter((a) => a.kind === "model"),
     asset = assets.find((a) => a.id === assetId) ?? assets[0],
     model =
@@ -46,6 +47,12 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
   const submit = (operation: string) =>
     void props.services.run("提交资产处理", async () => {
       if (!asset) throw Error("选择模型资产");
+      if (
+        ![triangleBudget, textureBudget, encodedBudget].every(
+          (value) => Number.isSafeInteger(value) && value >= 0,
+        )
+      )
+        throw Error("预算需要非负安全整数");
       if (meshopt && surfaceAnchors.length)
         throw Error(
           "该模型有表面三角锚点；请关闭几何优化，或先明确修复为实体锚点",
@@ -56,6 +63,11 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
           sourceAssetId: asset.id,
           operation,
           settings: {
+            budget: {
+              maxTriangles: triangleBudget,
+              maxGpuTextureBytes: textureBudget * 1024 * 1024,
+              maxEncodedBytes: encodedBudget * 1024 * 1024,
+            },
             useMeshopt: meshopt,
             textureCodec: ktx2 ? "ktx2" : "retain",
             preserveSemantics: true,
@@ -95,6 +107,12 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
       label: "应用已核验的派生模型修订",
       mutate(doc) {
         revision.command.mutate(doc);
+        doc.settings.processingReports = [
+          ...(doc.settings.processingReports ?? []).filter(
+            (pin) => pin.assetId !== derived.id,
+          ),
+          { assetId: derived.id, jobId: job.id },
+        ];
         if (result.report.geometryUnchanged)
           for (const e of doc.entities)
             for (const c of e.components)
@@ -174,7 +192,7 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
           纹理显存估算预算（MiB）
           <input
             type="number"
-            min={1}
+            min={0}
             value={textureBudget}
             onChange={(e) => setTextureBudget(Number(e.target.value))}
           />
@@ -183,9 +201,18 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
           三角量预算
           <input
             type="number"
-            min={1}
+            min={0}
             value={triangleBudget}
             onChange={(e) => setTriangleBudget(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          编码体积预算（MiB）
+          <input
+            type="number"
+            min={0}
+            value={encodedBudget}
+            onChange={(event) => setEncodedBudget(Number(event.target.value))}
           />
         </label>
         <button
@@ -206,10 +233,33 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
           导出实际运行统计
         </button>
       </div>
+      <p>
+        预算进入处理策略与发布检查；显存按 RGBA8 完整 mip
+        链保守估算。无损流程不会通过删减几何满足不可能的三角预算，未达预算的结果保留报告并阻止应用。
+      </p>
       <JobMonitor
         services={props.services}
         jobs={jobs.jobs.filter((j) => j.operation !== "ifc")}
         onApply={apply}
+        onAdmit={async (job) => {
+          if (
+            !props.document.assets.some(
+              (asset) => asset.id === job.sourceAssetId,
+            )
+          )
+            throw Error("源资产不属于当前场景");
+          props.command({
+            label: "固定资产预算报告",
+            mutate(document) {
+              document.settings.processingReports = [
+                ...(document.settings.processingReports ?? []).filter(
+                  (pin) => pin.assetId !== job.sourceAssetId,
+                ),
+                { assetId: job.sourceAssetId, jobId: job.id },
+              ];
+            },
+          });
+        }}
       />
       <section>
         <h3>原始 / 优化质量比较</h3>
@@ -263,7 +313,18 @@ export function OptimizationPanel(props: ExtensionPanelProps) {
               value={wipe}
               onChange={(e) => setWipe(Number(e.target.value))}
             />
-            <p>像素 RMSE {comparison.rmse.toFixed(3)} / 255</p>
+            <p>
+              像素 RMSE {comparison.rmse.toFixed(3)} / 255，最大通道差{" "}
+              {comparison.maxChannelError}，变化像素 {comparison.changedPixels}
+            </p>
+            <details>
+              <summary>视觉误差热力图（红色按通道误差 ×4）</summary>
+              <img
+                src={comparison.heatmap}
+                alt="同相机视觉误差热力图"
+                style={{ maxWidth: "100%" }}
+              />
+            </details>
             <pre>
               {JSON.stringify(
                 {
