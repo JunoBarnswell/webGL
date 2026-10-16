@@ -1,3 +1,5 @@
+import { useConsoleLayout } from "../shell/layout";
+import { workspaceWindow } from "../shell/windows";
 import { editablePoint } from "../shell/DocumentPoint";
 import { current as draftValue } from "immer";
 import * as THREE from "three";
@@ -134,7 +136,7 @@ export function Inspector() {
             </div>
           ))}
           <button
-            onClick={() => useStudio.getState().set({ workspace: "prefab" })}
+            onClick={() => useConsoleLayout.getState().open("extension.prefab")}
           >
             打开实例与源模板 Diff
           </button>
@@ -324,7 +326,7 @@ export function Inspector() {
                     <button
                       className="wide-button"
                       onClick={() =>
-                        useStudio.getState().set({ workspace: task })
+                        useConsoleLayout.getState().open(workspaceWindow(task))
                       }
                     >
                       打开{task === "content" ? "热点内容" : "导览巡航"}工作区

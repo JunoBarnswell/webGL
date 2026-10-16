@@ -44,6 +44,7 @@ const documentSessions = new Map<
     revision: number;
     versionId: string;
     name: string;
+    dirty: boolean;
   }
 >();
 export function useLibraryDocument<T extends object>(
@@ -60,6 +61,7 @@ export function useLibraryDocument<T extends object>(
       revision: number;
       versionId: string;
       name: string;
+      dirty: boolean;
     } | null>(null),
     [document, setDocument] = useState<T | null>(null),
     [error, setError] = useState(""),
@@ -67,6 +69,7 @@ export function useLibraryDocument<T extends object>(
   useEffect(() => {
     let active = true;
     const abort = new AbortController();
+    setEntry(null); setDocument(null); setDirty(false); setError("");
     const cached = documentSessions.get(key);
     const open = async () => {
       let record: {
@@ -79,6 +82,7 @@ export function useLibraryDocument<T extends object>(
         if (active) {
           setEntry(cached as unknown as typeof entry);
           setDocument(cached.session.document as T);
+          setDirty(cached.dirty);
         }
         return;
       }
@@ -107,6 +111,7 @@ export function useLibraryDocument<T extends object>(
           revision: record.revision,
           versionId: record.versionId,
           name: record.name,
+          dirty: Boolean(local?.dirty),
         };
       documentSessions.set(
         key,
@@ -115,6 +120,7 @@ export function useLibraryDocument<T extends object>(
           revision: number;
           versionId: string;
           name: string;
+          dirty: boolean;
         },
       );
       if (active) {
@@ -135,8 +141,10 @@ export function useLibraryDocument<T extends object>(
     if (!entry) return;
     services.historyTarget(entry.session, async () => {
       await save();
-    });
+    }, entry.dirty);
     const unsubscribe = entry.session.subscribe((change) => {
+      entry.dirty = true;
+      services.historyTarget(entry.session, async () => { await save(); }, true);
       setDocument(change.after);
       setDirty(true);
       void services.persistDraft(key, {
@@ -179,6 +187,8 @@ export function useLibraryDocument<T extends object>(
       entry.revision = result.revision;
       entry.versionId = result.versionId;
       const stillDirty = entry.session.document !== snapshot;
+      entry.dirty = stillDirty;
+      services.historyTarget(entry.session, async () => { await save(); }, stillDirty);
       setDirty(stillDirty);
       await services.persistDraft(key, {
         document: entry.session.document,
@@ -199,6 +209,7 @@ export function useLibraryDocument<T extends object>(
         revision: record.revision,
         versionId: record.versionId,
         name: record.name,
+        dirty: false,
       };
     documentSessions.set(
       key,
@@ -207,6 +218,7 @@ export function useLibraryDocument<T extends object>(
         revision: number;
         versionId: string;
         name: string;
+        dirty: boolean;
       },
     );
     setEntry(next);

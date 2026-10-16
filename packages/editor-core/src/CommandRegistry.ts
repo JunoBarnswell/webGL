@@ -4,9 +4,11 @@ export type FocusScope =
   | "preview"
   | "dialog"
   | "text-input"
+  | "interface"
   | "timeline";
 export interface CommandContext {
   surface: FocusScope;
+  owner?: string;
   editingAllowed: boolean;
   selectedIds: readonly string[];
   flying: boolean;
@@ -25,16 +27,29 @@ export interface StudioCommand {
   commitText?: boolean;
   preventNativeWhenBlocked?: boolean;
   scope: "global" | "editor" | "viewport" | "preview" | "timeline";
+  shortcutOwner?: string;
   enabled?: (ctx: CommandContext) => boolean;
   execute: (ctx: CommandContext) => void | Promise<void>;
 }
 export class CommandRegistry {
   readonly commands = new Map<string, StudioCommand>();
   readonly recent: string[] = [];
+  private revision = 0;
+  private readonly listeners = new Set<() => void>();
+  readonly getVersion = () => this.revision;
+  readonly subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  };
+  private changed() {
+    this.revision++;
+    this.listeners.forEach((listener) => listener());
+  }
   register(command: StudioCommand): () => void {
     if (this.commands.has(command.id)) throw Error("重复命令 " + command.id);
     this.commands.set(command.id, command);
-    return () => this.commands.delete(command.id);
+    this.changed();
+    return () => { this.commands.delete(command.id); this.changed(); };
   }
   allowed(command: StudioCommand, context: CommandContext): boolean {
     return !context.signal.aborted && (command.enabled?.(context) ?? true);
@@ -48,6 +63,7 @@ export class CommandRegistry {
       this.recent.length,
       ...[id, ...this.recent.filter((v) => v !== id)].slice(0, 12),
     );
+    this.changed();
     return true;
   }
   search(query: string): StudioCommand[] {
@@ -69,10 +85,11 @@ export class CommandRegistry {
 }
 export function focusScope(target: EventTarget | null): FocusScope {
   if (!(target instanceof HTMLElement)) return "editor";
-  if (target.closest('[role="dialog"],.modal-backdrop')) return "dialog";
+  if (target.closest('[role="dialog"][aria-modal="true"],.modal-backdrop')) return "dialog";
   if (target.closest('input,textarea,select,[contenteditable="true"]'))
     return "text-input";
   if (target.closest('[data-focus-scope="timeline"]')) return "timeline";
+  if (target.closest('[data-console-window="interface"]')) return "interface";
   if (target.closest('button,a,summary,[role="button"]')) return "editor";
   if (target.closest(".viewport-panel")) return "viewport";
   return "editor";
@@ -103,7 +120,7 @@ export function bindingConflicts(
   registry: CommandRegistry,
   bindings: Record<string, string[]>,
 ): string[] {
-  const assignments: { scope: string; key: string; title: string }[] = [],
+  const assignments: { scope: string; key: string; title: string; owner?: string }[] = [],
     errors: string[] = [];
   for (const command of registry.commands.values())
     for (const key of bindings[command.id] ?? command.shortcuts ?? []) {
@@ -111,12 +128,13 @@ export function bindingConflicts(
       for (const previous of assignments)
         if (
           previous.key === key &&
+          (!previous.owner || !command.shortcutOwner || previous.owner === command.shortcutOwner) &&
           (previous.scope === command.scope ||
             ["global", "editor"].includes(previous.scope) ||
             ["global", "editor"].includes(command.scope))
         )
           errors.push(key + " 冲突：" + previous.title + " / " + command.title);
-      assignments.push({ scope: command.scope, key, title: command.title });
+      assignments.push({ scope: command.scope, key, title: command.title, owner: command.shortcutOwner });
     }
   return errors;
 }
@@ -135,6 +153,7 @@ export class ShortcutManager {
       if (reserved.has(key)) return;
       const context = this.context();
       for (const command of this.registry.commands.values()) {
+        if (command.shortcutOwner && command.shortcutOwner !== context.owner) continue;
         if (
           !(this.bindings()[command.id] ?? command.shortcuts ?? []).includes(
             key,
@@ -158,6 +177,7 @@ export class ShortcutManager {
         }
         if (command.scope === "timeline" && context.surface !== "timeline")
           continue;
+        if (command.scope === "editor" && context.surface === "interface") continue;
         if (command.scope === "viewport" && context.surface !== "viewport")
           continue;
         if (command.scope === "preview" && context.editingAllowed) continue;

@@ -1,92 +1,28 @@
-import {
-  workspaceCatalog,
-  WorkspaceSidebar,
-  WorkspaceDesigner,
-} from "./workspaces/WorkspaceHost";
-import { DockResize } from "./shell/DockResize";
-import { ContextMenu } from "./shell/ContextMenu";
-import { usePreferences } from "./shell/preferences";
-import { execute, shortcuts } from "./shell/commands";
-import { CommandPanel } from "./shell/CommandPanel";
-import { ReleaseReadinessDialog } from "./components/ReleaseReadinessDialog";
 import { useEffect, useRef, useState } from "react";
-import { InterfaceCanvas } from "./panels/InterfaceCanvas";
 import { clearAssetCache } from "@studio/scene-runtime";
 import { runAssetTask } from "@studio/asset-pipeline";
-import { localDraft, resolveLocalDraft } from "./state/journal";
-import {
-  Box,
-  CloudUpload,
-  FolderOpen,
-  History,
-  Play,
-  Redo2,
-  Save,
-  Square,
-  Undo2,
-  Upload,
-  X,
-  LayoutDashboard,
-  MoreHorizontal,
-} from "lucide-react";
 import { assertDocument, migrateDocument } from "@studio/scene-schema";
-import { Inspector } from "./panels/Inspector";
-import { Viewport } from "./panels/Viewport";
-import { Resources } from "./panels/Resources";
-import { Interactions } from "./panels/Interactions";
-import {
-  Login,
-  ProjectsDialog,
-  RecoveryDialog,
-  VersionsDialog,
-} from "./components/Dialogs";
+import type { StudioCommand } from "@studio/editor-core";
+import { localDraft, resolveLocalDraft } from "./state/journal";
+import { Login, RecoveryDialog } from "./components/Dialogs";
+import { ReleaseReadinessDialog } from "./components/ReleaseReadinessDialog";
 import { useStudio } from "./state/studio";
-import {
-  ApiError,
-  download,
-  request,
-  saveBlob,
-  token,
-  type CloudDraft,
-} from "./state/api";
+import { ApiError, download, request, saveBlob, token, type CloudDraft } from "./state/api";
+import { ContextMenu } from "./shell/ContextMenu";
+import { CommandPanel } from "./shell/CommandPanel";
+import { commands, execute, shortcuts } from "./shell/commands";
+import { useConsoleLayout } from "./shell/layout";
+import { ConsoleDock } from "./shell/ConsoleDock";
+import { ConsoleChrome, ConsoleStatusBar } from "./shell/ConsoleChrome";
+import { useExtensionCommands } from "./extensions/ExtensionHost";
+import "./shell/console.css";
 
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(Boolean(token())),
-    [dialog, setDialog] = useState<"projects" | "versions" | null>(null),
-    [published, setPublished] = useState("");
+  const [authenticated, setAuthenticated] = useState(Boolean(token())), [published, setPublished] = useState("");
   const file = useRef<HTMLInputElement>(null);
-  const document = useStudio((s) => s.document),
-    session = useStudio((s) => s.session),
-    historyTarget = useStudio((s) => s.historyTarget),
-    editingLibrary = useStudio((s) => s.editingLibrary),
-    mode = useStudio((s) => s.mode),
-    saveState = useStudio((s) => s.saveState),
-    message = useStudio((s) => s.message),
-    busy = useStudio((s) => s.busy),
-    issues = useStudio((s) => s.issues),
-    revision = useStudio((s) => s.revision);
-  const [, refreshHistory] = useState(0);
-  const activeHistory = historyTarget ?? session;
-  useEffect(
-    () => activeHistory?.subscribe(() => refreshHistory((value) => value + 1)),
-    [activeHistory],
-  );
-  const workspace = useStudio((s) => s.workspace),
-    assetsOpen = useStudio((s) => s.assetsOpen),
-    inspectorOpen = useStudio((s) => s.inspectorOpen);
-  const preferences = usePreferences();
-  const leftOpen = preferences.leftOpen;
-  const setLeftOpen = (value: boolean) =>
-    preferences.patch({ leftOpen: value });
-  useEffect(() => {
-    const resize = () => {
-      if (window.innerWidth < 1024)
-        useStudio.getState().set({ inspectorOpen: false });
-      if (window.innerWidth < 768) setLeftOpen(false);
-    };
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, []);
+  const document = useStudio((s) => s.document), mode = useStudio((s) => s.mode), saveState = useStudio((s) => s.saveState), message = useStudio((s) => s.message), busy = useStudio((s) => s.busy);
+  const layout = useConsoleLayout();
+  useExtensionCommands();
   useEffect(() => {
     if (!authenticated) return;
     void useStudio.getState().run("载入工作空间", async () => {
@@ -116,7 +52,7 @@ export default function App() {
                   "/scenes/" + project.sceneId + "/draft",
                 ),
               );
-            else setDialog("projects");
+            else useConsoleLayout.getState().open("projects");
           }
         }
       } catch (error) {
@@ -167,274 +103,59 @@ export default function App() {
     });
     if (file.current) file.current.value = "";
   };
+  useEffect(() => {
+    const current = () => {
+      const state = useStudio.getState();
+      if (!state.document) throw Error("未打开工程");
+      return { ...state, document: state.document };
+    };
+    const hasDocument = () => Boolean(useStudio.getState().document) && !useStudio.getState().busy;
+    const items: StudioCommand[] = [
+      { id: "project.manage", title: "新建 / 打开 / 复制工程", execute: async () => { await useStudio.getState().run("读取工程", () => useStudio.getState().refreshProjects()); useConsoleLayout.getState().open("projects"); } },
+      { id: "project.close", title: "关闭工程", enabled: hasDocument, execute: () => useStudio.getState().close() },
+      { id: "project.import", title: "导入工程包 / 场景文档", execute: () => file.current?.click() },
+      { id: "project.export", title: "导出完整工程包", enabled: hasDocument, execute: async () => {
+        const state = current();
+        await state.save();
+        if (useStudio.getState().saveState !== "saved") throw Error("当前修改未成功保存，导出已取消");
+        await download("/projects/" + state.projectId + "/export", state.document.name + ".studio.zip");
+      } },
+      { id: "project.documentExport", title: "导出场景文档", enabled: hasDocument, execute: () => {
+        const { document } = current();
+        saveBlob(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }), document.name + ".scene.json");
+      } },
+      { id: "project.player", title: "打开独立 Player", enabled: hasDocument, execute: () => { window.open("/player/?scene=" + current().document.sceneId, "_blank", "noopener"); } },
+      { id: "project.unpublish", title: "取消场景发布", enabled: hasDocument, execute: async () => {
+        await useStudio.getState().run("取消发布", async () => { await request("/scenes/" + current().document.sceneId + "/publish", { method: "DELETE" }); useStudio.getState().set({ message: "已取消发布" }); });
+      } },
+      { id: "scene.publish", title: "发布场景", enabled: () => hasDocument() && useStudio.getState().mode === "edit" && !useStudio.getState().editingLibrary, execute: async () => {
+        await useStudio.getState().run("发布场景", async () => {
+          const state = current();
+          await state.save();
+          if (useStudio.getState().saveState !== "saved") throw Error("草稿尚未成功保存，请先处理保存状态");
+          const result = await request<{ versionId: string; playerUrl: string }>("/scenes/" + state.document.sceneId + "/publish", { method: "POST", body: JSON.stringify({ expectedRevision: useStudio.getState().revision }) });
+          setPublished(result.playerUrl);
+        });
+      } },
+      { id: "project.logout", title: "退出登录", execute: () => { useStudio.getState().close(); clearAssetCache(); sessionStorage.removeItem("studio-token"); setAuthenticated(false); } },
+    ].map((item) => ({ ...item, category: "工程", scope: "global" } as StudioCommand));
+    const remove = items.map((item) => commands.register(item));
+    return () => remove.forEach((unregister) => unregister());
+  }, []);
   if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />;
-  return (
-    <div
-      className={
-        "studio-shell layout-" +
-        preferences.layout +
-        (mode === "play" ? " preview-shell" : "")
-      }
-      style={
-        {
-          "--studio-left-w": preferences.leftWidth + "px",
-          "--studio-right-w": preferences.rightWidth + "px",
-        } as React.CSSProperties
-      }
-    >
-      <header className="app-header">
-        <button
-          className="brand"
-          aria-label="打开工程管理"
-          onClick={() => {
-            void useStudio.getState().refreshProjects();
-            setDialog("projects");
-          }}
-        >
-          <span className="brand-symbol">
-            <Box />
-          </span>
-          <span>
-            WebGL <strong>Studio</strong>
-          </span>
-        </button>
-        <span className="header-divider" />
-        <button className="project-title" onClick={() => setDialog("projects")}>
-          <FolderOpen size={15} />
-          <span>{document?.name ?? "选择工程"}</span>
-        </button>
-        <details className="file-menu">
-          <summary aria-label="工程菜单">
-            <MoreHorizontal size={18} />
-          </summary>
-          <nav
-            onClick={(event) =>
-              event.currentTarget.parentElement?.removeAttribute("open")
-            }
-          >
-            <button onClick={() => setDialog("projects")}>
-              新建 / 打开 / 复制工程
-            </button>
-            <button
-              disabled={!document}
-              onClick={() => useStudio.getState().close()}
-            >
-              关闭工程
-            </button>
-            <button onClick={() => file.current?.click()}>
-              <Upload />
-              导入工程包
-            </button>
-            <button
-              disabled={!document}
-              onClick={() =>
-                void useStudio.getState().run("导出工程", async () => {
-                  await useStudio.getState().save();
-                  if (useStudio.getState().saveState !== "saved")
-                    throw new Error("当前修改未成功保存，导出已取消");
-                  await download(
-                    "/projects/" + useStudio.getState().projectId + "/export",
-                    (document?.name ?? "project") + ".studio.zip",
-                  );
-                })
-              }
-            >
-              导出完整工程包
-            </button>
-            <button
-              disabled={!document}
-              onClick={() => {
-                if (document)
-                  window.open(
-                    "/player/?scene=" + document.sceneId,
-                    "_blank",
-                    "noopener",
-                  );
-              }}
-            >
-              打开独立 Player
-            </button>
-            <button
-              disabled={!document}
-              onClick={() =>
-                void useStudio.getState().run("取消发布", async () => {
-                  await request("/scenes/" + document!.sceneId + "/publish", {
-                    method: "DELETE",
-                  });
-                  useStudio.getState().set({ message: "已取消发布" });
-                })
-              }
-            >
-              取消发布
-            </button>
-            <button
-              disabled={!document}
-              onClick={() => {
-                if (document)
-                  saveBlob(
-                    new Blob([JSON.stringify(document, null, 2)], {
-                      type: "application/json",
-                    }),
-                    document.name + ".scene.json",
-                  );
-              }}
-            >
-              导出场景文档
-            </button>
-            <button onClick={() => execute("layout.restore")}>
-              <LayoutDashboard />
-              重置面板布局
-            </button>
-            <button
-              onClick={() => {
-                useStudio.getState().close();
-                clearAssetCache();
-                sessionStorage.removeItem("studio-token");
-                setAuthenticated(false);
-              }}
-            >
-              退出登录
-            </button>
-          </nav>
-        </details>
-        <input
-          ref={file}
-          type="file"
-          accept=".zip,.json"
-          hidden
-          aria-label="导入工程文件"
-          onChange={(event) => void importProject(event.target.files)}
-        />
-        <button
-          title="搜索命令 Ctrl+."
-          aria-label="搜索命令"
-          onClick={() => execute("palette.open")}
-        >
-          ⌕
-        </button>
-        <button aria-label="专注模式" onClick={() => execute("view.focus")}>
-          ⛶
-        </button>
-        <label className="workspace-switcher">
-          工作空间{" "}
-          <select
-            aria-label="工作空间"
-            value={workspace}
-            disabled={mode === "play"}
-            onChange={(event) => execute("workspace." + event.target.value)}
-          >
-            {workspaceCatalog.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.icon} {w.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <select
-          aria-label="工作台布局"
-          value={preferences.layout}
-          onChange={(e) => {
-            preferences.patch({
-              layout: e.target.value as typeof preferences.layout,
-              leftOpen: e.target.value === "standard",
-            });
-            useStudio
-              .getState()
-              .set({ inspectorOpen: e.target.value === "standard" });
-          }}
-        >
-          <option value="standard">标准</option>
-          <option value="compact">紧凑</option>
-          <option value="focus">专注</option>
-        </select>
-        <div className="header-spacer" />
-        <div className="history-controls">
-          <button
-            className="icon-button"
-            aria-label="撤销"
-            title="撤销 Ctrl+Z"
-            disabled={!activeHistory?.canUndo || mode === "play"}
-            onClick={() => execute("document.undo")}
-          >
-            <Undo2 />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="重做"
-            title="重做 Ctrl+Shift+Z"
-            disabled={!activeHistory?.canRedo || mode === "play"}
-            onClick={() => execute("document.redo")}
-          >
-            <Redo2 />
-          </button>
-        </div>
-        <button
-          className={"preview-button " + (mode === "play" ? "active" : "")}
-          disabled={!document || Boolean(busy)}
-          onClick={() => execute("view.preview")}
-        >
-          {mode === "play" ? <Square size={14} /> : <Play size={14} />}
-          <span>{mode === "play" ? "停止预览" : "预览"}</span>
-        </button>
-        <button
-          className="save-button"
-          disabled={!document || saveState === "saving" || Boolean(busy)}
-          onClick={() => execute("document.save")}
-        >
-          <Save size={15} />
-          <span>保存</span>
-        </button>
-        <button
-          className="icon-button"
-          title="版本历史"
-          aria-label="版本历史"
-          disabled={!document}
-          onClick={() => setDialog("versions")}
-        >
-          <History />
-        </button>
-        <button
-          title="发布检查"
-          disabled={
-            !document ||
-            Boolean(busy) ||
-            mode === "play" ||
-            Boolean(editingLibrary)
-          }
-          onClick={() => execute("studio.readiness")}
-        >
-          检查
-        </button>
-        <button
-          className="primary publish-button"
-          disabled={
-            !document ||
-            Boolean(busy) ||
-            mode === "play" ||
-            Boolean(editingLibrary)
-          }
-          onClick={() =>
-            void useStudio.getState().run("发布场景", async () => {
-              await useStudio.getState().save();
-              if (useStudio.getState().saveState !== "saved")
-                throw new Error("草稿尚未成功保存，请先处理保存状态");
-              const result = await request<{
-                versionId: string;
-                playerUrl: string;
-              }>("/scenes/" + document!.sceneId + "/publish", {
-                method: "POST",
-                body: JSON.stringify({
-                  expectedRevision: useStudio.getState().revision,
-                }),
-              });
-              setPublished(result.playerUrl);
-            })
-          }
-        >
-          <CloudUpload size={16} />
-          发布
-        </button>
-      </header>
+  return <div className="console-shell" data-mode={mode} data-immersive={layout.focus || mode === "play"} data-density={layout.density} onKeyDownCapture={(event) => {
+    if (event.key !== "Tab" || event.nativeEvent.isComposing) return;
+    const target = event.target as HTMLElement;
+    const modal = target.closest<HTMLElement>('[role="dialog"][aria-modal="true"]') ?? [...event.currentTarget.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].at(-1);
+    if (!modal) return;
+    const items = [...modal.querySelectorAll<HTMLElement>('input,select,textarea,button,a[href],[tabindex]:not([tabindex="-1"])')].filter((item) => !item.matches(":disabled") && item.getClientRects().length > 0);
+    const first = items[0], last = items.at(-1);
+    if (!modal.contains(target) || event.shiftKey && target === first || !event.shiftKey && target === last) {
+      event.preventDefault(); (event.shiftKey ? last : first)?.focus();
+    }
+  }}>
+    <ConsoleChrome />
+    <input ref={file} type="file" accept=".zip,.json" hidden aria-label="导入工程文件" onChange={(event) => void importProject(event.target.files)} />
       {saveState === "conflict" && (
         <div className="conflict-bar">
           <span>保存冲突：本地修改已保留。</span>
@@ -479,157 +200,13 @@ export default function App() {
           </button>
         </div>
       )}
-      <nav
-        hidden={!preferences.rail}
-        className="task-navigation"
-        aria-label="创作任务"
-      >
-        <div className="header-spacer" />
-        <button
-          className={leftOpen ? "active" : ""}
-          disabled={workspace === "interface"}
-          onClick={() => {
-            setLeftOpen(!leftOpen);
-            if (window.innerWidth < 1024)
-              useStudio.getState().set({ inspectorOpen: false });
-          }}
-        >
-          {mode === "play" && workspace === "interaction"
-            ? "调试面板"
-            : "任务面板"}
-        </button>
-        <button
-          className={assetsOpen ? "active" : ""}
-          onClick={() => useStudio.getState().set({ assetsOpen: !assetsOpen })}
-        >
-          资源库
-        </button>
-        <button
-          className={inspectorOpen ? "active" : ""}
-          disabled={workspace === "interface"}
-          onClick={() => {
-            useStudio.getState().set({ inspectorOpen: !inspectorOpen });
-            if (window.innerWidth < 1024) setLeftOpen(false);
-          }}
-        >
-          属性
-        </button>
-      </nav>
-      <main
-        className={
-          "creation-workspace task-" +
-          workspace +
-          (mode === "play" ? " is-preview" : "")
-        }
-      >
-        {workspace !== "interface" && leftOpen && mode === "edit" && (
-          <aside className="task-sidebar">
-            <DockResize side="left" />
-            <WorkspaceSidebar />
-          </aside>
-        )}
-        <div className="creation-main">
-          <div
-            className={
-              "persistent-viewport " +
-              (workspace === "interface" && mode === "edit"
-                ? "behind-canvas"
-                : "")
-            }
-          >
-            <Viewport />
-          </div>
-          {workspace === "interface" && mode === "edit" && <InterfaceCanvas />}
-          {mode === "edit" && <WorkspaceDesigner />}
-          {assetsOpen && mode === "edit" && (
-            <div className="resource-drawer">
-              <Resources />
-            </div>
-          )}
-        </div>
-        {workspace !== "interface" && inspectorOpen && mode === "edit" && (
-          <aside className="properties-sidebar">
-            <DockResize side="right" />
-            <Inspector />
-          </aside>
-        )}
-        {mode === "play" && workspace === "interaction" && leftOpen && (
-          <aside className="preview-debug">
-            <Interactions />
-          </aside>
-        )}
-      </main>
-      <ContextMenu />
-      <CommandPanel />
-      <ReleaseReadinessDialog />
-      {preferences.layout === "focus" && mode === "edit" && (
-        <div className="focus-exit">
-          <button onClick={() => execute("view.focus")}>退出专注 Space</button>
-          <button onClick={() => execute("layout.restore")}>恢复布局</button>
-        </div>
-      )}
-      {busy && (
-        <div className="operation-status" role="status">
-          {busy}…
-        </div>
-      )}
-      <footer className="status-bar">
-        <div>
-          <span className={"status-dot " + saveState} />
-          <span>
-            {!document
-              ? "未打开工程"
-              : (
-                  {
-                    saved: "已保存到云端",
-                    dirty: "本地已提交 · 等待保存",
-                    saving: "正在保存…",
-                    offline: "云端保存失败 · 本地事务已保留",
-                    conflict: "版本冲突",
-                  } as const
-                )[saveState]}
-          </span>
-          <small>修订 {revision}</small>
-        </div>
-        <span>
-          {busy ||
-            (Object.keys(issues).length
-              ? Object.keys(issues).length + " 项资源加载问题"
-              : "SceneDocument · 毫米")}
-        </span>
-      </footer>
-      {message && (
-        <aside className="notification" role="alert">
-          <button
-            className="icon-button"
-            aria-label="关闭消息"
-            onClick={() => useStudio.getState().set({ message: "" })}
-          >
-            <X />
-          </button>
-          <strong>操作信息</strong>
-          <pre>{message}</pre>
-          {saveState === "offline" && (
-            <button onClick={() => execute("document.save")}>重新保存</button>
-          )}
-        </aside>
-      )}
-      {Object.keys(issues).length > 0 && (
-        <details className="runtime-issues">
-          <summary>资源加载问题 · {Object.keys(issues).length}</summary>
-          {Object.entries(issues).map(([id, error]) => (
-            <p key={id}>
-              {document?.entities.find((e) => e.id === id)?.name ?? id}：{error}
-            </p>
-          ))}
-        </details>
-      )}
-      {dialog === "projects" && (
-        <ProjectsDialog close={() => setDialog(null)} />
-      )}{" "}
-      {dialog === "versions" && (
-        <VersionsDialog close={() => setDialog(null)} />
-      )}
+    {layout.notice && <div className="console-layout-notice" role="alert"><span>{layout.notice}</span><button onClick={() => layout.patch({ notice: "" })}>关闭</button><button onClick={() => layout.restore()}>恢复展厅布局</button></div>}
+    <ConsoleDock />
+    <ConsoleStatusBar />
+    <ContextMenu /><CommandPanel /><ReleaseReadinessDialog />
+    {layout.focus && mode === "edit" && <div className="console-immersive-exit"><button onClick={() => execute("view.focus")}>退出专注 Space</button><button onClick={() => execute("layout.restore")}>恢复布局</button></div>}
+    {busy && <div className="operation-status" role="status">{busy}…</div>}
+    {message && <aside className="notification" role="alert"><button className="icon-button" aria-label="关闭消息" onClick={() => useStudio.getState().set({ message: "" })}>×</button><strong>操作信息</strong><pre>{message}</pre>{saveState === "offline" && <button onClick={() => execute("document.save")}>重新保存</button>}</aside>}
       <RecoveryDialog />
       {published && (
         <div className="modal-backdrop">
@@ -677,6 +254,5 @@ export default function App() {
           </section>
         </div>
       )}
-    </div>
-  );
+  </div>;
 }

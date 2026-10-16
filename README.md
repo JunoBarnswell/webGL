@@ -71,9 +71,17 @@ npm run build
 npm run verify:contracts
 npm run verify:integration
 npm run verify:studio22
-# Vite 编辑器运行时验证模型映射与选面修复
-npm run verify:model-revision
-npm run verify:browser
+# 控制台源码入口清单
+npm run inventory:console
 ```
 
 [可移植行业样例](examples/README.md) 使用合成几何，包含 50 零件的汽车拆解和 100 管线 / 1000 管段 / 500 标签的管网。它们可通过工程导入、编辑、预览和发布。真实 CAD/IFC 双向编辑不在当前产品边界内。
+
+
+### 可停靠控制台
+
+默认采用展厅创作布局，巡航和资产按需打开。窗口菜单提供全部基础面板、专业设计器、七套布局预设、浮动、自动隐藏、私人布局和布局文件导入导出；命令搜索使用 `Ctrl+.`，`F6` / `Shift+F6` 切换聚焦窗口。窄屏将窗口合并为标签，恢复桌面尺寸时保留新打开的设计器与编辑状态。
+
+视口始终保留同一个 Canvas/Runtime；布局不进入场景文档，不触发云端保存。现有文档、API、Native AOT 服务和 Player 协议不变。前端不保留旧工作空间选择器驱动的自动化测试，CI 只运行编译、静态检查与现有核心/服务契约；真实浏览器验收单独记录，未执行项不作为通过。
+
+设计边界见 [console-shell-design.md](docs/console-shell-design.md)，源码入口清单见 [existing-feature-inventory.json](docs/existing-feature-inventory.json)，实际验收与阻塞见 [console-shell-acceptance.md](docs/console-shell-acceptance.md)。

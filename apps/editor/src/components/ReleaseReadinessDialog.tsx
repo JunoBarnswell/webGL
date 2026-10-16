@@ -1,3 +1,4 @@
+import { useConsoleLayout } from "../shell/layout";
 import { useEffect, useRef } from "react";
 import { useStudio } from "../state/studio";
 
@@ -110,8 +111,8 @@ export function ReleaseReadinessDialog() {
                   onClick={() => {
                     const state = useStudio.getState();
                     state.select([check.ownerId]);
+                    useConsoleLayout.getState().open("properties");
                     state.set({
-                      inspectorOpen: true,
                       releaseReport: null,
                       message: check.message + " " + check.path,
                     });

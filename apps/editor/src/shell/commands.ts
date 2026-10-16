@@ -1,3 +1,6 @@
+import * as THREE from "three";
+import { createComponent, createEntity } from "@studio/scene-schema";
+import { addEntity } from "@studio/editor-core";
 import {
   extensionPanels,
   extensionTools,
@@ -9,14 +12,17 @@ import {
   type CommandContext,
 } from "@studio/editor-core";
 import { deleteEntities, duplicateEntities } from "@studio/editor-core";
-import { useStudio, type Workspace } from "../state/studio";
+import { useStudio } from "../state/studio";
 import { usePreferences } from "./preferences";
+import { useConsoleLayout } from "./layout";
+import { windows, layoutPresets, workspaceWindow } from "./windows";
 export const commands = new CommandRegistry();
 const abort = new AbortController();
 export function context(): CommandContext {
   const s = useStudio.getState();
   return {
     surface: focusScope(document.activeElement),
+    owner: focusScope(document.activeElement) === "viewport" ? useConsoleLayout.getState().viewportContext : useConsoleLayout.getState().activeWindow,
     editingAllowed: s.mode === "edit" && !s.busy && Boolean(s.document),
     selectedIds: s.selected,
     flying: Boolean(s.view?.isFlying),
@@ -84,20 +90,10 @@ viewport("view.space", "切换世界 / 局部坐标", ["L"], () =>
 viewport("view.snap", "切换吸附", ["Shift+S"], () =>
   useStudio.getState().set({ snap: !useStudio.getState().snap }),
 );
-viewport("panel.inspector", "属性面板", ["I"], () =>
-  useStudio
-    .getState()
-    .set({ inspectorOpen: !useStudio.getState().inspectorOpen }),
-);
-viewport("panel.assets", "资源库", ["B"], () =>
-  useStudio.getState().set({ assetsOpen: !useStudio.getState().assetsOpen }),
-);
-viewport("panel.rail", "任务图标轨", ["Alt+`"], () =>
-  usePreferences.getState().patch({ rail: !usePreferences.getState().rail }),
-);
-viewport("view.focus", "专注模式", ["Space"], () =>
-  usePreferences.getState().toggleFocus(),
-);
+viewport("panel.inspector", "属性面板", ["I"], () => useConsoleLayout.getState().toggle("properties"));
+viewport("panel.assets", "资源库", ["B"], () => useConsoleLayout.getState().toggle("resources"));
+viewport("panel.rail", "任务图标轨", ["Alt+`"], () => useConsoleLayout.getState().patch({ rail: !useConsoleLayout.getState().rail }));
+viewport("view.focus", "专注模式", ["Space"], () => useConsoleLayout.getState().patch({ focus: !useConsoleLayout.getState().focus }));
 viewport(
   "view.fullscreen",
   "视口全屏",
@@ -108,7 +104,7 @@ viewport(
     if (document.fullscreenElement) void document.exitFullscreen();
     else
       void host.requestFullscreen().catch(() => {
-        usePreferences.getState().patch({ layout: "focus" });
+        useConsoleLayout.getState().patch({ focus: true });
         useStudio
           .getState()
           .set({ message: "浏览器未允许全屏，已切换专注模式" });
@@ -133,15 +129,14 @@ for (const [index, workspace, title] of [
   [3, "tour", "导览巡航"],
   [4, "interaction", "事件交互"],
   [5, "interface", "界面设计"],
-] as [number, Workspace, string][])
+] as [number, string, string][])
   viewport("workspace." + workspace, title, [String(index)], () => {
     useStudio.getState().set({
-      workspace,
       domainTool: "",
       placingHotspot: false,
       pickEntity: null,
     });
-    usePreferences.getState().patch({ leftOpen: true });
+    useConsoleLayout.getState().open(workspaceWindow(workspace));
   });
 commands.register({
   id: "document.save",
@@ -229,14 +224,7 @@ commands.register({
   title: "恢复工作台布局",
   category: "工作台",
   scope: "global",
-  execute: () => {
-    usePreferences.getState().restore();
-    useStudio.getState().set({
-      inspectorOpen: false,
-      assetsOpen: false,
-      layoutEpoch: useStudio.getState().layoutEpoch + 1,
-    });
-  },
+  execute: () => useConsoleLayout.getState().restore(),
 });
 commands.register({
   id: "palette.open",
@@ -267,7 +255,7 @@ commands.register({
   allowDuringNavigation: true,
   execute: () => {
     const state = useStudio.getState();
-    const menu = document.querySelector("details[open].file-menu");
+    const menu = document.querySelector("details[open].console-menu");
     if (menu) {
       menu.removeAttribute("open");
       return;
@@ -309,8 +297,8 @@ commands.register({
       void state.switchMode();
       return;
     }
-    if (usePreferences.getState().layout === "focus")
-      usePreferences.getState().toggleFocus();
+    if (useConsoleLayout.getState().focus)
+      useConsoleLayout.getState().patch({ focus: false });
   },
 });
 export const shortcuts = new ShortcutManager(
@@ -368,11 +356,68 @@ for (const panel of extensionPanels)
       enabled: edit,
       execute: () => {
         useStudio.getState().set({
-          workspace: panel.workspace!.id,
           domainTool: "",
           placingHotspot: false,
           pickEntity: null,
         });
-        usePreferences.getState().patch({ leftOpen: true });
+        useConsoleLayout.getState().open("extension." + panel.id);
       },
     });
+
+for (const item of windows) commands.register({
+  id: "window." + item.id,
+  title: "打开 " + item.title,
+  keywords: item.group + " window panel chuangkou",
+  category: "窗口 / " + item.group,
+  scope: "global",
+  execute: () => useConsoleLayout.getState().open(item.id),
+});
+for (const preset of layoutPresets) commands.register({
+  id: "layout." + preset.id,
+  title: preset.title + "布局",
+  category: "窗口布局",
+  keywords: preset.description,
+  scope: "global",
+  execute: () => useConsoleLayout.getState().restore(preset.id),
+});
+for (const [id, title] of [["float", "浮动当前工具窗口"], ["dock", "停靠当前工具窗口"], ["autoHide", "自动隐藏当前工具窗口"], ["close", "关闭当前工具窗口"]] as const) commands.register({
+  id: "window." + id, title, category: "窗口", scope: "global",
+  enabled: () => useConsoleLayout.getState().activeWindow !== "viewport",
+  execute: () => { const state = useConsoleLayout.getState(); state[id](state.activeWindow); },
+});
+commands.register({
+  id: "window.next", title: "切换到下一个窗口", category: "窗口", scope: "global", shortcuts: ["F6"], allowInTextInput: true,
+  execute: () => {
+    const state = useConsoleLayout.getState(), ids = state.api?.panels.filter(p => p.api.isVisible).map(p => p.id) ?? [];
+    const id = ids[(ids.indexOf(state.activeWindow) + 1) % ids.length];
+    if (id) state.open(id);
+  },
+});
+commands.register({
+  id: "window.previous", title: "切换到上一个窗口", category: "窗口", scope: "global", shortcuts: ["Shift+F6"], allowInTextInput: true,
+  execute: () => {
+    const state = useConsoleLayout.getState(), ids = state.api?.panels.filter(p => p.api.isVisible).map(p => p.id) ?? [];
+    const id = ids[(ids.indexOf(state.activeWindow) + ids.length - 1) % ids.length];
+    if (id) state.open(id);
+  },
+});
+
+for (const [id, title, component] of [["node", "新增节点", ""], ["light", "创建灯光", "Light"]]) commands.register({
+  id: "create." + id, title, category: "创建", scope: "editor", enabled: edit,
+  execute: () => {
+    const state = useStudio.getState(), parentId = state.selected[0] ?? null;
+    const entity = createEntity(component ? "灯光" : "新节点", parentId);
+    const parent = parentId ? state.runtime?.getObject(parentId) : undefined;
+    if (parent) {
+      const bounds = new THREE.Box3().setFromObject(parent);
+      if (!bounds.isEmpty()) entity.transform.position = parent.worldToLocal(bounds.getCenter(new THREE.Vector3())).toArray();
+    }
+    if (component) entity.components.push(createComponent(component));
+    state.command(addEntity(entity)); state.select([entity.id]);
+  },
+});
+commands.register({ id: "create.hotspot", title: "在视口放置热点", category: "创建", scope: "editor", enabled: edit, execute: () => {
+  useConsoleLayout.getState().open("content");
+  useStudio.getState().set({ placingHotspot: true });
+  useConsoleLayout.getState().open("viewport");
+} });

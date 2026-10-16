@@ -1,9 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { bindingConflicts } from "@studio/editor-core";
 import { commands, execute, context } from "./commands";
 import { usePreferences } from "./preferences";
 import { useStudio } from "../state/studio";
+import { useConsoleLayout } from "./layout";
+import type { ReactNode } from "react";
+export function CommandButton({ id, children, icon = false }: { id: string; children?: ReactNode; icon?: boolean }) {
+  useSyncExternalStore(commands.subscribe, commands.getVersion);
+  useStudio((s) => s.document);
+  useStudio((s) => s.selected);
+  useStudio((s) => s.mode);
+  useStudio((s) => s.busy);
+  useStudio((s) => s.saveState);
+  useStudio((s) => s.historyTarget);
+  useConsoleLayout((s) => s.activeWindow);
+  const command = commands.commands.get(id);
+  if (!command) return null;
+  const binding = usePreferences.getState().bindings[id] ?? command.shortcuts ?? [];
+  return <button className={icon ? "console-icon-command" : "console-command"} aria-label={command.title} title={command.title + (binding.length ? " · " + binding.join(" / ") : "")} disabled={!commands.allowed(command, context())} onClick={() => execute(id)}>{children ?? command.title}</button>;
+}
 export function CommandPanel() {
+  useSyncExternalStore(commands.subscribe, commands.getVersion);
   const kind = useStudio((s) => s.commandPanel),
     preferences = usePreferences();
   const [query, setQuery] = useState(""),
@@ -25,18 +42,6 @@ export function CommandPanel() {
         if (e.key === "Escape") {
           e.stopPropagation();
           useStudio.getState().set({ commandPanel: null });
-        }
-        if (e.key === "Tab") {
-          const items = [
-            ...host.current!.querySelectorAll<HTMLElement>("input,button"),
-          ];
-          if (e.shiftKey && document.activeElement === items[0]) {
-            e.preventDefault();
-            items.at(-1)?.focus();
-          } else if (!e.shiftKey && document.activeElement === items.at(-1)) {
-            e.preventDefault();
-            items[0]?.focus();
-          }
         }
       }}
     >
@@ -75,7 +80,7 @@ export function CommandPanel() {
         {error && <p role="alert">{error}</p>}
         <div className="command-results">
           {commands.search(query).map((command) => (
-            <div key={command.id} className="command-row">
+            <div key={command.id} className="command-row" data-command-id={command.id}>
               <button
                 disabled={!commands.allowed(command, context())}
                 onClick={() => {

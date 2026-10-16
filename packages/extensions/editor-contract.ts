@@ -43,6 +43,7 @@ export interface ExtensionPanelProps {
     historyTarget: (
       target: import("../editor-core/src/DocumentSession").HistoryTarget | null,
       save?: () => Promise<void>,
+      dirty?: boolean,
     ) => void;
     persistDraft: (key: string, value: unknown) => Promise<void>;
     recoverDraft: <T>(key: string) => Promise<T | undefined>;

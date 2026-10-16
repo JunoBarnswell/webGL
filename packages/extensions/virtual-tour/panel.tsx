@@ -53,16 +53,19 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
     [hotspotKind, setHotspotKind] = useState<TourHotspot["kind"]>("point"),
     [polygon, setPolygon] = useState<{ yaw: number; pitch: number }[]>([]),
     [published, setPublished] = useState(""),
-    [history, setHistory] = useState<{ id: string; createdAt: string }[]>([]);
+    [history, setHistory] = useState<{ id: string; createdAt: string }[]>([]),
+    [scenesError, setScenesError] = useState("");
   const graph = editor.document,
     node = graph?.nodes.find((n) => n.id === active) ?? graph?.nodes[0];
   useEffect(() => {
     const abort = new AbortController();
+    setScenesError("");
     void services
       .request<
         typeof scenes
       >("/projects/" + services.projectId + "/scenes", { signal: abort.signal })
-      .then(setScenes);
+      .then((value) => { if (!abort.signal.aborted) setScenes(value); })
+      .catch((error) => { if (!abort.signal.aborted) setScenesError("读取项目场景失败：" + String(error)); });
     return () => abort.abort();
   }, [services.projectId, props.document.sceneId]);
   const edit = (label: string, change: (g: ProjectGraph) => void) =>
@@ -579,6 +582,7 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
         </>
       )}
       {editor.error && <p role="alert">{editor.error}</p>}
+      {scenesError && <p role="alert">{scenesError}</p>}
     </div>
   );
 }

@@ -21,13 +21,6 @@ import { ApiError, request, type CloudDraft, type Project } from "./api";
 import { journal, localDraft, type JournalEntry } from "./journal";
 
 export type EditingPoint = import("../shell/DocumentPoint").DocumentPoint;
-export type Workspace =
-  | "scene"
-  | "content"
-  | "tour"
-  | "interaction"
-  | "interface"
-  | (string & {});
 type SaveState = "saved" | "dirty" | "saving" | "offline" | "conflict";
 interface StudioState {
   releaseReport: ReleaseReadinessReport | null;
@@ -38,6 +31,8 @@ interface StudioState {
   draggingPrefab: import("@studio/scene-schema").PrefabRevision | null;
   previewController: { stop: () => Promise<void>; dispose: () => void } | null;
   historyTarget: HistoryTarget | null;
+  setHistoryTarget: (owner: string, target: HistoryTarget | null, save?: () => Promise<void>) => void;
+  activateHistory: (owner: string) => void;
   activeDocumentSave: (() => Promise<void>) | null;
   scratchActive: boolean;
   beginScratch: () => Promise<void>;
@@ -73,9 +68,6 @@ interface StudioState {
   message: string;
   issues: Record<string, string>;
   busy: string;
-  workspace: Workspace;
-  assetsOpen: boolean;
-  inspectorOpen: boolean;
   view: EditorCamera | null;
   activeRuleId: string;
   activeTourId: string;
@@ -91,7 +83,6 @@ interface StudioState {
   commandPanel: "search" | "shortcuts" | null;
   projects: Project[];
   recovery: JournalEntry | null;
-  layoutEpoch: number;
   set: (patch: Partial<StudioState>) => void;
   command: (command: EditorCommand) => boolean;
   select: (ids: string[], add?: boolean) => void;
@@ -117,6 +108,8 @@ let unsubscribe: (() => void) | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saveQueue = Promise.resolve();
 let sessionGeneration = 0;
+const historyContexts = new Map<string, { target: HistoryTarget; save: (() => Promise<void>) | null }>();
+let historyOwner = "viewport";
 export const useStudio = create<StudioState>((set, get) => ({
   releaseReport: null,
   reportPending: false,
@@ -163,6 +156,19 @@ export const useStudio = create<StudioState>((set, get) => ({
   previewController: null,
   historyTarget: null,
   activeDocumentSave: null,
+  setHistoryTarget: (owner, target, save) => {
+    if (target) historyContexts.set(owner, { target, save: save ?? null });
+    else historyContexts.delete(owner);
+    if (historyOwner === owner) {
+      const current = historyContexts.get(owner);
+      set({ historyTarget: current?.target ?? null, activeDocumentSave: current?.save ?? null });
+    }
+  },
+  activateHistory: (owner) => {
+    historyOwner = owner;
+    const current = historyContexts.get(owner);
+    set({ historyTarget: current?.target ?? null, activeDocumentSave: current?.save ?? null });
+  },
   scratchActive: false,
   async beginScratch() {
     await get().save();
@@ -228,7 +234,6 @@ export const useStudio = create<StudioState>((set, get) => ({
         rootLocalId: record.document.rootLocalId,
         metadata: record.document,
       },
-      workspace: "prefab",
     });
   },
   async returnToScene() {
@@ -240,7 +245,6 @@ export const useStudio = create<StudioState>((set, get) => ({
     set({
       selected: resume.selected,
       editingLibrary: null,
-      workspace: "prefab",
     });
     suspendedScene = null;
   },
@@ -268,10 +272,6 @@ export const useStudio = create<StudioState>((set, get) => ({
   busy: "",
   projects: [],
   recovery: null,
-  layoutEpoch: 0,
-  workspace: "scene",
-  assetsOpen: false,
-  inspectorOpen: false,
   view: null,
   activeRuleId: "",
   activeTourId: "",
@@ -523,7 +523,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     if (!state.runtime) return;
     const mode = state.mode === "edit" ? "play" : "edit";
-    state.view?.setEnabled(mode === "edit" && state.workspace !== "interface");
+    state.view?.setEnabled(mode === "edit");
     try {
       await state.runtime.setMode(mode);
       if (mode === "edit" && window.document.fullscreenElement)

@@ -1,3 +1,4 @@
+import { useConsoleLayout } from "../shell/layout";
 import {
   ModelRevisionDialog,
   type RevisionInput,
@@ -282,7 +283,7 @@ export function Resources() {
       <div className="panel-toolbar">
         <strong>资源库</strong>
         <button
-          onClick={() => useStudio.getState().set({ assetsOpen: false })}
+          onClick={() => useConsoleLayout.getState().close("resources")}
           aria-label="关闭资源库"
         >
           <X size={16} />

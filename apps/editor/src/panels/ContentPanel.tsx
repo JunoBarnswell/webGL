@@ -1,3 +1,4 @@
+import { useConsoleLayout } from "../shell/layout";
 import * as THREE from 'three';
 import { useState } from 'react';
 import { createContent, getComponent } from '@studio/scene-schema';
@@ -27,7 +28,7 @@ export function ContentPanel(){
     {content?<fieldset disabled={mode==='play'} className="content-editor"><h3>编辑内容</h3><label className="field stacked"><span>标题</span><TextField label="内容标题" value={content.title} onChange={v=>update('title',v)}/></label><label className="field stacked"><span>介绍文案</span><TextAreaField label="介绍文案" value={content.body} onChange={v=>update('body',v)}/></label>
       <ReferencePicker kind="asset" assetKind="image" label="作品图片" value={content.imageAssetId} onChange={v=>update('imageAssetId',v)}/><ReferencePicker kind="entity" components={['Audio']} label="解说音频" value={content.audioEntityId} onChange={v=>update('audioEntityId',v)}/>
       <label className="field"><span>展示版式</span><select aria-label="内容展示版式" value={content.layoutId} onChange={e=>update('layoutId',e.target.value)}>{document.ui.layouts.filter(l=>l.scope==='content').map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-      <button className="wide-button" onClick={()=>useStudio.getState().set({workspace:'interface',uiLayoutId:content.layoutId,activeContentId:content.id,uiSelected:[]})}>自由设计内容版式 →</button>
+      <button className="wide-button" onClick={()=>{useStudio.getState().set({uiLayoutId:content.layoutId,activeContentId:content.id,uiSelected:[]});useConsoleLayout.getState().open('interface');}}>自由设计内容版式 →</button>
       {selected[0]&&getComponent(document.entities.find(e=>e.id===selected[0])!,'Hotspot')&&<details><summary>标记外观</summary>{['label','icon','color'].map(key=>{const hotspot=getComponent(document.entities.find(e=>e.id===selected[0])!,'Hotspot')!;return <label className="field" key={key}><span>{{label:'标记文字',icon:'图标字符',color:'颜色'}[key]}</span><TextField label={'热点 '+key} value={String(hotspot.data[key])} onChange={v=>useStudio.getState().command({label:'修改热点标记',mutate:doc=>{doc.entities.find(e=>e.id===selected[0])!.components.find(c=>c.type==='Hotspot')!.data[key]=v;}})}/></label>;})}</details>}
     </fieldset>:<div className="empty-state">选一幅作品，或放置第一个热点。</div>}
     <button className="text-button" disabled={mode==='play'} onClick={()=>{const item=createContent('新内容');useStudio.getState().command({label:'新建内容',mutate:doc=>{doc.contents.push(item);}});useStudio.getState().set({activeContentId:item.id});}}>＋ 新建独立内容</button>

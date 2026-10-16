@@ -5,18 +5,23 @@ export function ContextMenu() {
   const menu = useStudio((s) => s.contextMenu);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (menu) ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    if (!menu) return;
+    const previous = document.activeElement as HTMLElement | null;
+    ref.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    const outside = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) useStudio.getState().set({ contextMenu: null }); };
+    window.addEventListener("pointerdown", outside);
+    return () => { window.removeEventListener("pointerdown", outside); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, [menu]);
   if (!menu) return null;
   return (
     <div
       ref={ref}
-      className="object-context-menu"
+      className="object-context-menu console-quad-menu"
       role="menu"
       aria-label="对象操作"
       style={{
-        left: Math.min(menu.x, innerWidth - 220),
-        top: Math.min(menu.y, innerHeight - 290),
+        left: Math.max(6, Math.min(menu.x, innerWidth - 376)),
+        top: Math.max(6, Math.min(menu.y, innerHeight - 380)),
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -41,16 +46,12 @@ export function ContextMenu() {
       }}
     >
       {[
-        "view.selection",
-        "document.duplicate",
-        "workspace.prefab",
-        "document.delete",
-        "panel.inspector",
-        "annotation.label",
-      ].map((id) => {
-        const command = commands.commands.get(
-          id === "annotation.label" ? "extension.annotation.label" : id,
-        );
+        { title: "变换与视角", ids: ["tool.select", "tool.translate", "tool.rotate", "tool.scale", "view.selection"] },
+        { title: "对象与层级", ids: ["document.duplicate", "document.delete", "panel.inspector", "workspace.prefab"] },
+        { title: "内容与行为", ids: ["workspace.content", "workspace.tour", "workspace.interaction", "extension.annotation.label"] },
+        { title: "显示与审阅", ids: ["view.grid", "view.statistics", "view.focus", "workspace.industrial"] },
+      ].map((group) => <section key={group.title}><h3>{group.title}</h3>{group.ids.map((id) => {
+        const command = commands.commands.get(id);
         return (
           command && (
             <button
@@ -66,7 +67,7 @@ export function ContextMenu() {
             </button>
           )
         );
-      })}
+      })}</section>)}
     </div>
   );
 }

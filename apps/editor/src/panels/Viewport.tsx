@@ -1,3 +1,4 @@
+import { useConsoleLayout } from "../shell/layout";
 import { pointWorld, pointValue, pointFrame } from "../shell/DocumentPoint";
 import { instantiatePrefab } from "@studio/editor-core";
 import { writeDocumentValue } from "@studio/editor-core";
@@ -92,7 +93,7 @@ export function Viewport() {
   } | null>(null);
   const runtimeReference = useStudio((s) => s.runtime),
     runtimeState = useRuntime(runtimeReference),
-    workspace = useStudio((s) => s.workspace),
+    viewportVisible = useConsoleLayout((s) => s.viewportVisible),
     activeTourId = useStudio((s) => s.activeTourId);
   const mode = useStudio((s) => s.mode),
     tool = useStudio((s) => s.tool),
@@ -667,11 +668,11 @@ export function Viewport() {
   useEffect(() => {
     const current = controls.current;
     if (current) {
-      current.view.setEnabled(mode === "edit" && workspace !== "interface");
-      current.helpers.visible = mode === "edit" && workspace !== "interface";
+      current.view.setEnabled(mode === "edit" && viewportVisible);
+      current.helpers.visible = mode === "edit" && viewportVisible;
       current.engine.requestRender();
     }
-  }, [mode, workspace]);
+  }, [mode, viewportVisible]);
 
   useEffect(() => {
     const helper = controls.current?.helpers.children.find(

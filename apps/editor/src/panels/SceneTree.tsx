@@ -1,5 +1,5 @@
+import { execute } from "../shell/commands";
 import { ExtensionTools } from "../extensions/ExtensionTools";
-import * as THREE from "three";
 import { useMemo, useState } from "react";
 import {
   ChevronDown,
@@ -15,9 +15,8 @@ import {
   Box,
   Layers,
 } from "lucide-react";
-import { createEntity, getComponent, type Entity } from "@studio/scene-schema";
+import { getComponent, type Entity } from "@studio/scene-schema";
 import {
-  addEntity,
   deleteEntities,
   duplicateEntities,
   reparentEntity,
@@ -248,22 +247,7 @@ export function SceneTree() {
             title="新增节点"
             aria-label="新增节点"
             disabled={mode === "play"}
-            onClick={() => {
-              const parentId = selected[0] ?? null;
-              const entity = createEntity("新节点", parentId);
-              const parent = parentId
-                ? useStudio.getState().runtime?.getObject(parentId)
-                : undefined;
-              if (parent) {
-                const bounds = new THREE.Box3().setFromObject(parent);
-                if (!bounds.isEmpty())
-                  entity.transform.position = parent
-                    .worldToLocal(bounds.getCenter(new THREE.Vector3()))
-                    .toArray();
-              }
-              command(addEntity(entity));
-              useStudio.getState().select([entity.id]);
-            }}
+            onClick={() => execute("create.node")}
           >
             <Plus />
           </button>

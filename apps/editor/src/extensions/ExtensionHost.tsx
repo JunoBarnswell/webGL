@@ -1,5 +1,6 @@
 import { editablePoint } from "../shell/DocumentPoint";
 import { useEffect, useRef } from "react";
+import { useConsoleLayout } from "../shell/layout";
 import { commands } from "../shell/commands";
 import { prepareModel } from "../panels/Resources";
 import { ProjectNavigation } from "../../../../packages/extensions/virtual-tour/navigation";
@@ -12,59 +13,17 @@ import {
 import {
   extensionPanels,
   extensionCommands,
+  extensionTools,
 } from "../../../../packages/extensions/editor";
+import { CommandButton } from "../shell/CommandPanel";
 import type { ExtensionPanelProps } from "../../../../packages/extensions/editor-contract";
-import { SceneTree } from "../panels/SceneTree";
-import { ContentPanel } from "../panels/ContentPanel";
-import { TourPanel } from "../panels/TourPanel";
-import { Interactions } from "../panels/Interactions";
 import { ReferenceAssets } from "../components/ReferencePicker";
 import { Fields } from "../components/Fields";
 import { useStudio } from "../state/studio";
 import { persistDocumentDraft, recoverDocumentDraft } from "../state/journal";
 import { request, upload, authHeaders, saveBlob } from "../state/api";
 import {analyze} from "../state/analysis";
-export const workspaceCatalog = [
-  {
-    id: "scene",
-    title: "场景搭建",
-    description: "搭建空间与外观",
-    icon: "◈",
-    Sidebar: SceneTree,
-  },
-  {
-    id: "content",
-    title: "热点内容",
-    description: "作品与介绍",
-    icon: "◉",
-    Sidebar: ContentPanel,
-  },
-  {
-    id: "tour",
-    title: "导览巡航",
-    description: "记录镜头与路线",
-    icon: "⌁",
-    Sidebar: TourPanel,
-  },
-  {
-    id: "interaction",
-    title: "事件交互",
-    description: "当…如果…就…",
-    icon: "⚡",
-    Sidebar: Interactions,
-  },
-  {
-    id: "interface",
-    title: "界面设计",
-    description: "设计 Player 界面",
-    icon: "▦",
-    Sidebar: SceneTree,
-  },
-  ...extensionPanels
-    .filter((p) => p.workspace)
-    .map((p) => ({ ...p.workspace!, Sidebar: SceneTree })),
-];
-export function useExtensionProps(): ExtensionPanelProps | null {
+export function useExtensionProps(owner = "viewport"): ExtensionPanelProps | null {
   const runtime = useStudio((s) => s.runtime),
     state = useRuntime(runtime),
     document = useStudio((s) => s.document),
@@ -89,7 +48,7 @@ export function useExtensionProps(): ExtensionPanelProps | null {
     placeAnchor: (id) => studio.set({ placingAnnotation: id }),
     inspect: (id) => {
       studio.select([id]);
-      studio.set({ inspectorOpen: true });
+      useConsoleLayout.getState().open("properties");
     },
     services: {
       analyze,
@@ -155,8 +114,11 @@ export function useExtensionProps(): ExtensionPanelProps | null {
       scratchActive: studio.scratchActive,
       beginScratch: studio.beginScratch,
       cancelScratch: studio.cancelScratch,
-      historyTarget: (target, save) =>
-        studio.set({ historyTarget: target, activeDocumentSave: save ?? null }),
+      historyTarget: (target, save, dirty = false) => {
+        studio.setHistoryTarget(owner, target, save);
+        const layout = useConsoleLayout.getState();
+        if (layout.dirtyWindows[owner] !== dirty) layout.patch({ dirtyWindows: { ...layout.dirtyWindows, [owner]: dirty } });
+      },
       persistDraft: persistDocumentDraft,
       recoverDraft: recoverDocumentDraft,
       sourceEditing: Boolean(studio.editingLibrary),
@@ -275,45 +237,34 @@ function DomainFields({
     </fieldset>
   );
 }
-export function WorkspaceSidebar() {
-  const id = useStudio((s) => s.workspace);
-  const Component =
-    workspaceCatalog.find((w) => w.id === id)?.Sidebar ?? SceneTree;
-  return <Component />;
+export function ExtensionWindow({ id }: { id: string }) {
+  const props = useExtensionProps("extension." + id);
+  const panel = extensionPanels.find((item) => item.id === id);
+  if (!panel) throw Error("未注册的专业窗口：" + id);
+  if (!props) return <div className="empty-state">打开工程后使用{panel.title}</div>;
+  const Component = panel.Component;
+  const tools = extensionTools.filter((tool) => tool.id.startsWith(id + "."));
+  return <>
+    {tools.length > 0 && <header className="console-tool-content"><h3>{panel.title}</h3><p>创建工具使用当前场景选择，完成后在下方编辑。</p>{tools.map((tool) => <div key={tool.id}><CommandButton id={"extension." + tool.id} /><p>{tool.description}</p></div>)}</header>}
+    <Component key={props.services.projectId} {...props} />
+  </>;
 }
-export function WorkspaceDesigner() {
-  const id = useStudio((s) => s.workspace),
-    props = useExtensionProps(),
-    latest = useRef(props);
+export function useExtensionCommands() {
+  const props = useExtensionProps(), latest = useRef(props);
   latest.current = props;
   useEffect(() => {
-    const unregister = extensionCommands
-      .filter((command) => command.workspace === id)
-      .map((command) =>
-        commands.register({
-          id: command.id,
-          title: command.title,
-          category: "工作空间",
-          scope: command.scope,
-          shortcuts: command.shortcuts,
-          enabled: () => Boolean(latest.current?.mode === "edit"),
-          execute: async () => {
-            if (latest.current) await command.execute(latest.current);
-          },
-        }),
-      );
-    return () => unregister.forEach((remove) => remove());
-  }, [id]);
-  const panel = extensionPanels.find((p) => p.workspace?.id === id);
-  if (!panel || !props) return null;
-  const Component = panel.Component;
-  return (
-    <section className="designer-drawer" aria-label={panel.title}>
-      <header>
-        <h2>{panel.title}</h2>
-        <small>{panel.workspace?.description}</small>
-      </header>
-      <Component {...props} />
-    </section>
-  );
+    const remove = extensionCommands.map((command) => commands.register({
+      id: command.id,
+      title: command.title,
+      category: "专业设计器",
+      scope: command.scope,
+      shortcutOwner: "extension." + command.workspace,
+      shortcuts: command.shortcuts,
+      enabled: (context) => context.editingAllowed,
+      execute: async () => {
+        if (latest.current) await command.execute(latest.current);
+      },
+    }));
+    return () => remove.forEach((unregister) => unregister());
+  }, []);
 }
