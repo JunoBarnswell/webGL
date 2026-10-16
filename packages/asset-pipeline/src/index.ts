@@ -640,6 +640,7 @@ export function modelEntities(
 
 import { runAssetTask } from "./AssetWorker";
 export { runAssetTask };
+export {createWorkerTaskPool,type AssetTaskOptions} from "./AssetWorker";
 
 /** Trusted importers produce the same model document contract and packaged render assets. */
 export interface PreparedModel {

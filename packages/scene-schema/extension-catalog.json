@@ -1,6 +1,6 @@
 {
   "runtimeBuild": "2.3.0",
-  "hash": "a90bf58191b160730d9db4d4b600e4f3a62e11bdfe8174924dd152693d3508fb",
+  "hash": "2ba94f322dff664442c78632647f489dccb8de606cf5bbc919652d1dae4f87fc",
   "manifests": [
     {
       "id": "studio.annotation",
@@ -18,8 +18,8 @@
     },
     {
       "id": "studio.configurator",
-      "version": "2.2.0",
-      "minRuntimeVersion": "2.2.0",
+      "version": "2.3.0",
+      "minRuntimeVersion": "2.3.0",
       "dependsOn": {},
       "permissions": [],
       "contributions": {

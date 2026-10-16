@@ -1,22 +1,117 @@
-export interface AssetTaskOptions { signal?:AbortSignal; onProgress?:(message:string,completed:number,total:number)=>void }
-interface Job { id:number; operation:string; payload:unknown; options:AssetTaskOptions; resolve:(value:unknown)=>void; reject:(error:Error)=>void }
-const queue:Job[]=[];let serial=0;
-const slots:{worker:Worker|null;busy:boolean}[]=[{worker:null,busy:false},{worker:null,busy:false}];
-function start():void{
-  for(const slot of slots){
-    if(slot.busy||!queue.length)continue;
-    const job=queue.shift()!;if(job.options.signal?.aborted){job.reject(new DOMException('任务已取消','AbortError'));continue;}
-    slot.busy=true;const worker=slot.worker??new Worker(new URL('./asset.worker.ts',import.meta.url),{type:'module'});slot.worker=worker;
-    let done=false;
-    const finish=(error?:Error,value?:unknown)=>{if(done)return;done=true;if(error){worker.terminate();slot.worker=null;}worker.onmessage=null;worker.onerror=null;job.options.signal?.removeEventListener('abort',abort);slot.busy=false;if(error)job.reject(error);else job.resolve(value);start();};
-    const abort=()=>finish(new DOMException('任务已取消','AbortError'));
-    job.options.signal?.addEventListener('abort',abort,{once:true});
-    worker.onmessage=(event:MessageEvent)=>{const response=event.data;if(response.progress){job.options.onProgress?.(response.message,response.completed,response.total);return;}if(response.error)finish(new Error(response.error));else finish(undefined,response.result);};
-    worker.onerror=event=>finish(new Error('资源 Worker 失败：'+event.message));
-    worker.postMessage({operation:job.operation,payload:job.payload});
-  }
-  if(queue.length&&slots.some(slot=>!slot.busy))start();
+export interface AssetTaskOptions {
+  signal?: AbortSignal;
+  onProgress?: (message: string, completed: number, total: number) => void;
 }
-export function runAssetTask<T>(operation:string,payload:unknown,options:AssetTaskOptions={}):Promise<T>{
-  return new Promise((resolve,reject)=>{queue.push({id:++serial,operation,payload,options,resolve:resolve as (value:unknown)=>void,reject});start();});
+interface Job {
+  operation: string;
+  payload: unknown;
+  options: AssetTaskOptions;
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  abort: () => void;
+  finish?: () => void;
 }
+/** One cancellable, bounded worker lifecycle for resource and editor document analysis tasks. */
+export function createWorkerTaskPool(factory: () => Worker, concurrency = 2) {
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16)
+    throw Error("Worker 并发范围为 1～16");
+  const queue: Job[] = [],
+    slots: { worker: Worker | null; busy: boolean }[] = Array.from(
+      { length: concurrency },
+      () => ({ worker: null, busy: false }),
+    );
+  const start = () => {
+    for (const slot of slots) {
+      if (slot.busy || !queue.length) continue;
+      const job = queue.shift()!;
+      if (job.options.signal?.aborted) {
+        job.abort();
+        continue;
+      }
+      slot.busy = true;
+      let worker: Worker;
+      try {
+        worker = slot.worker ?? factory();
+        slot.worker = worker;
+      } catch (error) {
+        slot.busy = false;
+        job.options.signal?.removeEventListener("abort", job.abort);
+        job.reject(error instanceof Error ? error : Error(String(error)));
+        continue;
+      }
+      let done = false;
+      const finish = (error?: Error, result?: unknown) => {
+        if (done) return;
+        done = true;
+        job.finish = undefined;
+        worker.onmessage = null;
+        worker.onerror = null;
+        job.options.signal?.removeEventListener("abort", job.abort);
+        if (error) {
+          worker.terminate();
+          slot.worker = null;
+        }
+        slot.busy = false;
+        if (error) job.reject(error);
+        else job.resolve(result);
+        start();
+      };
+      job.finish = () => finish(new DOMException("任务已取消", "AbortError"));
+      worker.onmessage = (event) => {
+        const value = event.data;
+        if (value.progress) {
+          job.options.onProgress?.(value.message, value.completed, value.total);
+          return;
+        }
+        if (value.error) finish(Error(value.error));
+        else finish(undefined, value.result);
+      };
+      worker.onerror = (event) =>
+        finish(Error("Worker 失败：" + event.message));
+      try {
+        worker.postMessage({ operation: job.operation, payload: job.payload });
+      } catch (error) {
+        finish(error instanceof Error ? error : Error(String(error)));
+      }
+    }
+    if (queue.length && slots.some((slot) => !slot.busy)) queueMicrotask(start);
+  };
+  return function run<T>(
+    operation: string,
+    payload: unknown,
+    options: AssetTaskOptions = {},
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const job: Job = {
+        operation,
+        payload,
+        options,
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        abort: () => {
+          if (job.finish) {
+            job.finish();
+            return;
+          }
+          const index = queue.indexOf(job);
+          if (index >= 0) queue.splice(index, 1);
+          options.signal?.removeEventListener("abort", job.abort);
+          reject(new DOMException("任务已取消", "AbortError"));
+        },
+      };
+      if (options.signal?.aborted) {
+        job.abort();
+        return;
+      }
+      options.signal?.addEventListener("abort", job.abort, { once: true });
+      queue.push(job);
+      start();
+    });
+  };
+}
+export const runAssetTask = createWorkerTaskPool(
+  () =>
+    new Worker(new URL("./asset.worker.ts", import.meta.url), {
+      type: "module",
+    }),
+);

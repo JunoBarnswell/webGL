@@ -1,21 +1,15 @@
 {
   "manifest": {
     "id": "studio.configurator",
-    "version": "2.2.0",
-    "minRuntimeVersion": "2.2.0",
+    "version": "2.3.0",
+    "minRuntimeVersion": "2.3.0",
     "dependsOn": {},
     "permissions": [],
     "contributions": {
-      "workspaces": [
-        "configurator"
-      ],
-      "documentKinds": [
-        "studio.configurator.Catalog"
-      ],
+      "workspaces": ["configurator"],
+      "documentKinds": ["studio.configurator.Catalog"],
       "compilerPasses": [],
-      "playerWidgets": [
-        "configurator"
-      ]
+      "playerWidgets": ["configurator"]
     }
   },
   "components": {
@@ -154,10 +148,7 @@
                             "minimum": 0
                           }
                         },
-                        "required": [
-                          "partId",
-                          "quantity"
-                        ],
+                        "required": ["partId", "quantity"],
                         "additionalProperties": false
                       },
                       "default": []
@@ -223,11 +214,7 @@
                                   "title": "",
                                   "default": 0
                                 },
-                                "default": [
-                                  0,
-                                  0,
-                                  0
-                                ],
+                                "default": [0, 0, 0],
                                 "minItems": 3,
                                 "maxItems": 3,
                                 "x-editor": "vector",
@@ -242,12 +229,7 @@
                                   "title": "",
                                   "default": 0
                                 },
-                                "default": [
-                                  0,
-                                  0,
-                                  0,
-                                  1
-                                ],
+                                "default": [0, 0, 0, 1],
                                 "minItems": 4,
                                 "maxItems": 4
                               },
@@ -259,21 +241,13 @@
                                   "title": "",
                                   "default": 0
                                 },
-                                "default": [
-                                  1,
-                                  1,
-                                  1
-                                ],
+                                "default": [1, 1, 1],
                                 "minItems": 3,
                                 "maxItems": 3,
                                 "x-editor": "vector"
                               }
                             },
-                            "required": [
-                              "position",
-                              "rotation",
-                              "scale"
-                            ],
+                            "required": ["position", "rotation", "scale"],
                             "additionalProperties": false
                           },
                           "camera": {
@@ -288,11 +262,7 @@
                                   "title": "",
                                   "default": 0
                                 },
-                                "default": [
-                                  0,
-                                  1000,
-                                  3000
-                                ],
+                                "default": [0, 1000, 3000],
                                 "minItems": 3,
                                 "maxItems": 3,
                                 "x-editor": "vector"
@@ -305,11 +275,7 @@
                                   "title": "",
                                   "default": 0
                                 },
-                                "default": [
-                                  0,
-                                  0,
-                                  0
-                                ],
+                                "default": [0, 0, 0],
                                 "minItems": 3,
                                 "maxItems": 3,
                                 "x-editor": "vector"
@@ -322,11 +288,7 @@
                                 "maximum": 150
                               }
                             },
-                            "required": [
-                              "position",
-                              "target",
-                              "fov"
-                            ],
+                            "required": ["position", "target", "fov"],
                             "additionalProperties": false
                           },
                           "assetId": {
@@ -348,6 +310,62 @@
                               "field": "operation",
                               "value": "variant"
                             }
+                          },
+                          "priority": {
+                            "type": "number",
+                            "title": "映射优先级",
+                            "default": 0,
+                            "x-optional": true
+                          },
+                          "numericBinding": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "property": {
+                                "type": "string",
+                                "enum": [
+                                  "position",
+                                  "scale",
+                                  "rotation",
+                                  "opacity"
+                                ],
+                                "default": "scale"
+                              },
+                              "axis": {
+                                "type": "string",
+                                "enum": ["x", "y", "z", "all"],
+                                "default": "all"
+                              },
+                              "mode": {
+                                "type": "string",
+                                "enum": ["set", "add"],
+                                "default": "set"
+                              },
+                              "factor": {
+                                "type": "number",
+                                "default": 1
+                              },
+                              "offset": {
+                                "type": "number",
+                                "default": 0
+                              },
+                              "reference": {
+                                "type": "number",
+                                "minimum": 0,
+                                "default": 0,
+                                "title": "基准尺寸；0 表示按比例单位换算",
+                                "x-optional": true
+                              }
+                            },
+                            "required": [
+                              "property",
+                              "axis",
+                              "mode",
+                              "factor",
+                              "offset"
+                            ],
+                            "title": "数值绑定（仅数值属性）",
+                            "x-optional": true
                           }
                         },
                         "required": [
@@ -393,7 +411,7 @@
                 "type": "number",
                 "title": "数值步长",
                 "default": 0.01,
-                "minimum": 1e-06
+                "minimum": 1e-6
               },
               "numericDefault": {
                 "type": "number",
@@ -461,11 +479,7 @@
                             "title": "",
                             "default": 0
                           },
-                          "default": [
-                            0,
-                            0,
-                            0
-                          ],
+                          "default": [0, 0, 0],
                           "minItems": 3,
                           "maxItems": 3,
                           "x-editor": "vector",
@@ -480,12 +494,7 @@
                             "title": "",
                             "default": 0
                           },
-                          "default": [
-                            0,
-                            0,
-                            0,
-                            1
-                          ],
+                          "default": [0, 0, 0, 1],
                           "minItems": 4,
                           "maxItems": 4
                         },
@@ -497,21 +506,13 @@
                             "title": "",
                             "default": 0
                           },
-                          "default": [
-                            1,
-                            1,
-                            1
-                          ],
+                          "default": [1, 1, 1],
                           "minItems": 3,
                           "maxItems": 3,
                           "x-editor": "vector"
                         }
                       },
-                      "required": [
-                        "position",
-                        "rotation",
-                        "scale"
-                      ],
+                      "required": ["position", "rotation", "scale"],
                       "additionalProperties": false
                     },
                     "camera": {
@@ -526,11 +527,7 @@
                             "title": "",
                             "default": 0
                           },
-                          "default": [
-                            0,
-                            1000,
-                            3000
-                          ],
+                          "default": [0, 1000, 3000],
                           "minItems": 3,
                           "maxItems": 3,
                           "x-editor": "vector"
@@ -543,11 +540,7 @@
                             "title": "",
                             "default": 0
                           },
-                          "default": [
-                            0,
-                            0,
-                            0
-                          ],
+                          "default": [0, 0, 0],
                           "minItems": 3,
                           "maxItems": 3,
                           "x-editor": "vector"
@@ -560,11 +553,7 @@
                           "maximum": 150
                         }
                       },
-                      "required": [
-                        "position",
-                        "target",
-                        "fov"
-                      ],
+                      "required": ["position", "target", "fov"],
                       "additionalProperties": false
                     },
                     "assetId": {
@@ -586,6 +575,57 @@
                         "field": "operation",
                         "value": "variant"
                       }
+                    },
+                    "priority": {
+                      "type": "number",
+                      "title": "映射优先级",
+                      "default": 0,
+                      "x-optional": true
+                    },
+                    "numericBinding": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "property": {
+                          "type": "string",
+                          "enum": ["position", "scale", "rotation", "opacity"],
+                          "default": "scale"
+                        },
+                        "axis": {
+                          "type": "string",
+                          "enum": ["x", "y", "z", "all"],
+                          "default": "all"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["set", "add"],
+                          "default": "set"
+                        },
+                        "factor": {
+                          "type": "number",
+                          "default": 1
+                        },
+                        "offset": {
+                          "type": "number",
+                          "default": 0
+                        },
+                        "reference": {
+                          "type": "number",
+                          "minimum": 0,
+                          "default": 0,
+                          "title": "基准尺寸；0 表示按比例单位换算",
+                          "x-optional": true
+                        }
+                      },
+                      "required": [
+                        "property",
+                        "axis",
+                        "mode",
+                        "factor",
+                        "offset"
+                      ],
+                      "title": "数值绑定（仅数值属性）",
+                      "x-optional": true
                     }
                   },
                   "required": [
@@ -601,6 +641,13 @@
                   "additionalProperties": false
                 },
                 "default": []
+              },
+              "numericUnit": {
+                "type": "string",
+                "title": "数值单位（空为操作默认单位）",
+                "default": "",
+                "x-unit": true,
+                "x-optional": true
               }
             },
             "required": [
@@ -659,10 +706,7 @@
                     "default": ""
                   }
                 },
-                "required": [
-                  "groupId",
-                  "optionId"
-                ],
+                "required": ["groupId", "optionId"],
                 "additionalProperties": false
               },
               "then": {
@@ -680,10 +724,7 @@
                     "default": ""
                   }
                 },
-                "required": [
-                  "groupId",
-                  "optionId"
-                ],
+                "required": ["groupId", "optionId"],
                 "additionalProperties": false
               },
               "minimum": {
@@ -705,6 +746,41 @@
                 "type": "string",
                 "title": "原因",
                 "default": "此组合不兼容"
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "default": ""
+                    },
+                    "operator": {
+                      "type": "string",
+                      "enum": ["selected", "notSelected", "gte", "lte", "eq"],
+                      "default": "selected"
+                    },
+                    "optionId": {
+                      "type": "string",
+                      "default": ""
+                    },
+                    "value": {
+                      "type": "number",
+                      "default": 0
+                    }
+                  },
+                  "required": ["groupId", "operator", "optionId", "value"]
+                },
+                "default": [],
+                "x-optional": true
+              },
+              "conditionJoin": {
+                "type": "string",
+                "enum": ["all", "any"],
+                "default": "all",
+                "x-optional": true
               }
             },
             "required": [
@@ -736,6 +812,13 @@
           "title": "固定目录修订",
           "default": "",
           "x-optional": true
+        },
+        "variantPolicy": {
+          "type": "string",
+          "enum": ["compose-primitives", "global-variant"],
+          "default": "compose-primitives",
+          "title": "材质变体模式",
+          "x-optional": true
         }
       }
     }
@@ -744,9 +827,7 @@
     "studio.configurator.Select": {
       "title": "产品配置Select",
       "target": "entity",
-      "components": [
-        "studio.configurator.Catalog"
-      ],
+      "components": ["studio.configurator.Catalog"],
       "fields": {
         "groupId": {
           "type": "string",
@@ -763,17 +844,13 @@
     "studio.configurator.Reset": {
       "title": "产品配置Reset",
       "target": "entity",
-      "components": [
-        "studio.configurator.Catalog"
-      ],
+      "components": ["studio.configurator.Catalog"],
       "fields": {}
     },
     "studio.configurator.SetNumber": {
       "title": "设置产品数值",
       "target": "entity",
-      "components": [
-        "studio.configurator.Catalog"
-      ],
+      "components": ["studio.configurator.Catalog"],
       "fields": {
         "groupId": {
           "type": "string",
@@ -786,6 +863,12 @@
           "default": 0
         }
       }
+    },
+    "studio.configurator.Cancel": {
+      "title": "取消配置准备",
+      "target": "entity",
+      "components": ["studio.configurator.Catalog"],
+      "fields": {}
     }
   }
 }

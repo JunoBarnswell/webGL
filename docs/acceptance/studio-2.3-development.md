@@ -37,3 +37,9 @@ Typecheck, lint and pure contracts passed. `npm run verify:ifc` compared the sam
 | IFC4x3 generated large coordinates | 24 / 1 | 30 | 0.01525 mm | 0.374 / 0.336 | 140160 / 143632 |
 
 The generated IFC4x3 input also passed type-property units, nullable non-geometric metadata, system/port connection preservation, and byte-identical output with one versus four iterator threads. Input hashes, reference source hash, timings, memory and issues are in `.local/acceptance/studio-2.3/ifc/results.json`. These are small CPU fixtures, not a production-model throughput or GPU claim. Native mapping parity and final browser/large-model acceptance remain in S6.
+
+## S4 configuration implementation
+
+Rule compilation and deterministic solving share one IR, explicit manual deselection, integer step indexes, priority ranges and final-pass diagnostics. Coverage uses the shared cancellable analysis worker and exports the exact catalog snapshot, a seeded 1000 random sample, pairwise/ternary/boundary requests, unresolved tuple counts and truncated details. The dedicated rule editor consumes that IR. Primitive material choices and atomic part preparation resolve explicit mapping priorities before a single visual scope commit; cancellation retains the last committed BOM and appearance. Numeric bindings declare axis, quantity unit and optional reference size; fields on independent axes compose. BOM exports distinguish immutable library pins from embedded revision labels.
+
+Initial S4 checks: pure rule regression and seeded coverage passed (1013 requests, 36/36 pairwise levels on the small fixture); Studio 2.3 pure contract suite and ESLint passed. Native admission checks and browser operation are consolidated with S5/S6; they are not marked accepted at this commit.

@@ -21,6 +21,7 @@ export interface ExtensionPanelProps {
     keys: string[],
   ) => ReactNode;
   services: {
+    analyze: import("./editor-analysis").EditorAnalysis;
     previewProject: (
       graph: import("./virtual-tour/core").ProjectGraph,
     ) => Promise<void>;

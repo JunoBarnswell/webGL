@@ -126,7 +126,7 @@ export class VisualStateSystem implements RuntimeSystem {
   }
   private hasMaterial(overrides: readonly VisualOverride[] = []): boolean {
     return overrides.some((o) =>
-      ["opacity", "color", "highlight", "material", "clipping"].includes(
+      ["opacity", "color", "highlight", "material", "clipping", "attachment"].includes(
         o.channel,
       ),
     );
@@ -234,6 +234,10 @@ export class VisualStateSystem implements RuntimeSystem {
       base.object.visible = base.visible;
     }
   }
+  baseTransform(object:THREE.Object3D):Transform {
+    const base=this.baselines.get(object.uuid);
+    return {position:(base?.position??object.position).toArray(),rotation:(base?.rotation??object.quaternion).toArray() as Transform["rotation"],scale:(base?.scale??object.scale).toArray()};
+  }
   private releaseMaterial(mesh: THREE.Mesh, effect: MaterialEffect): void {
     mesh.material = effect.source;
     for (const clone of effect.clones)
@@ -284,8 +288,8 @@ export class VisualStateSystem implements RuntimeSystem {
           });
         continue;
       }
-      active.add(override.targetId);
-      let base = this.baselines.get(override.targetId);
+      active.add(object.uuid);
+      let base = this.baselines.get(object.uuid);
       if (!base || base.object !== object) {
         base = {
           object,
@@ -294,7 +298,7 @@ export class VisualStateSystem implements RuntimeSystem {
           scale: object.scale.clone(),
           visible: object.visible,
         };
-        this.baselines.set(override.targetId, base);
+        this.baselines.set(object.uuid, base);
       }
       if (override.channel === "visibility") {
         object.visible =
@@ -321,6 +325,7 @@ export class VisualStateSystem implements RuntimeSystem {
     for (const id of this.baselines.keys())
       if (!active.has(id)) this.baselines.delete(id);
     if (materialDirty) {
+      for(const attachment of this.attachments.values())if(attachment.object instanceof THREE.Mesh&&!materialOverrides.has(attachment.object))materialOverrides.set(attachment.object,[]);
       this.runtime.engine.renderer.localClippingEnabled = [
         ...materialOverrides.values(),
       ].some((list) => list.some((o) => o.channel === "clipping"));
@@ -361,6 +366,7 @@ export class VisualStateSystem implements RuntimeSystem {
         effect.clones.forEach((clone, index) => {
           const oldClippingCount = clone.clippingPlanes?.length ?? 0;
           clone.copy(sources[index]);
+          if([...this.attachments.values()].some(attachment=>attachment.object===mesh))clone.visible=false;
           for (const override of overrides) {
             if (override.channel === "clipping") {
               const planes = override.value as THREE.Plane[];
@@ -399,7 +405,11 @@ export class VisualStateSystem implements RuntimeSystem {
     this.runtime.spatial?.invalidate();
     this.runtime.engine.requestRender();
   }
-  pointVisible(point: THREE.Vector3, object: THREE.Object3D): boolean {
+  pointVisible(point: THREE.Vector3, object: THREE.Object3D,materialIndex=0): boolean {
+    if(object instanceof THREE.Mesh) {
+      const material=Array.isArray(object.material)?object.material[materialIndex]:object.material;
+      if(material&&(!material.visible||material.transparent&&material.opacity===0))return false;
+    }
     let planes: THREE.Plane[] = [];
     for (const { override } of this.ordered())
       if (override.channel === "clipping") {

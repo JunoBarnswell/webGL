@@ -14,6 +14,7 @@ import type {
   SceneDocument,
   SceneMaterial,
 } from "@studio/scene-schema";
+import {modelIdentities} from "@studio/scene-schema";
 
 export interface AssetSource {
   recordsUrl?: (assetId: string, parameters: URLSearchParams) => string;
@@ -21,6 +22,7 @@ export interface AssetSource {
   headers?: () => HeadersInit;
 }
 export type GpuResource = THREE.BufferGeometry | THREE.Material | THREE.Texture;
+export interface VariantMaterial {material:THREE.Material;materialIndex:number;meshIndex:number;primitiveIndex:number}
 export class AssetStore {
   private scheduler = new AssetScheduler({ concurrency: 8 });
   private bytes = new Map<string, Promise<ArrayBuffer>>();
@@ -181,10 +183,13 @@ export class AssetStore {
             "https://studio.invalid/" +
             asset.entry.slice(0, asset.entry.lastIndexOf("/") + 1);
           const gltf = await loader.parseAsync(await this.file(asset), base);
+          const sourceIds=modelIdentities(gltf.parser.json.nodes??[],gltf.parser.json.scenes?.[gltf.parser.json.scene??0]?.nodes??[]);
           gltf.scene.traverse((node) => {
             const association = gltf.parser.associations.get(node);
-            if (association?.nodes !== undefined)
+            if (association?.nodes !== undefined) {
               node.userData.gltfNodeIndex = association.nodes;
+              node.userData.gltfSourceElementId=sourceIds.get(association.nodes)??"";
+            }
           });
           gltf.scene.traverse((node) => {
             if (node instanceof THREE.Mesh) {
@@ -278,7 +283,7 @@ export class AssetStore {
     id: string,
     targets: Iterable<THREE.Object3D>,
     name: string,
-  ): Promise<Map<THREE.Mesh, THREE.Material>> {
+  ): Promise<Map<THREE.Mesh, VariantMaterial>> {
     const gltf = await this.model(id);
     const definition = gltf.parser.json as {
       extensions?: {
@@ -299,7 +304,7 @@ export class AssetStore {
         (v) => v.name === name,
       ) ?? -1;
     if (variantIndex < 0) throw Error("材质变体不存在：" + name);
-    const result = new Map<THREE.Mesh, THREE.Material>();
+    const result = new Map<THREE.Mesh, VariantMaterial>();
     await Promise.all(
       [...targets].map(async (target) => {
         if (!(target instanceof THREE.Mesh)) return;
@@ -325,7 +330,7 @@ export class AssetStore {
           ))
             if (!this.owned.has(resource as GpuResource))
               this.own(resource as GpuResource);
-          result.set(target, material);
+          result.set(target, {material,materialIndex:mapping.material,meshIndex:mesh,primitiveIndex:primitive});
         }
       }),
     );

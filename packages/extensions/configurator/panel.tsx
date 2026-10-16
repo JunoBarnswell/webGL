@@ -1,3 +1,4 @@
+import { RuleDesigner, ConfigurationAnalysis } from "./analysis-panel";
 import { useState } from "react";
 import {
   createUiNode,
@@ -9,8 +10,6 @@ import type { ExtensionPanelProps } from "../editor-contract";
 import { useLibrary, type LibraryRecord } from "../library";
 import {
   validateCatalog,
-  resolveConfiguration,
-  defaultConfiguration,
   type ProductCatalog,
   type ProductOption,
 } from "./core";
@@ -21,7 +20,6 @@ export function ConfiguratorPanel(props: ExtensionPanelProps) {
     ),
     { data, entity } = domain,
     [tab, setTab] = useState("groups"),
-    [report, setReport] = useState<string[]>([]),
     library = useLibrary<ProductCatalog>("catalog", props.services),
     [version, setVersion] = useState<LibraryRecord<ProductCatalog> | null>(
       null,
@@ -198,16 +196,11 @@ export function ConfiguratorPanel(props: ExtensionPanelProps) {
                   ))}
                 </fieldset>
               ))}
-              {domain.fields(["groups"])}
+              {domain.fields(["variantPolicy", "groups"])}
             </section>
           )}
           {tab === "rules" && (
-            <>
-              {domain.fields(["rules"])}
-              <p>
-                规则只使用声明式节点，不执行项目脚本。冲突、自动调整和循环都会提供原因。
-              </p>
-            </>
+            <RuleDesigner catalog={data} mutate={domain.mutate} />
           )}
           {tab === "ui" && (
             <section>
@@ -250,29 +243,11 @@ export function ConfiguratorPanel(props: ExtensionPanelProps) {
           )}
           {tab === "validation" && (
             <section>
-              <button
-                onClick={() => {
-                  const errors = validateCatalog(data),
-                    samples = data.groups.flatMap((g) =>
-                      g.options.map((o) =>
-                        resolveConfiguration(data, {
-                          ...defaultConfiguration(data),
-                          [g.id]: [o.id],
-                        }),
-                      ),
-                    );
-                  setReport([
-                    ...errors,
-                    ...samples.flatMap((r, i) =>
-                      r.errors.map((e) => "样例 " + i + "：" + e),
-                    ),
-                    "覆盖选项样例数：" + samples.length,
-                  ]);
-                }}
-              >
-                验证默认与每选项覆盖
-              </button>
-              <pre>{report.join("\n")}</pre>
+              <ConfigurationAnalysis
+                catalog={data}
+                entityId={entity.id}
+                props={props}
+              />
               <button
                 onClick={() =>
                   void props.services.run("保存目录修订", async () => {

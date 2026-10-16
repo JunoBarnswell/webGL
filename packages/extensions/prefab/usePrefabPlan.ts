@@ -3,16 +3,17 @@ import {
   acceptPrefabPlan,
   type PrefabUpdatePlan,
   type PrefabReferenceMigration,
-  type PreparedPrefabUpdate,
 } from "../../editor-core/src/prefab";
 import type { PrefabRevision } from "../../scene-schema/src/prefab";
 import type { SceneDocument } from "../../scene-schema/src/types";
+import type { EditorAnalysis } from "../editor-analysis";
 export function usePrefabPlan(
   document: SceneDocument,
   ids: string[],
   revision: PrefabRevision | null,
   choices: Record<string, "instance" | "source">,
   migrations: PrefabReferenceMigration[],
+  analyze: EditorAnalysis,
 ) {
   const [state, setState] = useState<{
       plan: PrefabUpdatePlan | null;
@@ -20,56 +21,49 @@ export function usePrefabPlan(
       error: string;
     }>({ plan: null, status: "idle", error: "" }),
     [attempt, setAttempt] = useState(0),
-    worker = useRef<Worker | null>(null);
+    current = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!revision || !ids.length) {
       setState({ plan: null, status: "idle", error: "" });
       return;
     }
-    const task = new Worker(new URL("./plan.worker.ts", import.meta.url), {
-      type: "module",
-    });
-    worker.current = task;
+    const controller = new AbortController();
+    current.current = controller;
     let active = true;
     setState({ plan: null, status: "planning", error: "" });
-    task.onmessage = (
-      event: MessageEvent<{ prepared?: PreparedPrefabUpdate; error?: string }>,
-    ) => {
-      if (!active || worker.current !== task) return;
-      try {
-        if (!event.data.prepared)
-          throw Error(event.data.error ?? "计划生成失败");
-        setState({
-          plan: acceptPrefabPlan(document, event.data.prepared),
-          status: "ready",
-          error: "",
-        });
-      } catch (error) {
-        setState({ plan: null, status: "error", error: String(error) });
-      } finally {
-        task.terminate();
-        if (worker.current === task) worker.current = null;
-      }
-    };
-    task.onerror = (event) => {
-      if (active)
-        setState({ plan: null, status: "error", error: event.message });
-      task.terminate();
-    };
-    task.postMessage({ document, ids, revision, choices, migrations });
+    void analyze(
+      "prefabPlan",
+      { document, ids, revision, choices, migrations },
+      { signal: controller.signal },
+    )
+      .then((prepared) => {
+        if (active && !controller.signal.aborted)
+          setState({
+            plan: acceptPrefabPlan(document, prepared),
+            status: "ready",
+            error: "",
+          });
+      })
+      .catch((error) => {
+        if (active && !controller.signal.aborted)
+          setState({ plan: null, status: "error", error: String(error) });
+      })
+      .finally(() => {
+        if (current.current === controller) current.current = null;
+      });
     return () => {
       active = false;
-      task.terminate();
-      if (worker.current === task) worker.current = null;
+      controller.abort();
+      if (current.current === controller) current.current = null;
     };
-  }, [document, ids, revision, choices, migrations, attempt]);
+  }, [document, ids, revision, choices, migrations, analyze, attempt]);
   return {
     ...state,
     cancel: () => {
-      worker.current?.terminate();
-      worker.current = null;
+      current.current?.abort();
+      current.current = null;
       setState({ plan: null, status: "cancelled", error: "" });
     },
-    retry: () => setAttempt((v) => v + 1),
+    retry: () => setAttempt((value) => value + 1),
   };
 }

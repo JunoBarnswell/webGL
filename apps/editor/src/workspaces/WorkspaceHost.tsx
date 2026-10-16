@@ -23,6 +23,7 @@ import { Fields } from "../components/Fields";
 import { useStudio } from "../state/studio";
 import { persistDocumentDraft, recoverDocumentDraft } from "../state/journal";
 import { request, upload, authHeaders, saveBlob } from "../state/api";
+import {analyze} from "../state/analysis";
 export const workspaceCatalog = [
   {
     id: "scene",
@@ -91,6 +92,7 @@ export function useExtensionProps(): ExtensionPanelProps | null {
       studio.set({ inspectorOpen: true });
     },
     services: {
+      analyze,
       projectId,
       activeTool,
       activateTool: (id) => studio.set({ domainTool: id }),

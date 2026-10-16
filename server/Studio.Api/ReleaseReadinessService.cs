@@ -12,10 +12,16 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
     public async Task<ReleaseReadinessReport> Check(string sceneId,JsonElement authored,CancellationToken ct) {
         var checks=new List<ReadinessCheck>();
         void Add(string code,string status,string message,string path="",string owner="",string[]? details=null,string? severity=null)=>checks.Add(new(code,status,severity??(status=="fail"?"error":status=="unverified"?"warning":"info"),message,path,owner,sceneId,details??[]));
-        var structural=contract.Validate(authored,true);
+        var structural=contract.Validate(authored,true,false);
         Add("schema",structural.Length==0?"pass":"fail",structural.Length==0?"文档与扩展契约通过":"文档或扩展契约未通过",details:structural);
         if(structural.Length>0)return Summarize("scene",sceneId,checks);
         var document=contract.Compile(authored);Add("reference","pass","当前场景引用闭合");
+        var authoredEntities=authored.GetProperty("entities").EnumerateArray().ToDictionary(e=>DocumentContract.Text(e,"id"));
+        foreach(var entity in authoredEntities.Values)foreach(var component in entity.GetProperty("components").EnumerateArray())if(component.GetProperty("enabled").GetBoolean()){
+            var type=DocumentContract.Text(component,"type");var issues=CreativeContract.ValidateComponent(type,component.GetProperty("data"),authoredEntities,true);if(issues.Length>0)Add(type=="studio.configurator.Catalog"?"configuration":type=="studio.storyboard.Sequence"?"storyboard":"industrial","fail","业务配置未通过",owner:DocumentContract.Text(entity,"id"),details:issues);
+        }
+        foreach(var(owner,issues)in ConfigurationVisuals.Ownership(authored,contract.ReferenceEdges(authored)))Add("configuration-ownership","fail","配置目录拥有冲突的模型或槽位",owner:owner,details:issues.ToArray());
+
         try{library.AssertPins(authored);Add("revision","pass","模板和目录固定修订一致");}catch(ApiException error){Add("revision","fail",error.Message,details:error.Details);}
         var assets=document.GetProperty("assets").EnumerateArray().ToArray();var resourceReady=true;
         for(var i=0;i<assets.Length;i++) {
@@ -41,7 +47,7 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
     }
     private async Task CheckBindings(JsonElement document,string sceneId,List<ReadinessCheck> checks,CancellationToken ct) {
         var entities=document.GetProperty("entities").EnumerateArray().ToArray();var byId=entities.ToDictionary(e=>DocumentContract.Text(e,"id"));var definitions=new Dictionary<string,JsonElement>();var failures=0;
-        async Task<JsonElement> Definition(string id){if(!definitions.TryGetValue(id,out var definition)){definition=await objects.ModelDefinition(objects.Get(id),ct);definitions[id]=definition;}return definition;}
+        async Task<JsonElement> Definition(string id){if(!definitions.TryGetValue(id,out var definition)){definition=await objects.ModelDefinition(objects.Get(id),ct);_ = ModelIdentity.Read(definition);definitions[id]=definition;}return definition;}
         for(var ei=0;ei<entities.Length;ei++) {
             var entity=entities[ei];var components=entity.GetProperty("components").EnumerateArray().ToArray();
             for(var ci=0;ci<components.Length;ci++) {
@@ -60,21 +66,12 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
                         }
                         if(type=="Animation") {var clips=definition.TryGetProperty("animations",out var animations)?animations.EnumerateArray().Select((a,i)=>a.TryGetProperty("name",out var name)?name.GetString()!:"animation_"+i).ToArray():[];if(!clips.Contains(DocumentContract.Text(data,"clip")))Fail("动画片段不存在","/clip");}
                     }
-                    if(type=="studio.configurator.Catalog")foreach(var group in data.GetProperty("groups").EnumerateArray()) {
-                        var mappings=group.GetProperty("options").EnumerateArray().SelectMany(o=>o.GetProperty("visuals").EnumerateArray()).Concat(group.TryGetProperty("visuals",out var numeric)?numeric.EnumerateArray().ToArray():Array.Empty<JsonElement>());
-                        foreach(var mapping in mappings) {
-                            var operation=DocumentContract.Text(mapping,"operation");
-                            if(operation=="swapPart"&&objects.Get(DocumentContract.Text(mapping,"assetId")).Kind!="model")Fail("部件替换资源必须是模型");
-                            if(operation!="variant")continue;
-                            var target=byId[DocumentContract.Text(mapping,"targetId")];var node=target.GetProperty("components").EnumerateArray().FirstOrDefault(c=>DocumentContract.Text(c,"type")=="ModelNode");if(node.ValueKind!=JsonValueKind.Undefined)target=byId[DocumentContract.Text(node.GetProperty("data"),"modelEntityId")];
-                            var model=target.GetProperty("components").EnumerateArray().FirstOrDefault(c=>DocumentContract.Text(c,"type")=="Model"&&c.GetProperty("enabled").GetBoolean());if(model.ValueKind==JsonValueKind.Undefined){Fail("材质变体目标必须属于启用的 GLTF 模型");continue;}
-                            var definition=await Definition(DocumentContract.Text(model.GetProperty("data"),"assetId"));var name=DocumentContract.Text(mapping,"variant");
-                            if(!definition.TryGetProperty("extensions",out var extensions)||!extensions.TryGetProperty("KHR_materials_variants",out var variants)||!variants.TryGetProperty("variants",out var list)||list.ValueKind!=JsonValueKind.Array||!list.EnumerateArray().Any(v=>DocumentContract.Text(v,"name")==name))Fail("GLTF 材质变体不存在："+name);
-                        }
-                    }
+                    if(type=="studio.configurator.Catalog")foreach(var group in data.GetProperty("groups").EnumerateArray())foreach(var mapping in group.GetProperty("options").EnumerateArray().SelectMany(o=>o.GetProperty("visuals").EnumerateArray()).Concat(group.TryGetProperty("visuals",out var numeric)?numeric.EnumerateArray().ToArray():[]))if(DocumentContract.Text(mapping,"operation")=="swapPart"){var asset=objects.Get(DocumentContract.Text(mapping,"assetId"));if(asset.Kind!="model")Fail("部件替换资源必须是模型");else _ = await Definition(asset.Id);}
+
                 }catch(ApiException error){Fail(error.Message);}catch(KeyNotFoundException){Fail("视觉绑定的来源对象不存在");}
             }
         }
+        var visualChecks=await ConfigurationVisuals.Check(document,sceneId,Definition);checks.AddRange(visualChecks);failures+=visualChecks.Count(c=>c.Severity=="error");
         if(failures==0)checks.Add(new("visual","pass","info","模型节点、动画与材质变体绑定通过","","",sceneId,[]));
     }
 }

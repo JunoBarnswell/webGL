@@ -41,7 +41,7 @@ public sealed class DocumentContract
         if(spec.ValueKind==JsonValueKind.Undefined)throw new ApiException(422,"未知文档类型");
         var errors=new List<string>();Check(data,spec.GetProperty("properties").GetProperty("data"),"$",errors);if(errors.Count>0)throw new ApiException(422,"文档结构无效",errors.ToArray());
     }
-    public string[] Validate(JsonElement document, bool publish = false)
+    public string[] Validate(JsonElement document, bool publish = false, bool includeCreative = true)
     {
         var errors = new List<string>();
         Check(document, schema, "$", errors);
@@ -125,7 +125,8 @@ public sealed class DocumentContract
         }
         var settings = document.GetProperty("settings");
         if (settings.GetProperty("near").GetDouble() >= settings.GetProperty("far").GetDouble()) errors.Add("近裁剪面必须小于远裁剪面");
-        CreativeContract.Validate(document,errors,publish);
+        if(includeCreative)CreativeContract.Validate(document,errors,publish);
+        if(publish&&includeCreative)errors.AddRange(ConfigurationVisuals.Ownership(document,ReferenceEdges(document)).Values.SelectMany(v=>v));
         SemanticContract.Validate(document,schema,errors,publish);
         ExperienceContract.Validate(document, schema, groups, errors, publish);
         return errors.Distinct().Take(30).ToArray();

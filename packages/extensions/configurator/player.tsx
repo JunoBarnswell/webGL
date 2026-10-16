@@ -7,6 +7,7 @@ import {
   defaultConfiguration,
   optionAvailability,
   configurationOptionKey,
+  formatNumericValue,
   type ProductCatalog,
   type ConfigurationResult,
 } from "./core";
@@ -34,11 +35,15 @@ function ConfiguratorWidget({
   const current = entity
       ? state.extensions["studio.configurator:" + entity.id]
       : undefined,
-    result =
+    committed =
       (current?.result as unknown as ConfigurationResult) ??
       (catalog
         ? resolveConfiguration(catalog, defaultConfiguration(catalog))
         : null),
+    result =
+      (current?.pending
+        ? (current.requestedResult as unknown as ConfigurationResult)
+        : committed) ?? committed,
     reasons = useMemo(
       () =>
         catalog && result
@@ -73,11 +78,28 @@ function ConfiguratorWidget({
                 min={group.numericMinimum ?? 0}
                 max={group.numericMaximum ?? 1}
                 step={group.numericStep ?? 0.01}
-                value={result.numericValues[group.id] ?? 0}
-                disabled={design || Boolean(current?.pending)}
-                onChange={(e) =>
-                  run("SetNumber", group.id, "", Number(e.target.value))
-                }
+                key={group.id + ":" + result.numericValues[group.id]}
+                defaultValue={formatNumericValue(
+                  group,
+                  result.numericValues[group.id] ?? 0,
+                )}
+                disabled={design}
+                onBlur={(event) => {
+                  const value = event.currentTarget.valueAsNumber;
+                  if (Number.isFinite(value))
+                    run("SetNumber", group.id, "", value);
+                  else {
+                    event.currentTarget.value = formatNumericValue(
+                      group,
+                      result.numericValues[group.id] ?? 0,
+                    );
+                    setError("请输入有限数值");
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing)
+                    event.currentTarget.blur();
+                }}
               />
             </label>
           ) : group.control === "toggle" ? (
@@ -87,7 +109,6 @@ function ConfiguratorWidget({
                 checked={Boolean(result.selections[group.id]?.length)}
                 disabled={
                   design ||
-                  Boolean(current?.pending) ||
                   Boolean(
                     reasons[
                       configurationOptionKey(group.id, group.options[0]?.id)
@@ -115,9 +136,7 @@ function ConfiguratorWidget({
                     aria-label={
                       option.name + (reason ? "，不可选：" + reason : "")
                     }
-                    disabled={
-                      design || Boolean(current?.pending) || Boolean(reason)
-                    }
+                    disabled={design || Boolean(reason)}
                     title={reason || option.description}
                     onClick={() => run("Select", group.id, option.id)}
                     className={selected ? "selected" : ""}
@@ -168,7 +187,7 @@ function ConfiguratorWidget({
       )}
       <details>
         <summary>BOM / SKU 配置清单</summary>
-        {result.bom.map((part) => (
+        {committed!.bom.map((part) => (
           <p key={part.partId}>
             {part.partId} × {part.quantity}
             <small>
@@ -186,14 +205,21 @@ function ConfiguratorWidget({
             </small>
           </p>
         ))}
-        <p>SKU {result.skus.join(" / ") || "未指定"}</p>
+        <p>SKU {committed!.skus.join(" / ") || "未指定"}</p>
         <p>价格：需询价</p>
         <small>目录版本 {result.schemaRevision}</small>
       </details>
       <button disabled={design} onClick={() => run("Reset")}>
         恢复默认配置
       </button>
-      {Boolean(current?.pending) && <p role="status">正在准备视觉资产…</p>}
+      {Boolean(current?.pending) && (
+        <p role="status">
+          正在准备视觉资产；清单显示上一有效配置。
+          <button disabled={design} onClick={() => run("Cancel")}>
+            取消准备
+          </button>
+        </p>
+      )}
       {(error || current?.error) && (
         <p role="alert">{error || String(current?.error)}</p>
       )}
