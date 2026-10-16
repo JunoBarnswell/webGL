@@ -3,6 +3,12 @@ import type {SceneRuntime} from '../SceneRuntime';
 import type {RuntimeSystem} from './RuntimeSystem';
 import System0 from '../../../extensions/annotation/runtime';
 import System1 from '../../../extensions/assembly/runtime';
-import System2 from '../../../extensions/piping/runtime';
-import System3 from '../../../extensions/sample/runtime';
-export function createRuntimeSystems(runtime:SceneRuntime):RuntimeSystem[]{return [new System0(runtime),new System1(runtime),new System2(runtime),new System3(runtime)];}
+import System2 from '../../../extensions/configurator/runtime';
+import System3 from '../../../extensions/industrial/runtime';
+import System4 from '../../../extensions/optimization/runtime';
+import System5 from '../../../extensions/piping/runtime';
+import System6 from '../../../extensions/prefab/runtime';
+import System7 from '../../../extensions/sample/runtime';
+import System8 from '../../../extensions/storyboard/runtime';
+import System9 from '../../../extensions/virtual-tour/runtime';
+export function createRuntimeSystems(runtime:SceneRuntime):RuntimeSystem[]{return [new System0(runtime),new System1(runtime),new System2(runtime),new System3(runtime),new System4(runtime),new System5(runtime),new System6(runtime),new System7(runtime),new System8(runtime),new System9(runtime)];}

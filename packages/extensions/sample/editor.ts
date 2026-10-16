@@ -11,3 +11,5 @@ export const tools: ExtensionTool[] = [
 ];
 
 export const panels = [];
+
+export const commands = [];

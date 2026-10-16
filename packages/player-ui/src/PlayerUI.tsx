@@ -1,3 +1,4 @@
+import { playerWidgets } from "./widgets";
 import { ExtensionControls } from "./ExtensionControls";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
@@ -12,12 +13,13 @@ import { useRuntime } from "./useRuntime";
 import "./style.css";
 
 export function PlayerUI({
-  document: doc,
+  document: authoredDocument,
   runtime,
 }: {
   document: SceneDocument;
   runtime: SceneRuntime;
 }) {
+  const doc = runtime.document ?? authoredDocument;
   const state = useRuntime(runtime),
     host = useRef<HTMLDivElement>(null),
     dialog = useRef<HTMLDivElement>(null);
@@ -115,7 +117,46 @@ export function PlayerUI({
             onError={onError}
           />
         ))}
-      {state.entered && <ExtensionControls runtime={runtime} document={doc} />}
+      {state.entered && (
+        <>
+          <div className="player-domain-widgets">
+            {playerWidgets
+              .filter(
+                (widget) =>
+                  (!widget.available || widget.available(runtime, doc)) &&
+                  !doc.ui.nodes.some((node) => node.kind === widget.kind) &&
+                  (widget.always ||
+                    doc.entities.some((entity) =>
+                      entity.components.some(
+                        (c) => c.enabled && c.type === widget.componentType,
+                      ),
+                    )),
+              )
+              .map((widget) => {
+                const Component = widget.Component;
+                return (
+                  <details
+                    key={widget.kind}
+                    open={
+                      widget.kind === "projectNavigation" ||
+                      widget.kind === "configurator"
+                    }
+                  >
+                    <summary>{widget.title}</summary>
+                    <Component
+                      document={doc}
+                      runtime={runtime}
+                      state={state}
+                      node={null}
+                      design={false}
+                    />
+                  </details>
+                );
+              })}
+            <ExtensionControls runtime={runtime} document={doc} />
+          </div>
+        </>
+      )}
       {layout && content && (
         <div
           className={

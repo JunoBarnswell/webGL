@@ -519,7 +519,12 @@ export async function importO2vr(
 export function readGltf(
   files: FileBundle,
   entry: string,
-): { nodes: Record<string, unknown>[]; roots: number[]; animations: string[] } {
+): {
+  nodes: Record<string, unknown>[];
+  roots: number[];
+  animations: string[];
+  origin?: [number, number, number];
+} {
   const bytes = files.get(entry);
   if (!bytes) throw new Error("找不到模型入口");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -531,6 +536,7 @@ export function readGltf(
     scenes?: { nodes: number[] }[];
     scene?: number;
     animations?: { name?: string }[];
+    asset?: { extras?: { localOriginGltfMetres?: [number, number, number] } };
     buffers?: { uri?: string }[];
     images?: { uri?: string }[];
   };
@@ -544,6 +550,7 @@ export function readGltf(
         );
     }
   return {
+    origin: data.asset?.extras?.localOriginGltfMetres,
     nodes: data.nodes ?? [],
     roots: data.scenes?.[data.scene ?? 0]?.nodes ?? [],
     animations: (data.animations ?? []).map(
@@ -557,6 +564,18 @@ export function modelEntities(
   parentId: string | null,
 ): Entity[] {
   const root = createEntity(asset.name, parentId);
+  if (metadata.origin) {
+    if (
+      metadata.origin.length !== 3 ||
+      metadata.origin.some((v) => !Number.isFinite(v))
+    )
+      throw Error("来源坐标原点无效");
+    root.transform.position = metadata.origin.map((v) => v * 1000) as [
+      number,
+      number,
+      number,
+    ];
+  }
   const model = createComponent("Model");
   model.data.assetId = asset.id;
   root.components.push(model);

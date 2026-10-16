@@ -13,9 +13,9 @@ export class SpatialSystem implements RuntimeSystem {
     this.index.invalidate();
   }
   pick(ray: THREE.Raycaster): THREE.Intersection[] {
-    return this.index.raycast(this.runtime.root, ray, (object) =>
-      this.runtime.visible(object),
-    );
+    return this.index
+      .raycast(this.runtime.root, ray, (object) => this.runtime.visible(object))
+      .filter((hit) => this.runtime.visual.pointVisible(hit.point, hit.object));
   }
   readonly id = "studio.spatial";
   private colliders = new Map<string, THREE.Object3D>();

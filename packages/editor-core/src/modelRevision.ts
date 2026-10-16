@@ -6,6 +6,7 @@ import {
   type SceneAsset,
   type SceneDocument,
 } from "@studio/scene-schema";
+import { reconcileSourceIdentities } from "../../scene-schema/src/model-identity";
 import type { EditorCommand } from "./EditorSession";
 export interface ModelRevisionReport {
   matched: string[];
@@ -71,6 +72,10 @@ export function replaceModelRevision(
   const previous = document.entities.filter(
     (e) => getComponent(e, "ModelNode")?.data.modelEntityId === modelId,
   );
+  const incomingNodes = nodes.filter((e) => getComponent(e, "ModelNode"));
+  const incomingKeys = incomingNodes.map((e) =>
+    String(getComponent(e, "ModelNode")!.data.sourceElementId),
+  );
   const incoming = new Map(
     nodes.flatMap((e) => {
       const c = getComponent(e, "ModelNode");
@@ -80,6 +85,16 @@ export function replaceModelRevision(
   const mapping: Record<string, string> = {},
     used = new Set<string>(),
     conflicts: string[] = [];
+  const identity = reconcileSourceIdentities(
+    previous.map((e) =>
+      String(getComponent(e, "ModelNode")!.data.sourceElementId),
+    ),
+    incomingKeys,
+  );
+  if (identity.ambiguous.length)
+    conflicts.push("来源身份重复或歧义：" + identity.ambiguous.join(", "));
+  if (new Set(incomingKeys).size !== incomingKeys.length)
+    conflicts.push("新模型来源身份重复");
   for (const e of previous) {
     const key = String(
       getComponent(e, "ModelNode")!.data.sourceElementId ?? "",

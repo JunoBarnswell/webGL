@@ -44,7 +44,12 @@ export function ActionList({
       {actions.map((action, index) => {
         const definition = actionDefinitions.find(
           (d) => d.type === action.type,
-        )!;
+        ) ?? {
+          title: "缺失动作扩展：" + action.type,
+          fields: {},
+          target: "" as const,
+          components: [],
+        };
         const current = [...state.trace]
           .reverse()
           .find((item) => item.actionId === action.id);

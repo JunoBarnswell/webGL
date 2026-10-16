@@ -1,0 +1,693 @@
+{
+  "manifest": {
+    "id": "studio.storyboard",
+    "version": "2.2.0",
+    "minRuntimeVersion": "2.2.0",
+    "dependsOn": {},
+    "permissions": [],
+    "contributions": {
+      "workspaces": [
+        "storyboard"
+      ],
+      "documentKinds": [],
+      "compilerPasses": [],
+      "playerWidgets": [
+        "storyboard"
+      ]
+    }
+  },
+  "components": {
+    "studio.storyboard.Sequence": {
+      "title": "故事板Sequence",
+      "fields": {
+        "name": {
+          "type": "string",
+          "title": "演示名称",
+          "default": "演示"
+        },
+        "duration": {
+          "type": "number",
+          "title": "时长（秒）",
+          "default": 30,
+          "minimum": 0.001
+        },
+        "fps": {
+          "type": "string",
+          "title": "帧网格",
+          "default": "30",
+          "enum": [
+            "24",
+            "30",
+            "60"
+          ]
+        },
+        "loop": {
+          "type": "boolean",
+          "title": "循环",
+          "default": false
+        },
+        "tracks": {
+          "type": "array",
+          "title": "轨道",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "轨道名称",
+                "default": "轨道"
+              },
+              "channel": {
+                "type": "string",
+                "title": "通道",
+                "default": "transform",
+                "enum": [
+                  "transform",
+                  "opacity",
+                  "visibility",
+                  "camera",
+                  "annotation",
+                  "assembly",
+                  "content",
+                  "audio",
+                  "caption"
+                ]
+              },
+              "targetId": {
+                "type": "string",
+                "title": "目标实体",
+                "default": "",
+                "x-reference": "entity",
+                "x-reference-when": {
+                  "field": "channel",
+                  "values": [
+                    "transform",
+                    "opacity",
+                    "visibility",
+                    "annotation",
+                    "assembly",
+                    "audio"
+                  ]
+                }
+              },
+              "contentId": {
+                "type": "string",
+                "title": "内容",
+                "default": "",
+                "x-reference": "content"
+              },
+              "muted": {
+                "type": "boolean",
+                "title": "静音",
+                "default": false
+              },
+              "locked": {
+                "type": "boolean",
+                "title": "锁定",
+                "default": false
+              },
+              "priority": {
+                "type": "number",
+                "title": "合成优先级",
+                "default": 0
+              },
+              "clips": {
+                "type": "array",
+                "title": "片段",
+                "items": {
+                  "type": "object",
+                  "title": "",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "稳定 ID",
+                      "default": "",
+                      "x-editor": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "title": "片段名称",
+                      "default": "片段"
+                    },
+                    "start": {
+                      "type": "number",
+                      "title": "开始",
+                      "default": 0,
+                      "minimum": 0
+                    },
+                    "duration": {
+                      "type": "number",
+                      "title": "时长",
+                      "default": 2,
+                      "minimum": 0.001
+                    },
+                    "easing": {
+                      "type": "string",
+                      "title": "缓动",
+                      "default": "smooth",
+                      "enum": [
+                        "linear",
+                        "smooth",
+                        "easeIn",
+                        "easeOut"
+                      ]
+                    },
+                    "fromTransform": {
+                      "type": "object",
+                      "title": "",
+                      "properties": {
+                        "position": {
+                          "type": "array",
+                          "title": "位置",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "parent",
+                          "x-coordinate-target": "targetId"
+                        },
+                        "rotation": {
+                          "type": "array",
+                          "title": "",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "minItems": 4,
+                          "maxItems": 4
+                        },
+                        "scale": {
+                          "type": "array",
+                          "title": "缩放",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            1,
+                            1,
+                            1
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector"
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "rotation",
+                        "scale"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "toTransform": {
+                      "type": "object",
+                      "title": "",
+                      "properties": {
+                        "position": {
+                          "type": "array",
+                          "title": "位置",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "parent",
+                          "x-coordinate-target": "targetId"
+                        },
+                        "rotation": {
+                          "type": "array",
+                          "title": "",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "minItems": 4,
+                          "maxItems": 4
+                        },
+                        "scale": {
+                          "type": "array",
+                          "title": "缩放",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            1,
+                            1,
+                            1
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector"
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "rotation",
+                        "scale"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "path": {
+                      "type": "array",
+                      "title": "路径控制点",
+                      "items": {
+                        "type": "array",
+                        "title": "",
+                        "items": {
+                          "type": "number",
+                          "title": "",
+                          "default": 0
+                        },
+                        "default": [
+                          0,
+                          0,
+                          0
+                        ],
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "x-editor": "vector",
+                        "x-coordinate": "parent",
+                        "x-coordinate-target": "targetId"
+                      },
+                      "default": []
+                    },
+                    "fromCamera": {
+                      "type": "object",
+                      "title": "",
+                      "properties": {
+                        "position": {
+                          "type": "array",
+                          "title": "相机位置",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            1000,
+                            3000
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "world"
+                        },
+                        "target": {
+                          "type": "array",
+                          "title": "目标",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "world"
+                        },
+                        "fov": {
+                          "type": "number",
+                          "title": "FOV",
+                          "default": 60,
+                          "minimum": 10,
+                          "maximum": 150
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "target",
+                        "fov"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "toCamera": {
+                      "type": "object",
+                      "title": "",
+                      "properties": {
+                        "position": {
+                          "type": "array",
+                          "title": "相机位置",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            1000,
+                            3000
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "world"
+                        },
+                        "target": {
+                          "type": "array",
+                          "title": "目标",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector",
+                          "x-coordinate": "world"
+                        },
+                        "fov": {
+                          "type": "number",
+                          "title": "FOV",
+                          "default": 60,
+                          "minimum": 10,
+                          "maximum": 150
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "target",
+                        "fov"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "fromValue": {
+                      "type": "number",
+                      "title": "初值",
+                      "default": 0
+                    },
+                    "toValue": {
+                      "type": "number",
+                      "title": "终值",
+                      "default": 1
+                    },
+                    "text": {
+                      "type": "string",
+                      "title": "字幕",
+                      "default": ""
+                    },
+                    "groupId": {
+                      "type": "string",
+                      "title": "片段组",
+                      "default": ""
+                    },
+                    "curveStart": {
+                      "type": "number",
+                      "title": "求值窗口开始",
+                      "default": 0,
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "curveEnd": {
+                      "type": "number",
+                      "title": "求值窗口结束",
+                      "default": 1,
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "start",
+                    "duration",
+                    "easing",
+                    "fromTransform",
+                    "toTransform",
+                    "path",
+                    "fromCamera",
+                    "toCamera",
+                    "fromValue",
+                    "toValue",
+                    "text",
+                    "groupId",
+                    "curveStart",
+                    "curveEnd"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "channel",
+              "targetId",
+              "contentId",
+              "muted",
+              "locked",
+              "priority",
+              "clips"
+            ],
+            "additionalProperties": false
+          },
+          "default": [],
+          "x-unique-by": "id"
+        },
+        "snapshots": {
+          "type": "array",
+          "title": "镜头快照",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "镜头名称",
+                "default": "快照"
+              },
+              "pose": {
+                "type": "object",
+                "title": "",
+                "properties": {
+                  "position": {
+                    "type": "array",
+                    "title": "相机位置",
+                    "items": {
+                      "type": "number",
+                      "title": "",
+                      "default": 0
+                    },
+                    "default": [
+                      0,
+                      1000,
+                      3000
+                    ],
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "x-editor": "vector",
+                    "x-coordinate": "world"
+                  },
+                  "target": {
+                    "type": "array",
+                    "title": "目标",
+                    "items": {
+                      "type": "number",
+                      "title": "",
+                      "default": 0
+                    },
+                    "default": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "x-editor": "vector",
+                    "x-coordinate": "world"
+                  },
+                  "fov": {
+                    "type": "number",
+                    "title": "FOV",
+                    "default": 60,
+                    "minimum": 10,
+                    "maximum": 150
+                  }
+                },
+                "required": [
+                  "position",
+                  "target",
+                  "fov"
+                ],
+                "additionalProperties": false
+              },
+              "thumbnailAssetId": {
+                "type": "string",
+                "title": "缩略图",
+                "default": "",
+                "x-reference": "asset"
+              },
+              "bound": {
+                "type": "boolean",
+                "title": "绑定时间",
+                "default": false
+              },
+              "time": {
+                "type": "number",
+                "title": "绑定时间",
+                "default": 0,
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pose",
+              "thumbnailAssetId",
+              "bound",
+              "time"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "markers": {
+          "type": "array",
+          "title": "章节",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "章节名称",
+                "default": "章节"
+              },
+              "time": {
+                "type": "number",
+                "title": "时间",
+                "default": 0,
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "time"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      }
+    }
+  },
+  "actions": {
+    "studio.storyboard.Play": {
+      "title": "故事板Play",
+      "target": "entity",
+      "components": [
+        "studio.storyboard.Sequence"
+      ],
+      "fields": {
+        "time": {
+          "type": "number",
+          "title": "起始秒",
+          "default": 0,
+          "minimum": 0
+        },
+        "speed": {
+          "type": "number",
+          "title": "速度",
+          "default": 1
+        }
+      }
+    },
+    "studio.storyboard.Pause": {
+      "title": "故事板Pause",
+      "target": "entity",
+      "components": [
+        "studio.storyboard.Sequence"
+      ],
+      "fields": {}
+    },
+    "studio.storyboard.Seek": {
+      "title": "故事板Seek",
+      "target": "entity",
+      "components": [
+        "studio.storyboard.Sequence"
+      ],
+      "fields": {
+        "time": {
+          "type": "number",
+          "title": "绝对秒",
+          "default": 0,
+          "minimum": 0
+        }
+      }
+    },
+    "studio.storyboard.Stop": {
+      "title": "故事板Stop",
+      "target": "entity",
+      "components": [
+        "studio.storyboard.Sequence"
+      ],
+      "fields": {}
+    }
+  }
+}

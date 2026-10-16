@@ -51,8 +51,7 @@ export class SamplePulseSystem implements RuntimeSystem {
           after?.components.find((c) => c.type === "studio.sample.Pulse")
       )
         continue;
-      const entry = this.active.get(id);
-      if (entry) this.runtime.getObject(id)?.scale.fromArray(entry.base);
+      this.runtime.visual.reset("sample:" + id);
       this.active.delete(id);
       this.dirty.add(id);
     }
@@ -72,9 +71,8 @@ export class SamplePulseSystem implements RuntimeSystem {
   }
   mode(): void {
     this.time = 0;
-    for (const [id, entry] of this.active) {
-      const object = this.runtime.getObject(id);
-      if (object) object.scale.fromArray(entry.base);
+    for (const id of this.active.keys()) {
+      this.runtime.visual.reset("sample:" + id);
     }
   }
   actions = {
@@ -86,7 +84,7 @@ export class SamplePulseSystem implements RuntimeSystem {
       if (!entry) throw Error("脉冲组件未就绪");
       entry.enabled = Boolean(action.data.active);
       if (!entry.enabled)
-        this.runtime.getObject(action.targetId)?.scale.fromArray(entry.base);
+        this.runtime.visual.reset("sample:" + action.targetId);
       this.runtime.spatial.invalidate();
       this.runtime.engine.requestRender();
     },
@@ -106,7 +104,22 @@ export class SamplePulseSystem implements RuntimeSystem {
             Math.sin(this.time * Number(c.data.speed) * Math.PI * 2) *
               Number(c.data.amplitude)
           : 1;
-        object.scale.fromArray(entry.base).multiplyScalar(scale);
+        this.runtime.visual.setScope(
+          "sample:" + id,
+          [
+            {
+              targetId: id,
+              channel: "transform",
+              composition: "add",
+              value: {
+                position: [0, 0, 0],
+                rotation: [0, 0, 0, 1],
+                scale: [scale, scale, scale],
+              },
+            },
+          ],
+          45,
+        );
         active = entry.enabled || active;
       }
     }

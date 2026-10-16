@@ -1,11 +1,16 @@
 import * as THREE from "three";
 import { documentValue, type DocumentPath } from "@studio/editor-core";
 import type { SceneRuntime } from "@studio/scene-runtime";
-import type { Vec3, Viewpoint } from "@studio/scene-schema";
+import type {
+  Vec3,
+  Viewpoint,
+  SceneDocument,
+  FieldSchema,
+} from "@studio/scene-schema";
 export interface DocumentPoint {
   path: DocumentPath;
   label: string;
-  basis?: { entityId: string; space: "local" | "parent-offset" };
+  basis?: { entityId: string; space: "local" | "parent-offset" | "parent" };
 }
 export function pointFrame(
   runtime: SceneRuntime,
@@ -19,6 +24,10 @@ export function pointFrame(
   object.parent?.updateWorldMatrix(true, false);
   const entity = runtime.index.entities.get(point.basis.entityId);
   const units = entity ? runtime.sourceUnits(entity) : 1;
+  if (point.basis.space === "parent")
+    return (object.parent?.matrixWorld.clone() ?? new THREE.Matrix4()).multiply(
+      new THREE.Matrix4().makeScale(1 / units, 1 / units, 1 / units),
+    );
   return (object.parent?.matrixWorld.clone() ?? new THREE.Matrix4())
     .multiply(
       new THREE.Matrix4().makeTranslation(
@@ -65,5 +74,31 @@ export function viewpointPoint(
     ...(view.anchorId
       ? { basis: { entityId: view.anchorId, space: "local" as const } }
       : {}),
+  };
+}
+
+export function editablePoint(
+  document: SceneDocument,
+  path: DocumentPath,
+  label: string,
+  space: NonNullable<FieldSchema["x-coordinate"]>,
+  fallback: string,
+  targetField?: string,
+): DocumentPoint {
+  let entityId = fallback;
+  if (targetField)
+    for (let i = path.length; i >= 0; i--) {
+      const value = documentValue(document, path.slice(0, i));
+      if (value && typeof value === "object" && targetField in value) {
+        entityId = String(
+          (value as Record<string, unknown>)[targetField] || fallback,
+        );
+        break;
+      }
+    }
+  return {
+    path,
+    label,
+    ...(space === "world" ? {} : { basis: { entityId, space } }),
   };
 }

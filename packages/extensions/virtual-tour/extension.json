@@ -1,0 +1,597 @@
+{
+  "manifest": {
+    "id": "studio.virtualTour",
+    "version": "2.2.0",
+    "minRuntimeVersion": "2.2.0",
+    "dependsOn": {},
+    "permissions": [],
+    "contributions": {
+      "workspaces": [
+        "virtual-tour"
+      ],
+      "documentKinds": [
+        "studio.virtualTour.Project"
+      ],
+      "compilerPasses": [],
+      "playerWidgets": [
+        "projectNavigation"
+      ]
+    }
+  },
+  "components": {
+    "studio.virtualTour.Panorama": {
+      "title": "云展漫游Panorama",
+      "fields": {
+        "assetId": {
+          "type": "string",
+          "title": "全景媒体",
+          "default": "",
+          "x-reference": "asset"
+        },
+        "video": {
+          "type": "boolean",
+          "title": "全景视频",
+          "default": false
+        },
+        "heading": {
+          "type": "number",
+          "title": "初始朝向",
+          "default": 0
+        },
+        "pitch": {
+          "type": "number",
+          "title": "初始俯仰",
+          "default": 0
+        },
+        "fov": {
+          "type": "number",
+          "title": "FOV",
+          "default": 60,
+          "minimum": 10,
+          "maximum": 150
+        }
+      }
+    }
+  },
+  "actions": {
+    "studio.virtualTour.Navigate": {
+      "title": "云展漫游Navigate",
+      "target": "",
+      "components": [],
+      "fields": {
+        "nodeId": {
+          "type": "string",
+          "title": "目标节点",
+          "default": ""
+        }
+      }
+    }
+  },
+  "documents": {
+    "studio.virtualTour.Project": {
+      "title": "云展漫游Project",
+      "fields": {
+        "entryNodeId": {
+          "type": "string",
+          "title": "入口节点",
+          "default": ""
+        },
+        "nodes": {
+          "type": "array",
+          "title": "场景节点",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "场景名称",
+                "default": "场景"
+              },
+              "kind": {
+                "type": "string",
+                "title": "场景类型",
+                "default": "scene3d",
+                "enum": [
+                  "scene3d",
+                  "panorama",
+                  "pano-video"
+                ]
+              },
+              "sceneId": {
+                "type": "string",
+                "title": "场景 ID",
+                "default": ""
+              },
+              "sceneVersionId": {
+                "type": "string",
+                "title": "固定场景版本",
+                "default": ""
+              },
+              "assetId": {
+                "type": "string",
+                "title": "全景媒体",
+                "default": "",
+                "x-reference": "asset"
+              },
+              "floorId": {
+                "type": "string",
+                "title": "楼层",
+                "default": ""
+              },
+              "floorX": {
+                "type": "number",
+                "title": "地图 X",
+                "default": 0.5
+              },
+              "floorY": {
+                "type": "number",
+                "title": "地图 Y",
+                "default": 0.5
+              },
+              "heading": {
+                "type": "number",
+                "title": "初始朝向",
+                "default": 0
+              },
+              "pitch": {
+                "type": "number",
+                "title": "初始俯仰",
+                "default": 0,
+                "minimum": -90,
+                "maximum": 90
+              },
+              "fov": {
+                "type": "number",
+                "title": "FOV",
+                "default": 60,
+                "minimum": 10,
+                "maximum": 150
+              },
+              "camera": {
+                "type": "object",
+                "title": "",
+                "properties": {
+                  "position": {
+                    "type": "array",
+                    "title": "相机位置",
+                    "items": {
+                      "type": "number",
+                      "title": "",
+                      "default": 0
+                    },
+                    "default": [
+                      0,
+                      1000,
+                      3000
+                    ],
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "x-editor": "vector"
+                  },
+                  "target": {
+                    "type": "array",
+                    "title": "目标",
+                    "items": {
+                      "type": "number",
+                      "title": "",
+                      "default": 0
+                    },
+                    "default": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "x-editor": "vector"
+                  },
+                  "fov": {
+                    "type": "number",
+                    "title": "FOV",
+                    "default": 60,
+                    "minimum": 10,
+                    "maximum": 150
+                  }
+                },
+                "required": [
+                  "position",
+                  "target",
+                  "fov"
+                ],
+                "additionalProperties": false
+              },
+              "hotspots": {
+                "type": "array",
+                "title": "热点",
+                "items": {
+                  "type": "object",
+                  "title": "",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "稳定 ID",
+                      "default": "",
+                      "x-editor": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "title": "热点名称",
+                      "default": "导航点"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "title": "热点类型",
+                      "default": "point",
+                      "enum": [
+                        "point",
+                        "text",
+                        "image",
+                        "polygon",
+                        "video"
+                      ]
+                    },
+                    "yaw": {
+                      "type": "number",
+                      "title": "水平角",
+                      "default": 0
+                    },
+                    "pitch": {
+                      "type": "number",
+                      "title": "俯仰角",
+                      "default": 0,
+                      "minimum": -90,
+                      "maximum": 90
+                    },
+                    "points": {
+                      "type": "array",
+                      "title": "球面顶点",
+                      "items": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "yaw": {
+                            "type": "number",
+                            "title": "水平角",
+                            "default": 0
+                          },
+                          "pitch": {
+                            "type": "number",
+                            "title": "俯仰角",
+                            "default": 0,
+                            "minimum": -90,
+                            "maximum": 90
+                          }
+                        },
+                        "required": [
+                          "yaw",
+                          "pitch"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "toNodeId": {
+                      "type": "string",
+                      "title": "目标节点",
+                      "default": ""
+                    },
+                    "contentId": {
+                      "type": "string",
+                      "title": "内容 ID",
+                      "default": ""
+                    },
+                    "assetId": {
+                      "type": "string",
+                      "title": "图像/视频",
+                      "default": "",
+                      "x-reference": "asset"
+                    },
+                    "text": {
+                      "type": "string",
+                      "title": "文字",
+                      "default": ""
+                    },
+                    "alt": {
+                      "type": "string",
+                      "title": "替代文本",
+                      "default": ""
+                    },
+                    "color": {
+                      "type": "string",
+                      "title": "颜色",
+                      "default": "#38caa6"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "yaw",
+                    "pitch",
+                    "points",
+                    "toNodeId",
+                    "contentId",
+                    "assetId",
+                    "text",
+                    "alt",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "thumbnailAssetId": {
+                "type": "string",
+                "title": "缩略图",
+                "default": "",
+                "x-reference": "asset"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "kind",
+              "sceneId",
+              "sceneVersionId",
+              "assetId",
+              "floorId",
+              "floorX",
+              "floorY",
+              "heading",
+              "pitch",
+              "fov",
+              "camera",
+              "hotspots",
+              "thumbnailAssetId"
+            ],
+            "additionalProperties": false
+          },
+          "default": [],
+          "x-unique-by": "id"
+        },
+        "floors": {
+          "type": "array",
+          "title": "楼层",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "楼层名称",
+                "default": "楼层"
+              },
+              "assetId": {
+                "type": "string",
+                "title": "平面图",
+                "default": "",
+                "x-reference": "asset"
+              },
+              "calibrated": {
+                "type": "boolean",
+                "title": "已标定",
+                "default": false
+              },
+              "north": {
+                "type": "number",
+                "title": "北向（度）",
+                "default": 0
+              },
+              "mmPerPixel": {
+                "type": "number",
+                "title": "毫米/像素",
+                "default": 1,
+                "minimum": 0.0001
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "assetId",
+              "calibrated",
+              "north",
+              "mmPerPixel"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "links": {
+          "type": "array",
+          "title": "连接",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "fromNodeId": {
+                "type": "string",
+                "title": "来源节点",
+                "default": ""
+              },
+              "toNodeId": {
+                "type": "string",
+                "title": "目标节点",
+                "default": ""
+              },
+              "transition": {
+                "type": "string",
+                "title": "转场",
+                "default": "fade",
+                "enum": [
+                  "fade",
+                  "cut"
+                ]
+              },
+              "reverseLinkId": {
+                "type": "string",
+                "title": "反向链接",
+                "default": ""
+              }
+            },
+            "required": [
+              "id",
+              "fromNodeId",
+              "toNodeId",
+              "transition",
+              "reverseLinkId"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "routes": {
+          "type": "array",
+          "title": "自动导览",
+          "items": {
+            "type": "object",
+            "title": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "稳定 ID",
+                "default": "",
+                "x-editor": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "title": "路线名称",
+                "default": "自动导览"
+              },
+              "loop": {
+                "type": "boolean",
+                "title": "循环",
+                "default": false
+              },
+              "stops": {
+                "type": "array",
+                "title": "站点",
+                "items": {
+                  "type": "object",
+                  "title": "",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "稳定 ID",
+                      "default": "",
+                      "x-editor": "uuid"
+                    },
+                    "nodeId": {
+                      "type": "string",
+                      "title": "节点",
+                      "default": ""
+                    },
+                    "hold": {
+                      "type": "number",
+                      "title": "停留秒数",
+                      "default": 5,
+                      "minimum": 0.1
+                    },
+                    "heading": {
+                      "type": "number",
+                      "title": "目标朝向",
+                      "default": 0
+                    },
+                    "pitch": {
+                      "type": "number",
+                      "title": "目标俯仰",
+                      "default": 0
+                    },
+                    "actions": {
+                      "type": "array",
+                      "title": "到站动作",
+                      "items": {
+                        "$ref": "#/$defs/action"
+                      },
+                      "default": [],
+                      "x-editor": "actions"
+                    },
+                    "audioAssetId": {
+                      "type": "string",
+                      "title": "路线语音",
+                      "default": "",
+                      "x-reference": "asset"
+                    },
+                    "waitForMedia": {
+                      "type": "boolean",
+                      "title": "等待媒体结束",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nodeId",
+                    "hold",
+                    "heading",
+                    "pitch",
+                    "actions",
+                    "audioAssetId",
+                    "waitForMedia"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "loop",
+              "stops"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "skinLayoutId": {
+          "type": "string",
+          "title": "界面布局",
+          "default": "hud-default"
+        },
+        "assets": {
+          "type": "array",
+          "title": "项目媒体",
+          "items": {
+            "$ref": "#/$defs/asset"
+          },
+          "default": []
+        },
+        "name": {
+          "type": "string",
+          "title": "工程名称",
+          "default": "新项目",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "skinSceneId": {
+          "type": "string",
+          "title": "皮肤及热点内容来源场景",
+          "default": ""
+        },
+        "skinSceneVersionId": {
+          "type": "string",
+          "title": "固定皮肤场景版本",
+          "default": ""
+        }
+      }
+    }
+  }
+}

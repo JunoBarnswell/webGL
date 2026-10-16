@@ -1,10 +1,14 @@
 # WebGL Studio
 
-面向作品、热点、导览、交互和 Player 界面的场景创作工作台。React / TypeScript / Vite / Zustand，统一 Three.js 场景运行层，.NET 10 Windows Native AOT API，SqlSugar / MySQL 协议数据库、真实 MinIO 和 IMemoryCache。
+面向作品、热点、导览、交互和 Player 界面的场景创作工作台。React / TypeScript / Vite / Zustand，统一 Three.js 场景运行层，.NET 10 Native AOT API，SqlSugar / MySQL 协议数据库、真实 MinIO 和 IMemoryCache。
 
 导入素材 → 搭建场景 → 编辑热点与导览 → 设计界面和交互 → 完整预览 → 保存与发布独立 Player。
 
-本次基线为 main `f1e4863`，开发分支 `codex/studio-creation-experience`。直接维护当前 SceneDocument 契约，不保留分代运行入口，不迁移既有展厅文档。
+Studio 2.2 基于 main `631d782815dd66c51597f578691fd2b59e8eb479`，本轮交付六个方向的 G1。Linux x64 为本轮验收平台，Windows 发布与 EXE 验收按用户要求豁免。
+
+## Studio 2.2 专业工作区
+
+预制体源与实例 Diff、多场景及全景项目、故事板与 Scratch 试摆、IFC 工业审阅、声明式产品配置、Meshopt / KTX2 资产处理共用一个编辑会话体系、一个运行层和一个 Canvas。详见 [2.2 设计](docs/studio-2.2-design.md)、[Linux 交付](docs/linux-delivery.md) 和 [本轮验收](docs/acceptance/studio-2.2.md)。G2/G3 不在本轮范围。
 
 ## 工作台
 
@@ -20,7 +24,7 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| apps/editor | 五个任务工作区、二维画布、三维编辑工具、IndexedDB 恢复 |
+| apps/editor | 任务及专业工作区、二维画布、三维编辑工具、IndexedDB 恢复 |
 | apps/player | 公开加载不可变发布，使用共享 Player UI |
 | packages/scene-schema | 当前 JSON Schema、业务引用、内容、视点、规则、UI 定义 |
 | packages/editor-core | EditorCommand、结构共享、正反向变更、撤销重做 |
@@ -33,15 +37,14 @@
 
 ## 本机启动与交付
 
-完整说明见 [Windows 启动与发布](docs/windows-delivery.md)，设计见 [统一架构](docs/studio-creation-design.md) 和 [创作流程](docs/studio-product-design.md)，结果见 [实际验收记录](docs/acceptance/windows.md)。
+本轮说明见 [Linux 启动与发布](docs/linux-delivery.md) 和 [2.2 验收](docs/acceptance/studio-2.2.md)。历史 Windows 流程保留在 [Windows 交付](docs/windows-delivery.md)。
 
-```powershell
+```bash
 npm ci
-npm run typecheck
-npm run lint
-npm run build
-.\scripts\package-windows.ps1 -SkipFrontend
-.\scripts\start-local.ps1 -ConfigPath .local/config.json -Port 18080
+bash scripts/services.sh build
+bash scripts/services.sh up
+bash scripts/package-linux.sh
+bash scripts/start-linux.sh
 ```
 
 本机数据库与 MinIO 服务须先运行。工作台地址为 `http://127.0.0.1:18080/editor/`。密码、连接配置、持久化数据和工具位于忽略目录，不进入 Git 或发布 ZIP。
@@ -67,6 +70,7 @@ npm run build
 # 完整 API / MySQL / MinIO 环境启动后
 npm run verify:contracts
 npm run verify:integration
+npm run verify:studio22
 # Vite 编辑器运行时验证模型映射与选面修复
 npm run verify:model-revision
 npm run verify:browser

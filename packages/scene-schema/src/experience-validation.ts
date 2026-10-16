@@ -68,6 +68,9 @@ export function experienceReferences(
         audioControls: "entity",
         animationControls: "entity",
         panoramaControls: "entity",
+        configurator: "entity",
+        storyboard: "entity",
+        industrial: "entity",
       } as Record<string, string>
     )[node.kind];
     if (kind) reference(kind, node.targetId);
@@ -259,6 +262,9 @@ export function validateExperience(
         audioControls: "Audio",
         animationControls: "Animation",
         panoramaControls: "Panorama",
+        configurator: "studio.configurator.Catalog",
+        storyboard: "studio.storyboard.Sequence",
+        industrial: "studio.industrial.Review",
       } as Record<string, string>
     )[node.kind];
     if (

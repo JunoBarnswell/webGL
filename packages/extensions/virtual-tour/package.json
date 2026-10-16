@@ -1,0 +1,1 @@
+{"name": "@studio/extension-virtual-tour", "private": true, "type": "module", "exports": {"./runtime": "./runtime.ts", "./editor": "./editor.ts"}}

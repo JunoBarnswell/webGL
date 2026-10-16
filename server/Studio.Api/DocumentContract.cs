@@ -22,12 +22,31 @@ public sealed class DocumentContract
         schema = JsonDocument.Parse(stream).RootElement.Clone();
     }
     public static string Text(JsonElement value, string key) => value.TryGetProperty(key, out var found) ? found.GetString() ?? "" : "";
-    private JsonElement Resolve(JsonElement spec) => spec.TryGetProperty("$ref", out var reference) ? schema.GetProperty("$defs").GetProperty(reference.GetString()!.Split('/').Last()) : spec;
+    private JsonElement Resolve(JsonElement spec) {
+        if (!spec.TryGetProperty("$ref", out var reference)) return spec;
+        if(reference.GetString()=="#")return schema;
+        var node=schema;foreach(var key in reference.GetString()![2..].Split('/'))node=node.GetProperty(key);return node;
+    }
+    public JsonElement Compile(JsonElement document) => PrefabCompiler.Compile(document,schema);
+    public string[] LibraryAssetIds(string type,JsonElement data){
+        var spec=schema.GetProperty("$defs").GetProperty("libraryDocument").GetProperty("oneOf").EnumerateArray().First(d=>Text(d.GetProperty("properties").GetProperty("type"),"const")==type).GetProperty("properties").GetProperty("data");
+        var ids=References(data,spec).Where(r=>r.Kind=="asset"&&r.Id!="").Select(r=>r.Id).ToList();if(data.TryGetProperty("assets",out var assets))ids.AddRange(assets.EnumerateArray().Select(a=>Text(a,"id")));return ids.Distinct().ToArray();
+    }
+    public void AssertLibraryData(string type,JsonElement data){
+        var spec=schema.GetProperty("$defs").GetProperty("libraryDocument").GetProperty("oneOf").EnumerateArray().FirstOrDefault(d=>Text(d.GetProperty("properties").GetProperty("type"),"const")==type);
+        if(spec.ValueKind==JsonValueKind.Undefined)throw new ApiException(422,"未知资源库文档类型");var errors=new List<string>();Check(data,spec.GetProperty("properties").GetProperty("data"),"$",errors);if(errors.Count>0)throw new ApiException(422,"资源库结构无效",errors.ToArray());
+    }
+    public void AssertComponentData(string type, JsonElement data) {
+        var spec=schema.GetProperty("$defs").GetProperty("component").GetProperty("oneOf").EnumerateArray().FirstOrDefault(d=>d.GetProperty("properties").GetProperty("type").TryGetProperty("const",out var value)&&value.GetString()==type);
+        if(spec.ValueKind==JsonValueKind.Undefined)throw new ApiException(422,"未知文档类型");
+        var errors=new List<string>();Check(data,spec.GetProperty("properties").GetProperty("data"),"$",errors);if(errors.Count>0)throw new ApiException(422,"文档结构无效",errors.ToArray());
+    }
     public string[] Validate(JsonElement document, bool publish = false)
     {
         var errors = new List<string>();
         Check(document, schema, "$", errors);
         if (errors.Count > 0) return errors.Take(30).ToArray();
+        try { document=Compile(document); } catch(ApiException error) { return [error.Message]; }
         var available=Catalog.GetProperty("manifests").EnumerateArray().ToDictionary(m=>Text(m,"id"));
         var declared=new HashSet<string>();
         foreach(var requirement in document.GetProperty("requiredExtensions").EnumerateArray()) {
@@ -106,9 +125,16 @@ public sealed class DocumentContract
         }
         var settings = document.GetProperty("settings");
         if (settings.GetProperty("near").GetDouble() >= settings.GetProperty("far").GetDouble()) errors.Add("近裁剪面必须小于远裁剪面");
+        CreativeContract.Validate(document,errors,publish);
         SemanticContract.Validate(document,schema,errors,publish);
         ExperienceContract.Validate(document, schema, groups, errors, publish);
         return errors.Distinct().Take(30).ToArray();
+    }
+    public void AssertActions(JsonElement document,JsonElement actions) {
+        if(actions.GetArrayLength()==0)return;
+        var context=JsonNode.Parse(document.GetRawText())!.AsObject();
+        context["behaviors"]!.AsArray().Add((JsonNode)new JsonObject { ["id"]=Database.Id(),["name"]="项目导览动作",["enabled"]=true,["sourceKind"]="scene",["sourceId"]="",["event"]="ready",["once"]=false,["concurrency"]="ignore",["condition"]=JsonNode.Parse("{\"type\":\"all\",\"conditions\":[]}"),["actions"]=JsonNode.Parse(actions.GetRawText()) });
+        Assert(JsonDocument.Parse(context.ToJsonString()).RootElement,true);
     }
     public void Assert(JsonElement document, bool publish = false) { var errors = Validate(document, publish); if (errors.Length > 0) throw new ApiException(422, "场景文档校验失败", errors); }
     private static bool Equal(JsonElement a, JsonElement b) => JsonElement.DeepEquals(a, b);
@@ -154,6 +180,7 @@ public sealed class DocumentContract
     private IEnumerable<(string Kind, string Id)> References(JsonElement value, JsonElement raw)
     {
         var spec = Resolve(raw);
+        if(spec.TryGetProperty("x-reference-scope",out var scope)&&scope.GetString()=="local")yield break;
         if (value.ValueKind == JsonValueKind.String && spec.TryGetProperty("x-reference", out var kind)) yield return (kind.GetString()!, value.GetString()!);
         if (spec.TryGetProperty("oneOf", out var alternatives)) {
             foreach (var alternative in alternatives.EnumerateArray()) {

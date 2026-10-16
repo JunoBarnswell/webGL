@@ -60,3 +60,5 @@ import { AssemblyPanel } from "./panel";
 export const panels = [
   { id: "assembly", title: "装配 BOM 与步骤", Component: AssemblyPanel },
 ];
+
+export const commands = [];

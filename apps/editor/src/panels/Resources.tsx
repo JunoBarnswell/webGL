@@ -31,11 +31,10 @@ const source = {
     path.split("/").map(encodeURIComponent).join("/"),
   headers: authHeaders,
 };
-export async function mountModel(
+export async function prepareModel(
   asset: SceneAsset,
   parentId: string | null = null,
-): Promise<void> {
-  const sceneId = useStudio.getState().document?.sceneId;
+): Promise<import("@studio/scene-schema").Entity[]> {
   const files = new Map(
     await Promise.all(
       asset.files.map(
@@ -50,9 +49,16 @@ export async function mountModel(
   const importer = modelImporter(asset.entry);
   if (!importer) throw Error("没有可用的模型导入器");
   const { metadata } = await importer.prepare(files, asset.entry, {});
+  return modelEntities(asset, metadata, parentId);
+}
+export async function mountModel(
+  asset: SceneAsset,
+  parentId: string | null = null,
+): Promise<void> {
+  const sceneId = useStudio.getState().document?.sceneId;
+  const entities = await prepareModel(asset, parentId);
   if (useStudio.getState().document?.sceneId !== sceneId)
-    throw new Error("场景已切换，未挂载模型");
-  const entities = modelEntities(asset, metadata, parentId);
+    throw Error("场景已切换，未挂载模型");
   useStudio.getState().command({
     label: "挂载模型",
     mutate: (doc) => {

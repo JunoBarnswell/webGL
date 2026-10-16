@@ -1,3 +1,4 @@
+import { recompilePrefabs } from "./prefab";
 import { current } from "immer";
 import * as THREE from "three";
 import {
@@ -78,8 +79,16 @@ export function duplicateEntities(selected: string[]): EditorCommand {
       }
       const ids = descendants(doc, selected);
       const remap = new Map([...ids].map((id) => [id, crypto.randomUUID()]));
+      const instances = (doc.prefabs ?? []).filter((instance) =>
+        ids.has(instance.bindings.entity[instance.rootLocalId]),
+      );
+      const generated = new Set(
+        instances.flatMap((instance) =>
+          Object.values(instance.bindings.entity),
+        ),
+      );
       const copies = doc.entities
-        .filter((e) => ids.has(e.id))
+        .filter((e) => ids.has(e.id) && !generated.has(e.id))
         .map((entity) => {
           const copy = structuredClone(current(entity));
           copy.id = remap.get(entity.id)!;
@@ -101,6 +110,22 @@ export function duplicateEntities(selected: string[]): EditorCommand {
           return copy;
         });
       doc.entities.push(...copies);
+      for (const instance of instances) {
+        const clone = structuredClone(current(instance));
+        clone.id = crypto.randomUUID();
+        clone.name += " 副本";
+        clone.parentId = instance.parentId
+          ? (remap.get(instance.parentId) ?? instance.parentId)
+          : null;
+        for (const [kind, bindings] of Object.entries(clone.bindings))
+          for (const [local, id] of Object.entries(bindings))
+            bindings[local] =
+              kind === "entity"
+                ? (remap.get(id) ?? crypto.randomUUID())
+                : crypto.randomUUID();
+        (doc.prefabs ??= []).push(clone);
+      }
+      if (instances.length) recompilePrefabs(doc);
       for (const behavior of [...doc.behaviors])
         if (ids.has(behavior.sourceId)) {
           const copy = structuredClone(current(behavior));

@@ -1,0 +1,58 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.IO.Compression;
+using static Studio.Database;
+namespace Studio;
+public record OptimizationSettings(bool UseMeshopt=true,string TextureCodec="retain",bool PreserveSemantics=true,string[]? ProtectedSourceIds=null);
+public record ProcessingRequest(string SourceAssetId,string Operation,OptimizationSettings Settings);
+public record ProcessingResult(JsonElement Report,AssetResponse[] Assets);
+public class ProcessingJobRow {public string Id{get;set;}="";public string SourceAssetId{get;set;}="";public string SourceSha256{get;set;}="";public string Operation{get;set;}="";public string SettingsJson{get;set;}="";public string SettingsHash{get;set;}="";public string Status{get;set;}="";public string Stage{get;set;}="";public double Progress{get;set;}public string LogsJson{get;set;}="[]";public string? ResultJson{get;set;}public string Error{get;set;}="";public bool CancelRequested{get;set;}public string CreatedAt{get;set;}="";public string UpdatedAt{get;set;}="";}
+public sealed class ProcessingService(Database database,ObjectStore objects,SemanticService semantics,IConfiguration config,ILogger<ProcessingService> logger):BackgroundService
+{
+ private string? runningId;private CancellationTokenSource? runningCancellation;
+ public ProcessingJobRow Create(ProcessingRequest request,bool force=false){
+  var asset=objects.Get(request.SourceAssetId);if(request.Operation is not ("diagnose" or "optimize" or "ifc"))throw new ApiException(422,"未知处理作业");if(request.Operation=="ifc"?asset.Kind!="source"||!asset.Entry.EndsWith(".ifc",StringComparison.OrdinalIgnoreCase):asset.Kind!="model")throw new ApiException(422,"作业输入资源类型不匹配");
+  if(request.Settings.TextureCodec is not ("retain" or "ktx2")||!request.Settings.PreserveSemantics)throw new ApiException(422,"首期处理必须保留来源语义；纹理策略仅支持 retain/ktx2");
+  using var db=database.Open();if(db.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM ProcessingJobs WHERE Status IN ('Queued','Running')")[0].Value>=50)throw new ApiException(429,"处理队列已满");
+  var id=Id();var now=Now();var settings=JsonSerializer.Serialize(request.Settings,ApiJson.Default.OptimizationSettings);var hash=Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("studio-asset-worker@2.2.0:3\0"+settings)));if(!force){var cached=db.Ado.SqlQuery<ProcessingJobRow>("SELECT * FROM ProcessingJobs WHERE SourceSha256=@sha AND Operation=@op AND SettingsHash=@hash AND Status='Succeeded' ORDER BY UpdatedAt DESC LIMIT 1",P("sha",asset.Sha256),P("op",request.Operation),P("hash",hash)).SingleOrDefault();if(cached!=null)return cached;}db.Ado.BeginTran();try{
+   db.Ado.ExecuteCommand("INSERT INTO ProcessingJobs(Id,SourceAssetId,SourceSha256,Operation,SettingsJson,SettingsHash,Status,Stage,Progress,LogsJson,Error,CancelRequested,CreatedAt,UpdatedAt) VALUES(@id,@asset,@sha,@operation,@settings,@hash,'Queued','Queued',0,'[]','',0,@now,@now)",P("id",id),P("asset",asset.Id),P("sha",asset.Sha256),P("operation",request.Operation),P("settings",settings),P("hash",hash),P("now",now));db.Ado.ExecuteCommand("INSERT INTO Dependencies(OwnerType,OwnerId,AssetId) VALUES('job',@id,@asset)",P("id",id),P("asset",asset.Id));db.Ado.CommitTran();
+  }catch{db.Ado.RollbackTran();throw;}return Read(id);
+ }
+ public ProcessingJobRow Read(string id){using var db=database.Open();return db.Ado.SqlQuery<ProcessingJobRow>("SELECT * FROM ProcessingJobs WHERE Id=@id",P("id",id)).SingleOrDefault()??throw new ApiException(404,"作业不存在");}
+ public ProcessingJobRow[] List(){using var db=database.Open();return db.Ado.SqlQuery<ProcessingJobRow>("SELECT * FROM ProcessingJobs ORDER BY CreatedAt DESC LIMIT 100").ToArray();}
+ public ProcessingJobRow Retry(string id){var source=Read(id);if(source.Status is "Queued" or "Running")throw new ApiException(409,"作业尚未结束");return Create(new(source.SourceAssetId,source.Operation,JsonSerializer.Deserialize(source.SettingsJson,ApiJson.Default.OptimizationSettings)!),true);}
+ public void Cancel(string id){var job=Read(id);if(job.Status is not ("Queued" or "Running"))return;using var db=database.Open();db.Ado.ExecuteCommand("UPDATE ProcessingJobs SET CancelRequested=1,Status=IF(Status='Queued','Cancelled',Status),UpdatedAt=@now WHERE Id=@id",P("now",Now()),P("id",id));if(runningId==id)runningCancellation?.Cancel();}
+ protected override async Task ExecuteAsync(CancellationToken stoppingToken){
+  using(var db=database.Open())db.Ado.ExecuteCommand("UPDATE ProcessingJobs SET Status=IF(CancelRequested=1,'Cancelled','Queued'),Stage='Recovered after restart' WHERE Status='Running'");
+  while(!stoppingToken.IsCancellationRequested){ProcessingJobRow? job=null;try{using(var db=database.Open()){db.Ado.BeginTran();try{job=db.Ado.SqlQuery<ProcessingJobRow>("SELECT * FROM ProcessingJobs WHERE Status='Queued' AND CancelRequested=0 ORDER BY CreatedAt LIMIT 1 FOR UPDATE SKIP LOCKED").SingleOrDefault();if(job!=null)db.Ado.ExecuteCommand("UPDATE ProcessingJobs SET Status='Running',Stage='Staging',Progress=0,UpdatedAt=@now WHERE Id=@id",P("now",Now()),P("id",job.Id));db.Ado.CommitTran();}catch{db.Ado.RollbackTran();throw;}}
+    if(job==null){await Task.Delay(1000,stoppingToken);continue;}
+    using var cancellation=CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);cancellation.CancelAfter(TimeSpan.FromMinutes(15));runningId=job.Id;runningCancellation=cancellation;
+    try{await Process(job,cancellation.Token);}catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){Finish(job.Id,"Queued","等待服务重启恢复",null);}catch(OperationCanceledException){Finish(job.Id,"Cancelled","作业取消或达到执行时限",null);}catch(Exception error){logger.LogWarning(error,"Asset job {Id} failed",job.Id);Finish(job.Id,"Failed",error.Message[..Math.Min(4000,error.Message.Length)],null);}finally{runningId=null;runningCancellation=null;}
+   }catch(OperationCanceledException)when(stoppingToken.IsCancellationRequested){break;}catch(Exception error){logger.LogError(error,"Asset queue unavailable");await Task.Delay(2000,stoppingToken);}
+  }
+ }
+ private void Finish(string id,string status,string error,ProcessingResult? result){using var db=database.Open();db.Ado.ExecuteCommand("UPDATE ProcessingJobs SET Status=@status,Stage=@status,Progress=IF(@status='Succeeded',1,Progress),ResultJson=@result,Error=@error,UpdatedAt=@now WHERE Id=@id",P("status",status),P("result",result==null?null:JsonSerializer.Serialize(result,ApiJson.Default.ProcessingResult)),P("error",error),P("now",Now()),P("id",id));}
+ private async Task Process(ProcessingJobRow job,CancellationToken ct){
+  var root=Path.GetFullPath(config["STUDIO_JOB_ROOT"]??Path.Combine(AppContext.BaseDirectory,".jobs"));var work=Path.Combine(root,job.Id);if(Directory.Exists(work))Directory.Delete(work,true);Directory.CreateDirectory(Path.Combine(work,"input"));var logs=new List<string>();
+  try{var asset=objects.Get(job.SourceAssetId);if(asset.Sha256!=job.SourceSha256)throw new ApiException(422,"源资产摘要变化");await objects.Confirm(asset,ct);long total=0;foreach(var file in asset.Files){ct.ThrowIfCancellationRequested();if(!ObjectStore.ValidPath(file))throw new ApiException(422,"输入资源路径非法");var destination=Path.Combine(work,"input",file);Directory.CreateDirectory(Path.GetDirectoryName(destination)!);await using var stream=File.Create(destination);await objects.CopyTo("assets/"+asset.Id+"/"+file,stream,ct);total+=stream.Length;if(total>1024L*1024*1024)throw new ApiException(413,"作业输入超过 1 GiB 预算");}
+   var task=new JsonObject{["sourceAssetId"]=asset.Id,["sourceSha256"]=asset.Sha256,["entry"]=asset.Entry,["operation"]=job.Operation,["settingsHash"]=job.SettingsHash,["settings"]=JsonNode.Parse(job.SettingsJson)};var taskPath=Path.Combine(work,"task.json");await File.WriteAllTextAsync(taskPath,task.ToJsonString(),ct);
+   var start=new ProcessStartInfo(config["STUDIO_NODE"]??"node"){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true,WorkingDirectory=work};start.ArgumentList.Add("--max-old-space-size=1024");start.ArgumentList.Add(Path.Combine(config["STUDIO_WORKER_ROOT"]??Path.Combine(AppContext.BaseDirectory,"workers"),"asset-worker.mjs"));start.ArgumentList.Add(taskPath);
+   foreach(var key in new[]{"STUDIO_IFC_PYTHON","STUDIO_IFC_MODULES","STUDIO_TOKTX"})if(config[key] is {Length:>0} value)start.Environment[key]=value;
+   using var process=new System.Diagnostics.Process{StartInfo=start};process.Start();using var registration=ct.Register(()=>{try{if(!process.HasExited)process.Kill(true);}catch(InvalidOperationException){}});
+   async Task ReadLines(StreamReader reader){while(await reader.ReadLineAsync(ct) is {} line){line=line[..Math.Min(2000,line.Length)];lock(logs){logs.Add(line);if(logs.Count>500)logs.RemoveAt(0);}string stage="Converting";double progress=.1;try{using var parsed=JsonDocument.Parse(line);if(parsed.RootElement.TryGetProperty("stage",out var value))stage=value.GetString()??stage;if(parsed.RootElement.TryGetProperty("progress",out var p))progress=Math.Clamp(p.GetDouble(),0,.99);}catch(JsonException){}using var db=database.Open();string[] snapshot;lock(logs)snapshot=logs.ToArray();db.Ado.ExecuteCommand("UPDATE ProcessingJobs SET Stage=@stage,Progress=@progress,LogsJson=@logs,UpdatedAt=@now WHERE Id=@id",P("stage",stage),P("progress",progress),P("logs",JsonSerializer.Serialize(snapshot,ApiJson.Default.StringArray)),P("now",Now()),P("id",job.Id));}}
+   await Task.WhenAll(ReadLines(process.StandardOutput),ReadLines(process.StandardError),process.WaitForExitAsync(ct));ct.ThrowIfCancellationRequested();if(process.ExitCode!=0)throw new ApiException(422,"转换进程失败："+string.Join('\n',logs.TakeLast(8)));
+   var result=JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(work,"result.json"),ct)).RootElement;var assets=new List<AssetResponse>();foreach(var output in result.GetProperty("outputs").EnumerateArray()){
+    var kind=DocumentContract.Text(output,"kind");var entry=DocumentContract.Text(output,"entry");if(kind=="semantic"){
+     var path=Path.Combine(work,"output",entry);var dataset=JsonNode.Parse(await File.ReadAllTextAsync(path,ct))!.AsObject();var model=assets.LastOrDefault(a=>a.Kind=="model");foreach(var record in dataset["records"]!.AsArray())record!["modelRevision"]=model?.Sha256??job.SourceSha256;if(model!=null)dataset["modelAssetId"]=model.Id;await File.WriteAllTextAsync(path,dataset.ToJsonString(),ct);
+    }
+    var zipPath=Path.Combine(work,"result-"+assets.Count+".zip");using(var zip=ZipFile.Open(zipPath,ZipArchiveMode.Create)){foreach(var item in output.GetProperty("files").EnumerateArray()){var file=item.GetString()!;if(!ObjectStore.ValidPath(file))throw new ApiException(422,"转换结果路径非法");var source=Path.GetFullPath(Path.Combine(work,"output",file));if(!source.StartsWith(Path.Combine(work,"output")+Path.DirectorySeparatorChar,StringComparison.Ordinal))throw new ApiException(422,"转换结果路径越界");zip.CreateEntryFromFile(source,file);}}
+    await using var stream=File.OpenRead(zipPath);var derived=await objects.Upload(stream,asset.Name+" "+job.Operation,kind,entry,ct);assets.Add(derived);using(var db=database.Open())db.Ado.ExecuteCommand("INSERT IGNORE INTO Dependencies(OwnerType,OwnerId,AssetId) VALUES('job',@id,@asset)",P("id",job.Id),P("asset",derived.Id));if(kind=="semantic")await semantics.Index(derived.Id,ct);
+   }
+   ct.ThrowIfCancellationRequested();if(Read(job.Id).CancelRequested)throw new OperationCanceledException(ct);
+   Finish(job.Id,"Succeeded","",new(result.GetProperty("report").Clone(),assets.ToArray()));
+  }finally{if(Directory.Exists(work))Directory.Delete(work,true);}
+ }
+}

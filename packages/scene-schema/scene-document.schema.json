@@ -42,7 +42,9 @@
               "model",
               "image",
               "audio",
-              "texture"
+              "texture",
+              "source",
+              "semantic"
             ]
           },
           "entry": {
@@ -134,7 +136,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "x-reference": "entity"
           },
           "visible": {
             "type": "boolean",
@@ -266,6 +269,13 @@
     },
     "ui": {
       "$ref": "#/$defs/ui"
+    },
+    "prefabs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prefabInstance"
+      },
+      "x-reference-scope": "local"
     },
     "documentVersion": {
       "const": 2
@@ -1811,6 +1821,1610 @@
           "additionalProperties": false,
           "properties": {
             "type": {
+              "const": "studio.configurator.Catalog"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "catalogId": {
+                  "type": "string",
+                  "title": "稳定 ID",
+                  "default": "",
+                  "x-editor": "uuid"
+                },
+                "revision": {
+                  "type": "string",
+                  "title": "目录版本",
+                  "default": "1"
+                },
+                "name": {
+                  "type": "string",
+                  "title": "产品名称",
+                  "default": "产品配置"
+                },
+                "market": {
+                  "type": "string",
+                  "title": "市场",
+                  "default": "CN"
+                },
+                "groups": {
+                  "type": "array",
+                  "title": "属性组",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "属性名称",
+                        "default": "外观"
+                      },
+                      "control": {
+                        "type": "string",
+                        "title": "控件",
+                        "default": "radio",
+                        "enum": [
+                          "radio",
+                          "swatch",
+                          "cards",
+                          "toggle",
+                          "multi",
+                          "number"
+                        ]
+                      },
+                      "min": {
+                        "type": "number",
+                        "title": "最少选项",
+                        "default": 1,
+                        "minimum": 0
+                      },
+                      "max": {
+                        "type": "number",
+                        "title": "最多选项",
+                        "default": 1,
+                        "minimum": 1
+                      },
+                      "defaultIds": {
+                        "type": "array",
+                        "title": "默认选项",
+                        "items": {
+                          "type": "string",
+                          "title": "",
+                          "default": ""
+                        },
+                        "default": []
+                      },
+                      "options": {
+                        "type": "array",
+                        "title": "选项",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "选项名称",
+                              "default": "选项"
+                            },
+                            "sku": {
+                              "type": "string",
+                              "title": "SKU",
+                              "default": ""
+                            },
+                            "color": {
+                              "type": "string",
+                              "title": "色卡",
+                              "default": "#55bda3"
+                            },
+                            "imageAssetId": {
+                              "type": "string",
+                              "title": "图片",
+                              "default": "",
+                              "x-reference": "asset"
+                            },
+                            "description": {
+                              "type": "string",
+                              "title": "说明",
+                              "default": ""
+                            },
+                            "bom": {
+                              "type": "array",
+                              "title": "BOM",
+                              "items": {
+                                "type": "object",
+                                "title": "",
+                                "properties": {
+                                  "partId": {
+                                    "type": "string",
+                                    "title": "零件号",
+                                    "default": ""
+                                  },
+                                  "quantity": {
+                                    "type": "number",
+                                    "title": "数量",
+                                    "default": 1,
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "partId",
+                                  "quantity"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "default": []
+                            },
+                            "visuals": {
+                              "type": "array",
+                              "title": "模型绑定",
+                              "items": {
+                                "type": "object",
+                                "title": "",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "title": "稳定 ID",
+                                    "default": "",
+                                    "x-editor": "uuid"
+                                  },
+                                  "targetId": {
+                                    "type": "string",
+                                    "title": "目标对象",
+                                    "default": "",
+                                    "x-reference": "entity",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "values": [
+                                        "visibility",
+                                        "color",
+                                        "opacity",
+                                        "transform",
+                                        "variant",
+                                        "swapPart"
+                                      ]
+                                    }
+                                  },
+                                  "operation": {
+                                    "type": "string",
+                                    "title": "操作",
+                                    "default": "visibility",
+                                    "enum": [
+                                      "visibility",
+                                      "color",
+                                      "opacity",
+                                      "transform",
+                                      "variant",
+                                      "swapPart",
+                                      "camera"
+                                    ]
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "title": "值",
+                                    "default": "true"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector",
+                                        "x-coordinate": "parent",
+                                        "x-coordinate-target": "targetId"
+                                      },
+                                      "rotation": {
+                                        "type": "array",
+                                        "title": "",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0,
+                                          1
+                                        ],
+                                        "minItems": 4,
+                                        "maxItems": 4
+                                      },
+                                      "scale": {
+                                        "type": "array",
+                                        "title": "缩放",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          1,
+                                          1,
+                                          1
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "rotation",
+                                      "scale"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "camera": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "相机位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          1000,
+                                          3000
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      },
+                                      "target": {
+                                        "type": "array",
+                                        "title": "目标",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      },
+                                      "fov": {
+                                        "type": "number",
+                                        "title": "FOV",
+                                        "default": 60,
+                                        "minimum": 10,
+                                        "maximum": 150
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "target",
+                                      "fov"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "assetId": {
+                                    "type": "string",
+                                    "title": "替换模型",
+                                    "default": "",
+                                    "x-reference": "asset",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "value": "swapPart"
+                                    },
+                                    "x-asset-kind": "model"
+                                  },
+                                  "variant": {
+                                    "type": "string",
+                                    "title": "glTF 材质变体",
+                                    "default": "",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "value": "variant"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "targetId",
+                                  "operation",
+                                  "value",
+                                  "transform",
+                                  "camera",
+                                  "assetId",
+                                  "variant"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "default": []
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "sku",
+                            "color",
+                            "imageAssetId",
+                            "description",
+                            "bom",
+                            "visuals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "numericMinimum": {
+                        "type": "number",
+                        "title": "数值下限",
+                        "default": 0
+                      },
+                      "numericMaximum": {
+                        "type": "number",
+                        "title": "数值上限",
+                        "default": 1
+                      },
+                      "numericStep": {
+                        "type": "number",
+                        "title": "数值步长",
+                        "default": 0.01,
+                        "minimum": 0.000001
+                      },
+                      "numericDefault": {
+                        "type": "number",
+                        "title": "数值默认值",
+                        "default": 0
+                      },
+                      "visuals": {
+                        "type": "array",
+                        "title": "模型绑定",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "targetId": {
+                              "type": "string",
+                              "title": "目标对象",
+                              "default": "",
+                              "x-reference": "entity",
+                              "x-required-when": {
+                                "field": "operation",
+                                "values": [
+                                  "visibility",
+                                  "color",
+                                  "opacity",
+                                  "transform",
+                                  "variant",
+                                  "swapPart"
+                                ]
+                              }
+                            },
+                            "operation": {
+                              "type": "string",
+                              "title": "操作",
+                              "default": "visibility",
+                              "enum": [
+                                "visibility",
+                                "color",
+                                "opacity",
+                                "transform",
+                                "variant",
+                                "swapPart",
+                                "camera"
+                              ]
+                            },
+                            "value": {
+                              "type": "string",
+                              "title": "值",
+                              "default": "true"
+                            },
+                            "transform": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "parent",
+                                  "x-coordinate-target": "targetId"
+                                },
+                                "rotation": {
+                                  "type": "array",
+                                  "title": "",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "minItems": 4,
+                                  "maxItems": 4
+                                },
+                                "scale": {
+                                  "type": "array",
+                                  "title": "缩放",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    1,
+                                    1,
+                                    1
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "rotation",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "camera": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "相机位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    1000,
+                                    3000
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                },
+                                "target": {
+                                  "type": "array",
+                                  "title": "目标",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                },
+                                "fov": {
+                                  "type": "number",
+                                  "title": "FOV",
+                                  "default": 60,
+                                  "minimum": 10,
+                                  "maximum": 150
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "target",
+                                "fov"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "assetId": {
+                              "type": "string",
+                              "title": "替换模型",
+                              "default": "",
+                              "x-reference": "asset",
+                              "x-required-when": {
+                                "field": "operation",
+                                "value": "swapPart"
+                              },
+                              "x-asset-kind": "model"
+                            },
+                            "variant": {
+                              "type": "string",
+                              "title": "glTF 材质变体",
+                              "default": "",
+                              "x-required-when": {
+                                "field": "operation",
+                                "value": "variant"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "targetId",
+                            "operation",
+                            "value",
+                            "transform",
+                            "camera",
+                            "assetId",
+                            "variant"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "control",
+                      "min",
+                      "max",
+                      "defaultIds",
+                      "options"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": [],
+                  "x-unique-by": "id"
+                },
+                "rules": {
+                  "type": "array",
+                  "title": "规则",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "type": {
+                        "type": "string",
+                        "title": "约束类型",
+                        "default": "require",
+                        "enum": [
+                          "require",
+                          "exclude",
+                          "implies",
+                          "default",
+                          "range",
+                          "count",
+                          "bundle"
+                        ]
+                      },
+                      "when": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "groupId": {
+                            "type": "string",
+                            "title": "属性组 ID",
+                            "default": ""
+                          },
+                          "optionId": {
+                            "type": "string",
+                            "title": "选项 ID",
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "groupId",
+                          "optionId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "then": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "groupId": {
+                            "type": "string",
+                            "title": "属性组 ID",
+                            "default": ""
+                          },
+                          "optionId": {
+                            "type": "string",
+                            "title": "选项 ID",
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "groupId",
+                          "optionId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minimum": {
+                        "type": "number",
+                        "title": "下限",
+                        "default": 0
+                      },
+                      "maximum": {
+                        "type": "number",
+                        "title": "上限",
+                        "default": 1
+                      },
+                      "priority": {
+                        "type": "number",
+                        "title": "优先级",
+                        "default": 0
+                      },
+                      "reason": {
+                        "type": "string",
+                        "title": "原因",
+                        "default": "此组合不兼容"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "when",
+                      "then",
+                      "minimum",
+                      "maximum",
+                      "priority",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "priceSource": {
+                  "type": "string",
+                  "title": "价格来源",
+                  "default": "inquiry"
+                },
+                "priceCurrency": {
+                  "type": "string",
+                  "title": "币种",
+                  "default": "CNY"
+                },
+                "libraryVersionId": {
+                  "type": "string",
+                  "title": "固定目录修订",
+                  "default": "",
+                  "x-optional": true
+                }
+              },
+              "required": [
+                "catalogId",
+                "revision",
+                "name",
+                "market",
+                "groups",
+                "rules",
+                "priceSource",
+                "priceCurrency"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "产品配置Catalog"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.industrial.Review"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "semanticAssetId": {
+                  "type": "string",
+                  "title": "语义数据",
+                  "default": "",
+                  "x-reference": "asset"
+                },
+                "classes": {
+                  "type": "array",
+                  "title": "分类",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "code": {
+                        "type": "string",
+                        "title": "分类码",
+                        "default": ""
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "分类名称",
+                        "default": "设备"
+                      },
+                      "parentId": {
+                        "type": "string",
+                        "title": "父分类",
+                        "default": ""
+                      },
+                      "fields": {
+                        "type": "array",
+                        "title": "字段",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "字段名",
+                              "default": ""
+                            },
+                            "dataType": {
+                              "type": "string",
+                              "title": "数据类型",
+                              "default": "string",
+                              "enum": [
+                                "string",
+                                "number",
+                                "boolean"
+                              ]
+                            },
+                            "unit": {
+                              "type": "string",
+                              "title": "单位",
+                              "default": ""
+                            },
+                            "precision": {
+                              "type": "number",
+                              "title": "精度",
+                              "default": 2,
+                              "minimum": 0,
+                              "maximum": 12
+                            },
+                            "required": {
+                              "type": "boolean",
+                              "title": "必填",
+                              "default": false
+                            },
+                            "sourcePath": {
+                              "type": "string",
+                              "title": "来源路径",
+                              "default": ""
+                            },
+                            "sourceUnit": {
+                              "type": "string",
+                              "title": "来源单位",
+                              "default": ""
+                            },
+                            "emptyPolicy": {
+                              "type": "string",
+                              "title": "空值策略",
+                              "default": "keep",
+                              "enum": [
+                                "keep",
+                                "reject",
+                                "default"
+                              ]
+                            },
+                            "defaultValue": {
+                              "type": "string",
+                              "title": "默认值",
+                              "default": ""
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "dataType",
+                            "unit",
+                            "precision",
+                            "required",
+                            "sourcePath",
+                            "sourceUnit",
+                            "emptyPolicy",
+                            "defaultValue"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "code",
+                      "name",
+                      "parentId",
+                      "fields"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "filters": {
+                  "type": "array",
+                  "title": "过滤器",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "field": {
+                        "type": "string",
+                        "title": "字段",
+                        "default": ""
+                      },
+                      "operator": {
+                        "type": "string",
+                        "title": "条件",
+                        "default": "eq",
+                        "enum": [
+                          "eq",
+                          "neq",
+                          "contains",
+                          "gt",
+                          "gte",
+                          "lt",
+                          "lte",
+                          "empty"
+                        ]
+                      },
+                      "value": {
+                        "type": "string",
+                        "title": "值",
+                        "default": ""
+                      },
+                      "join": {
+                        "type": "string",
+                        "title": "组合",
+                        "default": "and",
+                        "enum": [
+                          "and",
+                          "or"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "field",
+                      "operator",
+                      "value",
+                      "join"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "colors": {
+                  "type": "array",
+                  "title": "颜色规则",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "field": {
+                        "type": "string",
+                        "title": "字段",
+                        "default": ""
+                      },
+                      "value": {
+                        "type": "string",
+                        "title": "类别值",
+                        "default": ""
+                      },
+                      "min": {
+                        "type": "number",
+                        "title": "下界",
+                        "default": 0
+                      },
+                      "max": {
+                        "type": "number",
+                        "title": "上界",
+                        "default": 0
+                      },
+                      "mode": {
+                        "type": "string",
+                        "title": "着色方式",
+                        "default": "category",
+                        "enum": [
+                          "category",
+                          "range",
+                          "missing"
+                        ]
+                      },
+                      "color": {
+                        "type": "string",
+                        "title": "颜色",
+                        "default": "#38caa6"
+                      },
+                      "priority": {
+                        "type": "number",
+                        "title": "优先级",
+                        "default": 0
+                      },
+                      "colorEnd": {
+                        "type": "string",
+                        "title": "范围终点颜色",
+                        "default": "#ef705c",
+                        "pattern": "^#[a-fA-F0-9]{6}$"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "field",
+                      "value",
+                      "min",
+                      "max",
+                      "mode",
+                      "color",
+                      "priority"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "sections": {
+                  "type": "array",
+                  "title": "剖切体积引用",
+                  "default": [],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "entityId": {
+                        "type": "string",
+                        "default": "",
+                        "title": "剖切实体",
+                        "x-reference": "entity",
+                        "x-target-component": "studio.industrial.Section"
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                        "title": "此审阅启用",
+                        "default": true
+                      }
+                    },
+                    "required": [
+                      "entityId",
+                      "enabled"
+                    ]
+                  }
+                },
+                "measurements": {
+                  "type": "array",
+                  "title": "测量",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "测量名称",
+                        "default": "测量"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "title": "测量类型",
+                        "default": "distance",
+                        "enum": [
+                          "distance",
+                          "angle",
+                          "path",
+                          "bounds"
+                        ]
+                      },
+                      "entityId": {
+                        "type": "string",
+                        "title": "对象",
+                        "default": "",
+                        "x-reference": "entity"
+                      },
+                      "points": {
+                        "type": "array",
+                        "title": "测量点",
+                        "items": {
+                          "type": "array",
+                          "title": "",
+                          "items": {
+                            "type": "number",
+                            "title": "",
+                            "default": 0
+                          },
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "x-editor": "vector"
+                        },
+                        "default": []
+                      },
+                      "sourceRevision": {
+                        "type": "string",
+                        "title": "来源修订",
+                        "default": ""
+                      },
+                      "unit": {
+                        "type": "string",
+                        "title": "单位",
+                        "default": "mm",
+                        "enum": [
+                          "mm",
+                          "cm",
+                          "m"
+                        ]
+                      },
+                      "tolerance": {
+                        "type": "number",
+                        "title": "容差",
+                        "default": 1,
+                        "minimum": 0
+                      },
+                      "anchorRefs": {
+                        "type": "array",
+                        "title": "测量来源锚点",
+                        "default": [],
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "entityId": {
+                              "type": "string",
+                              "default": "",
+                              "x-reference": "entity"
+                            },
+                            "position": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "default": [
+                                0,
+                                0,
+                                0
+                              ],
+                              "minItems": 3,
+                              "maxItems": 3
+                            },
+                            "sourceRevision": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "sourceElementId": {
+                              "type": "string",
+                              "default": ""
+                            }
+                          },
+                          "required": [
+                            "entityId",
+                            "position",
+                            "sourceRevision",
+                            "sourceElementId"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "entityId",
+                      "points",
+                      "sourceRevision",
+                      "unit",
+                      "tolerance",
+                      "anchorRefs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "views": {
+                  "type": "array",
+                  "title": "保存视图",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "视图名称",
+                        "default": "保存视图"
+                      },
+                      "camera": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "position": {
+                            "type": "array",
+                            "title": "相机位置",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              1000,
+                              3000
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "target": {
+                            "type": "array",
+                            "title": "目标",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "fov": {
+                            "type": "number",
+                            "title": "FOV",
+                            "default": 60,
+                            "minimum": 10,
+                            "maximum": 150
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "target",
+                          "fov"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "filters": {
+                        "type": "array",
+                        "title": "",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "field": {
+                              "type": "string",
+                              "title": "字段",
+                              "default": ""
+                            },
+                            "operator": {
+                              "type": "string",
+                              "title": "条件",
+                              "default": "eq",
+                              "enum": [
+                                "eq",
+                                "neq",
+                                "contains",
+                                "gt",
+                                "gte",
+                                "lt",
+                                "lte",
+                                "empty"
+                              ]
+                            },
+                            "value": {
+                              "type": "string",
+                              "title": "值",
+                              "default": ""
+                            },
+                            "join": {
+                              "type": "string",
+                              "title": "组合",
+                              "default": "and",
+                              "enum": [
+                                "and",
+                                "or"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "field",
+                            "operator",
+                            "value",
+                            "join"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "sections": {
+                        "type": "array",
+                        "title": "剖切快照",
+                        "default": [],
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "entityId": {
+                              "type": "string",
+                              "x-reference": "entity",
+                              "default": ""
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "plane",
+                                "box"
+                              ],
+                              "default": "plane"
+                            },
+                            "enabled": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "size": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "minimum": 0.000001
+                              },
+                              "default": [
+                                2000,
+                                2000,
+                                2000
+                              ],
+                              "minItems": 3,
+                              "maxItems": 3,
+                              "x-editor": "vector"
+                            },
+                            "flipped": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "matrix": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 16,
+                              "maxItems": 16,
+                              "default": [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "entityId",
+                            "kind",
+                            "enabled",
+                            "matrix",
+                            "size",
+                            "flipped"
+                          ]
+                        }
+                      },
+                      "hiddenIds": {
+                        "type": "array",
+                        "title": "",
+                        "items": {
+                          "type": "string",
+                          "title": "",
+                          "default": "",
+                          "x-reference": "entity"
+                        },
+                        "default": []
+                      },
+                      "thumbnailAssetId": {
+                        "type": "string",
+                        "title": "缩略图",
+                        "default": "",
+                        "x-reference": "asset"
+                      },
+                      "colors": {
+                        "type": "array",
+                        "title": "颜色规则",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "field": {
+                              "type": "string",
+                              "title": "字段",
+                              "default": ""
+                            },
+                            "value": {
+                              "type": "string",
+                              "title": "类别值",
+                              "default": ""
+                            },
+                            "min": {
+                              "type": "number",
+                              "title": "下界",
+                              "default": 0
+                            },
+                            "max": {
+                              "type": "number",
+                              "title": "上界",
+                              "default": 0
+                            },
+                            "mode": {
+                              "type": "string",
+                              "title": "着色方式",
+                              "default": "category",
+                              "enum": [
+                                "category",
+                                "range",
+                                "missing"
+                              ]
+                            },
+                            "color": {
+                              "type": "string",
+                              "title": "颜色",
+                              "default": "#38caa6"
+                            },
+                            "priority": {
+                              "type": "number",
+                              "title": "优先级",
+                              "default": 0
+                            },
+                            "colorEnd": {
+                              "type": "string",
+                              "title": "范围终点颜色",
+                              "default": "#ef705c",
+                              "pattern": "^#[a-fA-F0-9]{6}$"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "field",
+                            "value",
+                            "min",
+                            "max",
+                            "mode",
+                            "color",
+                            "priority"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "camera",
+                      "filters",
+                      "sections",
+                      "hiddenIds",
+                      "thumbnailAssetId",
+                      "colors"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                }
+              },
+              "required": [
+                "semanticAssetId",
+                "classes",
+                "filters",
+                "colors",
+                "sections",
+                "measurements",
+                "views"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "工业审阅Review"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.industrial.Section"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "title": "类型",
+                  "enum": [
+                    "plane",
+                    "box"
+                  ],
+                  "default": "plane"
+                },
+                "active": {
+                  "type": "boolean",
+                  "title": "启用剖切",
+                  "default": true
+                },
+                "size": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0.000001
+                  },
+                  "default": [
+                    2000,
+                    2000,
+                    2000
+                  ],
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "x-editor": "vector",
+                  "title": "盒尺寸（毫米）"
+                },
+                "flipped": {
+                  "type": "boolean",
+                  "title": "翻转平面",
+                  "default": false
+                }
+              },
+              "required": [
+                "kind",
+                "active",
+                "size",
+                "flipped"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "剖切体积"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
               "const": "studio.piping.Line"
             },
             "enabled": {
@@ -2110,6 +3724,716 @@
           "additionalProperties": false,
           "properties": {
             "type": {
+              "const": "studio.storyboard.Sequence"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "title": "演示名称",
+                  "default": "演示"
+                },
+                "duration": {
+                  "type": "number",
+                  "title": "时长（秒）",
+                  "default": 30,
+                  "minimum": 0.001
+                },
+                "fps": {
+                  "type": "string",
+                  "title": "帧网格",
+                  "default": "30",
+                  "enum": [
+                    "24",
+                    "30",
+                    "60"
+                  ]
+                },
+                "loop": {
+                  "type": "boolean",
+                  "title": "循环",
+                  "default": false
+                },
+                "tracks": {
+                  "type": "array",
+                  "title": "轨道",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "轨道名称",
+                        "default": "轨道"
+                      },
+                      "channel": {
+                        "type": "string",
+                        "title": "通道",
+                        "default": "transform",
+                        "enum": [
+                          "transform",
+                          "opacity",
+                          "visibility",
+                          "camera",
+                          "annotation",
+                          "assembly",
+                          "content",
+                          "audio",
+                          "caption"
+                        ]
+                      },
+                      "targetId": {
+                        "type": "string",
+                        "title": "目标实体",
+                        "default": "",
+                        "x-reference": "entity",
+                        "x-reference-when": {
+                          "field": "channel",
+                          "values": [
+                            "transform",
+                            "opacity",
+                            "visibility",
+                            "annotation",
+                            "assembly",
+                            "audio"
+                          ]
+                        }
+                      },
+                      "contentId": {
+                        "type": "string",
+                        "title": "内容",
+                        "default": "",
+                        "x-reference": "content"
+                      },
+                      "muted": {
+                        "type": "boolean",
+                        "title": "静音",
+                        "default": false
+                      },
+                      "locked": {
+                        "type": "boolean",
+                        "title": "锁定",
+                        "default": false
+                      },
+                      "priority": {
+                        "type": "number",
+                        "title": "合成优先级",
+                        "default": 0
+                      },
+                      "clips": {
+                        "type": "array",
+                        "title": "片段",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "片段名称",
+                              "default": "片段"
+                            },
+                            "start": {
+                              "type": "number",
+                              "title": "开始",
+                              "default": 0,
+                              "minimum": 0
+                            },
+                            "duration": {
+                              "type": "number",
+                              "title": "时长",
+                              "default": 2,
+                              "minimum": 0.001
+                            },
+                            "easing": {
+                              "type": "string",
+                              "title": "缓动",
+                              "default": "smooth",
+                              "enum": [
+                                "linear",
+                                "smooth",
+                                "easeIn",
+                                "easeOut"
+                              ]
+                            },
+                            "fromTransform": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "parent",
+                                  "x-coordinate-target": "targetId"
+                                },
+                                "rotation": {
+                                  "type": "array",
+                                  "title": "",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "minItems": 4,
+                                  "maxItems": 4
+                                },
+                                "scale": {
+                                  "type": "array",
+                                  "title": "缩放",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    1,
+                                    1,
+                                    1
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "rotation",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "toTransform": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "parent",
+                                  "x-coordinate-target": "targetId"
+                                },
+                                "rotation": {
+                                  "type": "array",
+                                  "title": "",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "minItems": 4,
+                                  "maxItems": 4
+                                },
+                                "scale": {
+                                  "type": "array",
+                                  "title": "缩放",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    1,
+                                    1,
+                                    1
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "rotation",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "path": {
+                              "type": "array",
+                              "title": "路径控制点",
+                              "items": {
+                                "type": "array",
+                                "title": "",
+                                "items": {
+                                  "type": "number",
+                                  "title": "",
+                                  "default": 0
+                                },
+                                "default": [
+                                  0,
+                                  0,
+                                  0
+                                ],
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "x-editor": "vector",
+                                "x-coordinate": "parent",
+                                "x-coordinate-target": "targetId"
+                              },
+                              "default": []
+                            },
+                            "fromCamera": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "相机位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    1000,
+                                    3000
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "world"
+                                },
+                                "target": {
+                                  "type": "array",
+                                  "title": "目标",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "world"
+                                },
+                                "fov": {
+                                  "type": "number",
+                                  "title": "FOV",
+                                  "default": 60,
+                                  "minimum": 10,
+                                  "maximum": 150
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "target",
+                                "fov"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "toCamera": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "相机位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    1000,
+                                    3000
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "world"
+                                },
+                                "target": {
+                                  "type": "array",
+                                  "title": "目标",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "world"
+                                },
+                                "fov": {
+                                  "type": "number",
+                                  "title": "FOV",
+                                  "default": 60,
+                                  "minimum": 10,
+                                  "maximum": 150
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "target",
+                                "fov"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "fromValue": {
+                              "type": "number",
+                              "title": "初值",
+                              "default": 0
+                            },
+                            "toValue": {
+                              "type": "number",
+                              "title": "终值",
+                              "default": 1
+                            },
+                            "text": {
+                              "type": "string",
+                              "title": "字幕",
+                              "default": ""
+                            },
+                            "groupId": {
+                              "type": "string",
+                              "title": "片段组",
+                              "default": ""
+                            },
+                            "curveStart": {
+                              "type": "number",
+                              "title": "求值窗口开始",
+                              "default": 0,
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "curveEnd": {
+                              "type": "number",
+                              "title": "求值窗口结束",
+                              "default": 1,
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "start",
+                            "duration",
+                            "easing",
+                            "fromTransform",
+                            "toTransform",
+                            "path",
+                            "fromCamera",
+                            "toCamera",
+                            "fromValue",
+                            "toValue",
+                            "text",
+                            "groupId",
+                            "curveStart",
+                            "curveEnd"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "channel",
+                      "targetId",
+                      "contentId",
+                      "muted",
+                      "locked",
+                      "priority",
+                      "clips"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": [],
+                  "x-unique-by": "id"
+                },
+                "snapshots": {
+                  "type": "array",
+                  "title": "镜头快照",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "镜头名称",
+                        "default": "快照"
+                      },
+                      "pose": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "position": {
+                            "type": "array",
+                            "title": "相机位置",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              1000,
+                              3000
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector",
+                            "x-coordinate": "world"
+                          },
+                          "target": {
+                            "type": "array",
+                            "title": "目标",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector",
+                            "x-coordinate": "world"
+                          },
+                          "fov": {
+                            "type": "number",
+                            "title": "FOV",
+                            "default": 60,
+                            "minimum": 10,
+                            "maximum": 150
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "target",
+                          "fov"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "thumbnailAssetId": {
+                        "type": "string",
+                        "title": "缩略图",
+                        "default": "",
+                        "x-reference": "asset"
+                      },
+                      "bound": {
+                        "type": "boolean",
+                        "title": "绑定时间",
+                        "default": false
+                      },
+                      "time": {
+                        "type": "number",
+                        "title": "绑定时间",
+                        "default": 0,
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "pose",
+                      "thumbnailAssetId",
+                      "bound",
+                      "time"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "markers": {
+                  "type": "array",
+                  "title": "章节",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "章节名称",
+                        "default": "章节"
+                      },
+                      "time": {
+                        "type": "number",
+                        "title": "时间",
+                        "default": 0,
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "time"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                }
+              },
+              "required": [
+                "name",
+                "duration",
+                "fps",
+                "loop",
+                "tracks",
+                "snapshots",
+                "markers"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "故事板Sequence"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.virtualTour.Panorama"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "title": "全景媒体",
+                  "default": "",
+                  "x-reference": "asset"
+                },
+                "video": {
+                  "type": "boolean",
+                  "title": "全景视频",
+                  "default": false
+                },
+                "heading": {
+                  "type": "number",
+                  "title": "初始朝向",
+                  "default": 0
+                },
+                "pitch": {
+                  "type": "number",
+                  "title": "初始俯仰",
+                  "default": 0
+                },
+                "fov": {
+                  "type": "number",
+                  "title": "FOV",
+                  "default": 60,
+                  "minimum": 10,
+                  "maximum": 150
+                }
+              },
+              "required": [
+                "assetId",
+                "video",
+                "heading",
+                "pitch",
+                "fov"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "云展漫游Panorama"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9_-]*(\\.[A-Za-z][A-Za-z0-9_-]*){2,}$",
               "not": {
@@ -2134,10 +4458,15 @@
                   "studio.assembly.Part",
                   "studio.assembly.Root",
                   "studio.assembly.Group",
+                  "studio.configurator.Catalog",
+                  "studio.industrial.Review",
+                  "studio.industrial.Section",
                   "studio.piping.Line",
                   "studio.piping.Segment",
                   "studio.piping.System",
-                  "studio.sample.Pulse"
+                  "studio.sample.Pulse",
+                  "studio.storyboard.Sequence",
+                  "studio.virtualTour.Panorama"
                 ]
               }
             },
@@ -3713,6 +6042,294 @@
               "pattern": "^[a-zA-Z0-9_-]{1,100}$"
             },
             "type": {
+              "const": "studio.configurator.Select"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "groupId": {
+                  "type": "string",
+                  "title": "属性组",
+                  "default": ""
+                },
+                "optionId": {
+                  "type": "string",
+                  "title": "选项",
+                  "default": ""
+                }
+              },
+              "required": [
+                "groupId",
+                "optionId"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "产品配置Select",
+          "x-target": "entity",
+          "x-components": [
+            "studio.configurator.Catalog"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.configurator.Reset"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "产品配置Reset",
+          "x-target": "entity",
+          "x-components": [
+            "studio.configurator.Catalog"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.configurator.SetNumber"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "groupId": {
+                  "type": "string",
+                  "title": "数值属性组",
+                  "default": ""
+                },
+                "value": {
+                  "type": "number",
+                  "title": "数值",
+                  "default": 0
+                }
+              },
+              "required": [
+                "groupId",
+                "value"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "设置产品数值",
+          "x-target": "entity",
+          "x-components": [
+            "studio.configurator.Catalog"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.industrial.Apply"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "工业审阅Apply",
+          "x-target": "entity",
+          "x-components": [
+            "studio.industrial.Review"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.industrial.RestoreView"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "viewId": {
+                  "type": "string",
+                  "title": "保存视图",
+                  "default": ""
+                }
+              },
+              "required": [
+                "viewId"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "工业审阅RestoreView",
+          "x-target": "entity",
+          "x-components": [
+            "studio.industrial.Review"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.industrial.Reset"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "工业审阅Reset",
+          "x-target": "entity",
+          "x-components": [
+            "studio.industrial.Review"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
               "const": "studio.piping.Highlight"
             },
             "targetId": {
@@ -3930,6 +6547,246 @@
               "pattern": "^[a-zA-Z0-9_-]{1,100}$"
             },
             "type": {
+              "const": "studio.storyboard.Play"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "title": "起始秒",
+                  "default": 0,
+                  "minimum": 0
+                },
+                "speed": {
+                  "type": "number",
+                  "title": "速度",
+                  "default": 1
+                }
+              },
+              "required": [
+                "time",
+                "speed"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "故事板Play",
+          "x-target": "entity",
+          "x-components": [
+            "studio.storyboard.Sequence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.storyboard.Pause"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "故事板Pause",
+          "x-target": "entity",
+          "x-components": [
+            "studio.storyboard.Sequence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.storyboard.Seek"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "title": "绝对秒",
+                  "default": 0,
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "time"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "故事板Seek",
+          "x-target": "entity",
+          "x-components": [
+            "studio.storyboard.Sequence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.storyboard.Stop"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "故事板Stop",
+          "x-target": "entity",
+          "x-components": [
+            "studio.storyboard.Sequence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.virtualTour.Navigate"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": ""
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "nodeId": {
+                  "type": "string",
+                  "title": "目标节点",
+                  "default": ""
+                }
+              },
+              "required": [
+                "nodeId"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "云展漫游Navigate",
+          "x-target": "",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9_-]*(\\.[A-Za-z][A-Za-z0-9_-]*){2,}$",
               "not": {
@@ -3968,11 +6825,22 @@
                   "studio.assembly.HighlightPart",
                   "studio.assembly.IsolatePart",
                   "studio.assembly.FocusPart",
+                  "studio.configurator.Select",
+                  "studio.configurator.Reset",
+                  "studio.configurator.SetNumber",
+                  "studio.industrial.Apply",
+                  "studio.industrial.RestoreView",
+                  "studio.industrial.Reset",
                   "studio.piping.Highlight",
                   "studio.piping.Isolate",
                   "studio.piping.Restore",
                   "studio.piping.Focus",
-                  "studio.sample.SetPulse"
+                  "studio.sample.SetPulse",
+                  "studio.storyboard.Play",
+                  "studio.storyboard.Pause",
+                  "studio.storyboard.Seek",
+                  "studio.storyboard.Stop",
+                  "studio.virtualTour.Navigate"
                 ]
               }
             },
@@ -6113,7 +8981,11 @@
             "panoramaControls",
             "movement",
             "loading",
-            "entry"
+            "entry",
+            "configurator",
+            "industrial",
+            "storyboard",
+            "projectNavigation"
           ],
           "title": "",
           "default": "text"
@@ -6255,6 +9127,1713 @@
         "layouts",
         "nodes",
         "theme"
+      ]
+    },
+    "prefabOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "localId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "value": {},
+        "remove": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "localId",
+        "componentType",
+        "path",
+        "value",
+        "remove"
+      ]
+    },
+    "prefabInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "prefabId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "rootLocalId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transform": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "position": {
+              "type": "array",
+              "title": "位置",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "default": [
+                0,
+                0,
+                0
+              ],
+              "x-editor": "vector"
+            },
+            "rotation": {
+              "type": "array",
+              "title": "四元数",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 4,
+              "maxItems": 4,
+              "default": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "x-editor": "quaternion"
+            },
+            "scale": {
+              "type": "array",
+              "title": "缩放",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "default": [
+                1,
+                1,
+                1
+              ],
+              "x-editor": "vector"
+            }
+          },
+          "required": [
+            "position",
+            "rotation",
+            "scale"
+          ]
+        },
+        "source": {
+          "$ref": "#"
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/prefabOverride"
+          }
+        },
+        "additions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "实体 ID",
+                "default": ""
+              },
+              "name": {
+                "type": "string",
+                "title": "名称",
+                "default": "节点"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "visible": {
+                "type": "boolean",
+                "title": "可见",
+                "default": true
+              },
+              "locked": {
+                "type": "boolean",
+                "title": "锁定",
+                "default": false
+              },
+              "transform": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "position": {
+                    "type": "array",
+                    "title": "位置",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "default": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "x-editor": "vector"
+                  },
+                  "rotation": {
+                    "type": "array",
+                    "title": "四元数",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "default": [
+                      0,
+                      0,
+                      0,
+                      1
+                    ],
+                    "x-editor": "quaternion"
+                  },
+                  "scale": {
+                    "type": "array",
+                    "title": "缩放",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "default": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "x-editor": "vector"
+                  }
+                },
+                "required": [
+                  "position",
+                  "rotation",
+                  "scale"
+                ]
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/component"
+                }
+              },
+              "legacyUuid": {
+                "type": "string",
+                "title": "源 UUID",
+                "default": ""
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "parentId",
+              "visible",
+              "locked",
+              "transform",
+              "components",
+              "legacyUuid"
+            ]
+          }
+        },
+        "tombstones": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "prefabId",
+        "revisionId",
+        "rootLocalId",
+        "name",
+        "parentId",
+        "transform",
+        "source",
+        "bindings",
+        "overrides",
+        "additions",
+        "tombstones"
+      ]
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "资源 ID",
+          "default": ""
+        },
+        "name": {
+          "type": "string",
+          "title": "资源名称",
+          "default": ""
+        },
+        "kind": {
+          "type": "string",
+          "title": "类型",
+          "default": "model",
+          "enum": [
+            "mesh",
+            "model",
+            "image",
+            "audio",
+            "texture",
+            "source",
+            "semantic"
+          ]
+        },
+        "entry": {
+          "type": "string",
+          "title": "入口文件",
+          "default": ""
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "preview": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string",
+              "title": "",
+              "default": ""
+            },
+            "width": {
+              "type": "number",
+              "title": "",
+              "default": 0,
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "height": {
+              "type": "number",
+              "title": "",
+              "default": 0,
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          },
+          "required": [
+            "file",
+            "width",
+            "height"
+          ]
+        },
+        "importTaskId": {
+          "type": "string",
+          "title": "",
+          "default": ""
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "entry",
+        "files",
+        "sha256"
+      ]
+    },
+    "libraryDocument": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "studio.configurator.Catalog"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "catalogId": {
+                  "type": "string",
+                  "title": "稳定 ID",
+                  "default": "",
+                  "x-editor": "uuid"
+                },
+                "revision": {
+                  "type": "string",
+                  "title": "目录版本",
+                  "default": "1"
+                },
+                "name": {
+                  "type": "string",
+                  "title": "产品名称",
+                  "default": "产品配置"
+                },
+                "market": {
+                  "type": "string",
+                  "title": "市场",
+                  "default": "CN"
+                },
+                "groups": {
+                  "type": "array",
+                  "title": "属性组",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "属性名称",
+                        "default": "外观"
+                      },
+                      "control": {
+                        "type": "string",
+                        "title": "控件",
+                        "default": "radio",
+                        "enum": [
+                          "radio",
+                          "swatch",
+                          "cards",
+                          "toggle",
+                          "multi",
+                          "number"
+                        ]
+                      },
+                      "min": {
+                        "type": "number",
+                        "title": "最少选项",
+                        "default": 1,
+                        "minimum": 0
+                      },
+                      "max": {
+                        "type": "number",
+                        "title": "最多选项",
+                        "default": 1,
+                        "minimum": 1
+                      },
+                      "defaultIds": {
+                        "type": "array",
+                        "title": "默认选项",
+                        "items": {
+                          "type": "string",
+                          "title": "",
+                          "default": ""
+                        },
+                        "default": []
+                      },
+                      "options": {
+                        "type": "array",
+                        "title": "选项",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "选项名称",
+                              "default": "选项"
+                            },
+                            "sku": {
+                              "type": "string",
+                              "title": "SKU",
+                              "default": ""
+                            },
+                            "color": {
+                              "type": "string",
+                              "title": "色卡",
+                              "default": "#55bda3"
+                            },
+                            "imageAssetId": {
+                              "type": "string",
+                              "title": "图片",
+                              "default": "",
+                              "x-reference": "asset"
+                            },
+                            "description": {
+                              "type": "string",
+                              "title": "说明",
+                              "default": ""
+                            },
+                            "bom": {
+                              "type": "array",
+                              "title": "BOM",
+                              "items": {
+                                "type": "object",
+                                "title": "",
+                                "properties": {
+                                  "partId": {
+                                    "type": "string",
+                                    "title": "零件号",
+                                    "default": ""
+                                  },
+                                  "quantity": {
+                                    "type": "number",
+                                    "title": "数量",
+                                    "default": 1,
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "partId",
+                                  "quantity"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "default": []
+                            },
+                            "visuals": {
+                              "type": "array",
+                              "title": "模型绑定",
+                              "items": {
+                                "type": "object",
+                                "title": "",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "title": "稳定 ID",
+                                    "default": "",
+                                    "x-editor": "uuid"
+                                  },
+                                  "targetId": {
+                                    "type": "string",
+                                    "title": "目标对象",
+                                    "default": "",
+                                    "x-reference": "entity",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "values": [
+                                        "visibility",
+                                        "color",
+                                        "opacity",
+                                        "transform",
+                                        "variant",
+                                        "swapPart"
+                                      ]
+                                    }
+                                  },
+                                  "operation": {
+                                    "type": "string",
+                                    "title": "操作",
+                                    "default": "visibility",
+                                    "enum": [
+                                      "visibility",
+                                      "color",
+                                      "opacity",
+                                      "transform",
+                                      "variant",
+                                      "swapPart",
+                                      "camera"
+                                    ]
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "title": "值",
+                                    "default": "true"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector",
+                                        "x-coordinate": "parent",
+                                        "x-coordinate-target": "targetId"
+                                      },
+                                      "rotation": {
+                                        "type": "array",
+                                        "title": "",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0,
+                                          1
+                                        ],
+                                        "minItems": 4,
+                                        "maxItems": 4
+                                      },
+                                      "scale": {
+                                        "type": "array",
+                                        "title": "缩放",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          1,
+                                          1,
+                                          1
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "rotation",
+                                      "scale"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "camera": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "相机位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          1000,
+                                          3000
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      },
+                                      "target": {
+                                        "type": "array",
+                                        "title": "目标",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      },
+                                      "fov": {
+                                        "type": "number",
+                                        "title": "FOV",
+                                        "default": 60,
+                                        "minimum": 10,
+                                        "maximum": 150
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "target",
+                                      "fov"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "assetId": {
+                                    "type": "string",
+                                    "title": "替换模型",
+                                    "default": "",
+                                    "x-reference": "asset",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "value": "swapPart"
+                                    },
+                                    "x-asset-kind": "model"
+                                  },
+                                  "variant": {
+                                    "type": "string",
+                                    "title": "glTF 材质变体",
+                                    "default": "",
+                                    "x-required-when": {
+                                      "field": "operation",
+                                      "value": "variant"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "targetId",
+                                  "operation",
+                                  "value",
+                                  "transform",
+                                  "camera",
+                                  "assetId",
+                                  "variant"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "default": []
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "sku",
+                            "color",
+                            "imageAssetId",
+                            "description",
+                            "bom",
+                            "visuals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "numericMinimum": {
+                        "type": "number",
+                        "title": "数值下限",
+                        "default": 0
+                      },
+                      "numericMaximum": {
+                        "type": "number",
+                        "title": "数值上限",
+                        "default": 1
+                      },
+                      "numericStep": {
+                        "type": "number",
+                        "title": "数值步长",
+                        "default": 0.01,
+                        "minimum": 0.000001
+                      },
+                      "numericDefault": {
+                        "type": "number",
+                        "title": "数值默认值",
+                        "default": 0
+                      },
+                      "visuals": {
+                        "type": "array",
+                        "title": "模型绑定",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "targetId": {
+                              "type": "string",
+                              "title": "目标对象",
+                              "default": "",
+                              "x-reference": "entity",
+                              "x-required-when": {
+                                "field": "operation",
+                                "values": [
+                                  "visibility",
+                                  "color",
+                                  "opacity",
+                                  "transform",
+                                  "variant",
+                                  "swapPart"
+                                ]
+                              }
+                            },
+                            "operation": {
+                              "type": "string",
+                              "title": "操作",
+                              "default": "visibility",
+                              "enum": [
+                                "visibility",
+                                "color",
+                                "opacity",
+                                "transform",
+                                "variant",
+                                "swapPart",
+                                "camera"
+                              ]
+                            },
+                            "value": {
+                              "type": "string",
+                              "title": "值",
+                              "default": "true"
+                            },
+                            "transform": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector",
+                                  "x-coordinate": "parent",
+                                  "x-coordinate-target": "targetId"
+                                },
+                                "rotation": {
+                                  "type": "array",
+                                  "title": "",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "minItems": 4,
+                                  "maxItems": 4
+                                },
+                                "scale": {
+                                  "type": "array",
+                                  "title": "缩放",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    1,
+                                    1,
+                                    1
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "rotation",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "camera": {
+                              "type": "object",
+                              "title": "",
+                              "properties": {
+                                "position": {
+                                  "type": "array",
+                                  "title": "相机位置",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    1000,
+                                    3000
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                },
+                                "target": {
+                                  "type": "array",
+                                  "title": "目标",
+                                  "items": {
+                                    "type": "number",
+                                    "title": "",
+                                    "default": 0
+                                  },
+                                  "default": [
+                                    0,
+                                    0,
+                                    0
+                                  ],
+                                  "minItems": 3,
+                                  "maxItems": 3,
+                                  "x-editor": "vector"
+                                },
+                                "fov": {
+                                  "type": "number",
+                                  "title": "FOV",
+                                  "default": 60,
+                                  "minimum": 10,
+                                  "maximum": 150
+                                }
+                              },
+                              "required": [
+                                "position",
+                                "target",
+                                "fov"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "assetId": {
+                              "type": "string",
+                              "title": "替换模型",
+                              "default": "",
+                              "x-reference": "asset",
+                              "x-required-when": {
+                                "field": "operation",
+                                "value": "swapPart"
+                              },
+                              "x-asset-kind": "model"
+                            },
+                            "variant": {
+                              "type": "string",
+                              "title": "glTF 材质变体",
+                              "default": "",
+                              "x-required-when": {
+                                "field": "operation",
+                                "value": "variant"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "targetId",
+                            "operation",
+                            "value",
+                            "transform",
+                            "camera",
+                            "assetId",
+                            "variant"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "control",
+                      "min",
+                      "max",
+                      "defaultIds",
+                      "options"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": [],
+                  "x-unique-by": "id"
+                },
+                "rules": {
+                  "type": "array",
+                  "title": "规则",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "type": {
+                        "type": "string",
+                        "title": "约束类型",
+                        "default": "require",
+                        "enum": [
+                          "require",
+                          "exclude",
+                          "implies",
+                          "default",
+                          "range",
+                          "count",
+                          "bundle"
+                        ]
+                      },
+                      "when": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "groupId": {
+                            "type": "string",
+                            "title": "属性组 ID",
+                            "default": ""
+                          },
+                          "optionId": {
+                            "type": "string",
+                            "title": "选项 ID",
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "groupId",
+                          "optionId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "then": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "groupId": {
+                            "type": "string",
+                            "title": "属性组 ID",
+                            "default": ""
+                          },
+                          "optionId": {
+                            "type": "string",
+                            "title": "选项 ID",
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "groupId",
+                          "optionId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minimum": {
+                        "type": "number",
+                        "title": "下限",
+                        "default": 0
+                      },
+                      "maximum": {
+                        "type": "number",
+                        "title": "上限",
+                        "default": 1
+                      },
+                      "priority": {
+                        "type": "number",
+                        "title": "优先级",
+                        "default": 0
+                      },
+                      "reason": {
+                        "type": "string",
+                        "title": "原因",
+                        "default": "此组合不兼容"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "when",
+                      "then",
+                      "minimum",
+                      "maximum",
+                      "priority",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "priceSource": {
+                  "type": "string",
+                  "title": "价格来源",
+                  "default": "inquiry"
+                },
+                "priceCurrency": {
+                  "type": "string",
+                  "title": "币种",
+                  "default": "CNY"
+                },
+                "libraryVersionId": {
+                  "type": "string",
+                  "title": "固定目录修订",
+                  "default": "",
+                  "x-optional": true
+                }
+              },
+              "required": [
+                "catalogId",
+                "revision",
+                "name",
+                "market",
+                "groups",
+                "rules",
+                "priceSource",
+                "priceCurrency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "additionalProperties": false,
+          "title": "产品配置Catalog"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "studio.prefab.Definition"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "rootLocalId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "document": {
+                  "$ref": "#"
+                },
+                "category": {
+                  "type": "string",
+                  "title": "分类",
+                  "default": "通用",
+                  "x-optional": true
+                },
+                "thumbnailAssetId": {
+                  "type": "string",
+                  "title": "缩略图",
+                  "default": "",
+                  "x-reference": "asset",
+                  "x-optional": true
+                }
+              },
+              "required": [
+                "rootLocalId",
+                "document"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "additionalProperties": false,
+          "title": "预制体源定义"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "studio.virtualTour.Project"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "entryNodeId": {
+                  "type": "string",
+                  "title": "入口节点",
+                  "default": ""
+                },
+                "nodes": {
+                  "type": "array",
+                  "title": "场景节点",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "场景名称",
+                        "default": "场景"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "title": "场景类型",
+                        "default": "scene3d",
+                        "enum": [
+                          "scene3d",
+                          "panorama",
+                          "pano-video"
+                        ]
+                      },
+                      "sceneId": {
+                        "type": "string",
+                        "title": "场景 ID",
+                        "default": ""
+                      },
+                      "sceneVersionId": {
+                        "type": "string",
+                        "title": "固定场景版本",
+                        "default": ""
+                      },
+                      "assetId": {
+                        "type": "string",
+                        "title": "全景媒体",
+                        "default": "",
+                        "x-reference": "asset"
+                      },
+                      "floorId": {
+                        "type": "string",
+                        "title": "楼层",
+                        "default": ""
+                      },
+                      "floorX": {
+                        "type": "number",
+                        "title": "地图 X",
+                        "default": 0.5
+                      },
+                      "floorY": {
+                        "type": "number",
+                        "title": "地图 Y",
+                        "default": 0.5
+                      },
+                      "heading": {
+                        "type": "number",
+                        "title": "初始朝向",
+                        "default": 0
+                      },
+                      "pitch": {
+                        "type": "number",
+                        "title": "初始俯仰",
+                        "default": 0,
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "fov": {
+                        "type": "number",
+                        "title": "FOV",
+                        "default": 60,
+                        "minimum": 10,
+                        "maximum": 150
+                      },
+                      "camera": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "position": {
+                            "type": "array",
+                            "title": "相机位置",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              1000,
+                              3000
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "target": {
+                            "type": "array",
+                            "title": "目标",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "fov": {
+                            "type": "number",
+                            "title": "FOV",
+                            "default": 60,
+                            "minimum": 10,
+                            "maximum": 150
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "target",
+                          "fov"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "hotspots": {
+                        "type": "array",
+                        "title": "热点",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "热点名称",
+                              "default": "导航点"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "title": "热点类型",
+                              "default": "point",
+                              "enum": [
+                                "point",
+                                "text",
+                                "image",
+                                "polygon",
+                                "video"
+                              ]
+                            },
+                            "yaw": {
+                              "type": "number",
+                              "title": "水平角",
+                              "default": 0
+                            },
+                            "pitch": {
+                              "type": "number",
+                              "title": "俯仰角",
+                              "default": 0,
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "points": {
+                              "type": "array",
+                              "title": "球面顶点",
+                              "items": {
+                                "type": "object",
+                                "title": "",
+                                "properties": {
+                                  "yaw": {
+                                    "type": "number",
+                                    "title": "水平角",
+                                    "default": 0
+                                  },
+                                  "pitch": {
+                                    "type": "number",
+                                    "title": "俯仰角",
+                                    "default": 0,
+                                    "minimum": -90,
+                                    "maximum": 90
+                                  }
+                                },
+                                "required": [
+                                  "yaw",
+                                  "pitch"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "default": []
+                            },
+                            "toNodeId": {
+                              "type": "string",
+                              "title": "目标节点",
+                              "default": ""
+                            },
+                            "contentId": {
+                              "type": "string",
+                              "title": "内容 ID",
+                              "default": ""
+                            },
+                            "assetId": {
+                              "type": "string",
+                              "title": "图像/视频",
+                              "default": "",
+                              "x-reference": "asset"
+                            },
+                            "text": {
+                              "type": "string",
+                              "title": "文字",
+                              "default": ""
+                            },
+                            "alt": {
+                              "type": "string",
+                              "title": "替代文本",
+                              "default": ""
+                            },
+                            "color": {
+                              "type": "string",
+                              "title": "颜色",
+                              "default": "#38caa6"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "kind",
+                            "yaw",
+                            "pitch",
+                            "points",
+                            "toNodeId",
+                            "contentId",
+                            "assetId",
+                            "text",
+                            "alt",
+                            "color"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "thumbnailAssetId": {
+                        "type": "string",
+                        "title": "缩略图",
+                        "default": "",
+                        "x-reference": "asset"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "sceneId",
+                      "sceneVersionId",
+                      "assetId",
+                      "floorId",
+                      "floorX",
+                      "floorY",
+                      "heading",
+                      "pitch",
+                      "fov",
+                      "camera",
+                      "hotspots",
+                      "thumbnailAssetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": [],
+                  "x-unique-by": "id"
+                },
+                "floors": {
+                  "type": "array",
+                  "title": "楼层",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "楼层名称",
+                        "default": "楼层"
+                      },
+                      "assetId": {
+                        "type": "string",
+                        "title": "平面图",
+                        "default": "",
+                        "x-reference": "asset"
+                      },
+                      "calibrated": {
+                        "type": "boolean",
+                        "title": "已标定",
+                        "default": false
+                      },
+                      "north": {
+                        "type": "number",
+                        "title": "北向（度）",
+                        "default": 0
+                      },
+                      "mmPerPixel": {
+                        "type": "number",
+                        "title": "毫米/像素",
+                        "default": 1,
+                        "minimum": 0.0001
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "assetId",
+                      "calibrated",
+                      "north",
+                      "mmPerPixel"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "links": {
+                  "type": "array",
+                  "title": "连接",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "fromNodeId": {
+                        "type": "string",
+                        "title": "来源节点",
+                        "default": ""
+                      },
+                      "toNodeId": {
+                        "type": "string",
+                        "title": "目标节点",
+                        "default": ""
+                      },
+                      "transition": {
+                        "type": "string",
+                        "title": "转场",
+                        "default": "fade",
+                        "enum": [
+                          "fade",
+                          "cut"
+                        ]
+                      },
+                      "reverseLinkId": {
+                        "type": "string",
+                        "title": "反向链接",
+                        "default": ""
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "fromNodeId",
+                      "toNodeId",
+                      "transition",
+                      "reverseLinkId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "routes": {
+                  "type": "array",
+                  "title": "自动导览",
+                  "items": {
+                    "type": "object",
+                    "title": "",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "稳定 ID",
+                        "default": "",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "路线名称",
+                        "default": "自动导览"
+                      },
+                      "loop": {
+                        "type": "boolean",
+                        "title": "循环",
+                        "default": false
+                      },
+                      "stops": {
+                        "type": "array",
+                        "title": "站点",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "nodeId": {
+                              "type": "string",
+                              "title": "节点",
+                              "default": ""
+                            },
+                            "hold": {
+                              "type": "number",
+                              "title": "停留秒数",
+                              "default": 5,
+                              "minimum": 0.1
+                            },
+                            "heading": {
+                              "type": "number",
+                              "title": "目标朝向",
+                              "default": 0
+                            },
+                            "pitch": {
+                              "type": "number",
+                              "title": "目标俯仰",
+                              "default": 0
+                            },
+                            "actions": {
+                              "type": "array",
+                              "title": "到站动作",
+                              "items": {
+                                "$ref": "#/$defs/action"
+                              },
+                              "default": [],
+                              "x-editor": "actions"
+                            },
+                            "audioAssetId": {
+                              "type": "string",
+                              "title": "路线语音",
+                              "default": "",
+                              "x-reference": "asset"
+                            },
+                            "waitForMedia": {
+                              "type": "boolean",
+                              "title": "等待媒体结束",
+                              "default": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nodeId",
+                            "hold",
+                            "heading",
+                            "pitch",
+                            "actions",
+                            "audioAssetId",
+                            "waitForMedia"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "loop",
+                      "stops"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "skinLayoutId": {
+                  "type": "string",
+                  "title": "界面布局",
+                  "default": "hud-default"
+                },
+                "assets": {
+                  "type": "array",
+                  "title": "项目媒体",
+                  "items": {
+                    "$ref": "#/$defs/asset"
+                  },
+                  "default": []
+                },
+                "name": {
+                  "type": "string",
+                  "title": "工程名称",
+                  "default": "新项目",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "skinSceneId": {
+                  "type": "string",
+                  "title": "皮肤及热点内容来源场景",
+                  "default": ""
+                },
+                "skinSceneVersionId": {
+                  "type": "string",
+                  "title": "固定皮肤场景版本",
+                  "default": ""
+                }
+              },
+              "required": [
+                "entryNodeId",
+                "nodes",
+                "floors",
+                "links",
+                "routes",
+                "skinLayoutId",
+                "assets",
+                "name",
+                "skinSceneId",
+                "skinSceneVersionId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "additionalProperties": false,
+          "title": "云展漫游Project"
+        }
       ]
     }
   },

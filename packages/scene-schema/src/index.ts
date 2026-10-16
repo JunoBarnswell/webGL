@@ -1,3 +1,6 @@
+import { extensionValidators } from "../../extensions/validators";
+import { compilePrefabs } from "./prefab";
+export * from "./prefab";
 import { fieldActive } from "./field-rules";
 export { fieldActive, editField } from "./field-rules";
 import { validateSemanticComponents } from "./semantic-validation";
@@ -47,6 +50,15 @@ export const componentDefinitions: ComponentDefinition[] =
         FieldSchema
       >,
     }));
+export const documentDefinitions: ComponentDefinition[] =
+  schema.$defs.libraryDocument.oneOf.map((item) => ({
+    type: item.properties.type.const,
+    title: item.title,
+    fields: item.properties.data.properties as unknown as Record<
+      string,
+      FieldSchema
+    >,
+  }));
 export const actionDefinitions: ActionDefinition[] = schema.$defs.action.oneOf
   .filter((item) => "const" in item.properties.type)
   .map((item) => ({
@@ -235,8 +247,15 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     return (validateShape.errors ?? [])
       .slice(0, 20)
       .map((error) => `${error.instancePath || "/"} ${error.message}`);
-  const document = value as unknown as SceneDocument;
+  let document: SceneDocument;
+  try {
+    document = compilePrefabs(value as unknown as SceneDocument);
+  } catch (error) {
+    return [String(error)];
+  }
   const errors: string[] = forPublish ? extensionErrors(document) : [];
+  for (const validate of extensionValidators)
+    errors.push(...validate(document, forPublish));
   for (const entity of document.entities)
     for (const component of entity.components) {
       const requirement = requiredExtension(component.type);

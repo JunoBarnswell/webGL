@@ -34,6 +34,17 @@ export function SceneTree() {
     () => new Map(document?.entities.map((e) => [e.id, e]) ?? []),
     [document?.entities],
   );
+  const prefabOwners = useMemo(
+    () =>
+      new Map(
+        (document?.prefabs ?? []).flatMap((instance) =>
+          Object.entries(instance.bindings.entity).map(
+            ([local, id]) => [id, { instance, local }] as const,
+          ),
+        ),
+      ),
+    [document?.prefabs],
+  );
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, Entity[]>();
     for (const entity of document?.entities ?? []) {
@@ -154,7 +165,29 @@ export function SceneTree() {
             ) : (
               <Layers />
             )}
-            <span>{title(entity)}</span>
+            <span>
+              {title(entity)}
+              {prefabOwners.has(entity.id) && (
+                <small
+                  className="prefab-badge"
+                  title={
+                    "Instance of " +
+                    prefabOwners.get(entity.id)!.instance.prefabId +
+                    "@" +
+                    prefabOwners.get(entity.id)!.instance.revisionId
+                  }
+                >
+                  ◇
+                  {prefabOwners
+                    .get(entity.id)!
+                    .instance.overrides.some(
+                      (o) => o.localId === prefabOwners.get(entity.id)!.local,
+                    )
+                    ? "•"
+                    : ""}
+                </small>
+              )}
+            </span>
             <small className="tree-type">
               {content
                 ? "作品"
