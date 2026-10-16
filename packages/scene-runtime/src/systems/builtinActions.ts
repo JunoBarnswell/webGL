@@ -207,8 +207,10 @@ export function builtinActions(
     CloseContent: async (_action, _signal) => {
       runtime.state.patch({ contentId: "" });
       runtime.navigation.enabled = true;
-      if (runtime.contentPausedTour && runtime.tour.state.status === "paused")
+      if (runtime.contentPausedTour && runtime.tour.state.status === "paused") {
+        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
         runtime.tour.resume();
+      }
       runtime.contentPausedTour = false;
       return;
     },
@@ -222,6 +224,7 @@ export function builtinActions(
         const scope = runtime.actionScope("tour", signal, () =>
           runtime.tour.stop(),
         );
+        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
         runtime.tour.start(tour);
         if (action.wait) await runtime.waitTour(tour.id, scope.signal);
         return;
@@ -237,6 +240,7 @@ export function builtinActions(
         const scope = runtime.actionScope("tour", signal, () =>
           runtime.tour.stop(),
         );
+        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
         runtime.tour.start(tour);
         if (action.wait) await runtime.waitTour(tour.id, scope.signal);
         return;
@@ -251,7 +255,10 @@ export function builtinActions(
     ResumeCruise: async (action, _signal) => {
       if (runtime.tour.id !== action.targetId)
         throw new Error("该巡航未在播放");
-      runtime.tour.resume();
+      {
+        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
+        runtime.tour.resume();
+      }
       return;
     },
     StopCruise: async (action, _signal) => {

@@ -1,16 +1,18 @@
+import {
+  workspaceCatalog,
+  WorkspaceSidebar,
+  WorkspaceDesigner,
+} from "./workspaces/WorkspaceHost";
 import { DockResize } from "./shell/DockResize";
 import { ContextMenu } from "./shell/ContextMenu";
 import { usePreferences } from "./shell/preferences";
 import { execute, shortcuts } from "./shell/commands";
 import { CommandPanel } from "./shell/CommandPanel";
 import { useEffect, useRef, useState } from "react";
-import { ContentPanel } from "./panels/ContentPanel";
-import { TourPanel } from "./panels/TourPanel";
 import { InterfaceCanvas } from "./panels/InterfaceCanvas";
 import { clearAssetCache } from "@studio/scene-runtime";
 import { runAssetTask } from "@studio/asset-pipeline";
 import { localDraft, resolveLocalDraft } from "./state/journal";
-import type { Workspace } from "./state/studio";
 import {
   Box,
   CloudUpload,
@@ -27,7 +29,6 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { assertDocument, migrateDocument } from "@studio/scene-schema";
-import { SceneTree } from "./panels/SceneTree";
 import { Inspector } from "./panels/Inspector";
 import { Viewport } from "./panels/Viewport";
 import { Resources } from "./panels/Resources";
@@ -48,13 +49,6 @@ import {
   type CloudDraft,
 } from "./state/api";
 
-const tasks: [Workspace, string, string][] = [
-  ["scene", "场景搭建", "搭建空间与外观"],
-  ["content", "热点内容", "作品与介绍"],
-  ["tour", "导览巡航", "记录镜头与路线"],
-  ["interaction", "事件交互", "当…如果…就…"],
-  ["interface", "界面设计", "设计 Player 界面"],
-];
 export default function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(token())),
     [dialog, setDialog] = useState<"projects" | "versions" | null>(null),
@@ -62,12 +56,20 @@ export default function App() {
   const file = useRef<HTMLInputElement>(null);
   const document = useStudio((s) => s.document),
     session = useStudio((s) => s.session),
+    historyTarget = useStudio((s) => s.historyTarget),
+    editingLibrary = useStudio((s) => s.editingLibrary),
     mode = useStudio((s) => s.mode),
     saveState = useStudio((s) => s.saveState),
     message = useStudio((s) => s.message),
     busy = useStudio((s) => s.busy),
     issues = useStudio((s) => s.issues),
     revision = useStudio((s) => s.revision);
+  const [, refreshHistory] = useState(0);
+  const activeHistory = historyTarget ?? session;
+  useEffect(
+    () => activeHistory?.subscribe(() => refreshHistory((value) => value + 1)),
+    [activeHistory],
+  );
   const workspace = useStudio((s) => s.workspace),
     assetsOpen = useStudio((s) => s.assetsOpen),
     inspectorOpen = useStudio((s) => s.inspectorOpen);
@@ -92,15 +94,29 @@ export default function App() {
         const state = useStudio.getState();
         if (!state.session) {
           const last = localStorage.getItem("studio-last-scene");
-          const project =
-            state.projects.find((p) => p.sceneId === last) ?? state.projects[0];
-          if (project)
-            await state.open(
-              await request<CloudDraft>(
-                "/scenes/" + project.sceneId + "/draft",
-              ),
-            );
-          else setDialog("projects");
+          let reopened = false;
+          if (last) {
+            try {
+              await state.open(
+                await request<CloudDraft>("/scenes/" + last + "/draft"),
+              );
+              reopened = true;
+            } catch (error) {
+              if (!(error instanceof ApiError) || error.status !== 404)
+                throw error;
+              localStorage.removeItem("studio-last-scene");
+            }
+          }
+          if (!reopened) {
+            const project = state.projects[0];
+            if (project)
+              await state.open(
+                await request<CloudDraft>(
+                  "/scenes/" + project.sceneId + "/draft",
+                ),
+              );
+            else setDialog("projects");
+          }
         }
       } catch (error) {
         if (error instanceof ApiError && error.status === 401)
@@ -298,6 +314,21 @@ export default function App() {
         <button aria-label="专注模式" onClick={() => execute("view.focus")}>
           ⛶
         </button>
+        <label className="workspace-switcher">
+          工作空间{" "}
+          <select
+            aria-label="工作空间"
+            value={workspace}
+            disabled={mode === "play"}
+            onChange={(event) => execute("workspace." + event.target.value)}
+          >
+            {workspaceCatalog.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.icon} {w.title}
+              </option>
+            ))}
+          </select>
+        </label>
         <select
           aria-label="工作台布局"
           value={preferences.layout}
@@ -321,7 +352,7 @@ export default function App() {
             className="icon-button"
             aria-label="撤销"
             title="撤销 Ctrl+Z"
-            disabled={!session?.canUndo || mode === "play"}
+            disabled={!activeHistory?.canUndo || mode === "play"}
             onClick={() => execute("document.undo")}
           >
             <Undo2 />
@@ -330,7 +361,7 @@ export default function App() {
             className="icon-button"
             aria-label="重做"
             title="重做 Ctrl+Shift+Z"
-            disabled={!session?.canRedo || mode === "play"}
+            disabled={!activeHistory?.canRedo || mode === "play"}
             onClick={() => execute("document.redo")}
           >
             <Redo2 />
@@ -363,7 +394,12 @@ export default function App() {
         </button>
         <button
           className="primary publish-button"
-          disabled={!document || Boolean(busy) || mode === "play"}
+          disabled={
+            !document ||
+            Boolean(busy) ||
+            mode === "play" ||
+            Boolean(editingLibrary)
+          }
           onClick={() =>
             void useStudio.getState().run("发布场景", async () => {
               await useStudio.getState().save();
@@ -435,29 +471,6 @@ export default function App() {
         className="task-navigation"
         aria-label="创作任务"
       >
-        {tasks.map(([id, title, description]) => (
-          <button
-            key={id}
-            aria-label={title}
-            title={title + " · " + description}
-            disabled={mode === "play"}
-            className={workspace === id ? "active" : ""}
-            onClick={() => execute("workspace." + id)}
-          >
-            <span aria-hidden="true">
-              {
-                {
-                  scene: "◈",
-                  content: "◉",
-                  tour: "⌁",
-                  interaction: "⚡",
-                  interface: "▦",
-                }[id]
-              }
-            </span>
-            <small>{title}</small>
-          </button>
-        ))}
         <div className="header-spacer" />
         <button
           className={leftOpen ? "active" : ""}
@@ -499,15 +512,7 @@ export default function App() {
         {workspace !== "interface" && leftOpen && mode === "edit" && (
           <aside className="task-sidebar">
             <DockResize side="left" />
-            {workspace === "scene" ? (
-              <SceneTree />
-            ) : workspace === "content" ? (
-              <ContentPanel />
-            ) : workspace === "tour" ? (
-              <TourPanel />
-            ) : (
-              <Interactions />
-            )}
+            <WorkspaceSidebar />
           </aside>
         )}
         <div className="creation-main">
@@ -522,6 +527,7 @@ export default function App() {
             <Viewport />
           </div>
           {workspace === "interface" && mode === "edit" && <InterfaceCanvas />}
+          {mode === "edit" && <WorkspaceDesigner />}
           {assetsOpen && mode === "edit" && (
             <div className="resource-drawer">
               <Resources />

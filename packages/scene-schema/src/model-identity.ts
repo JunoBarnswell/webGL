@@ -39,3 +39,56 @@ export function modelIdentities(
   for (const root of roots) visit(root, "", false, roots);
   return result;
 }
+
+export interface SourceIdentityReport {
+  matched: { previous: string; incoming: string }[];
+  added: string[];
+  unmatched: string[];
+  ambiguous: string[];
+}
+/** Shared by model revisions and derived-asset admission. Render node indices are never identities. */
+export function reconcileSourceIdentities(
+  previous: readonly string[],
+  incoming: readonly string[],
+  explicit: Readonly<Record<string, string>> = {},
+): SourceIdentityReport {
+  const count = (keys: readonly string[]) => {
+    const result = new Map<string, number>();
+    for (const key of keys) result.set(key, (result.get(key) ?? 0) + 1);
+    return result;
+  };
+  const old = count(previous),
+    next = count(incoming),
+    used = new Set<string>();
+  const report: SourceIdentityReport = {
+    matched: [],
+    added: [],
+    unmatched: [],
+    ambiguous: [],
+  };
+  for (const key of previous) {
+    const target = explicit[key] ?? key;
+    if (
+      (old.get(key) ?? 0) > 1 ||
+      (next.get(target) ?? 0) > 1 ||
+      used.has(target)
+    )
+      report.ambiguous.push(key);
+    else if (
+      !target ||
+      (target.startsWith("unresolved:") && !explicit[key]) ||
+      !next.has(target)
+    )
+      report.unmatched.push(key);
+    else {
+      report.matched.push({ previous: key, incoming: target });
+      used.add(target);
+    }
+  }
+  report.added = incoming.filter((key) => !used.has(key));
+  return report;
+}
+export function assertIdentityPreserved(report: SourceIdentityReport): void {
+  if (report.unmatched.length || report.ambiguous.length)
+    throw Error("来源身份门禁失败：" + JSON.stringify(report));
+}

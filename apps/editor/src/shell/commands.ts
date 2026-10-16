@@ -1,4 +1,7 @@
-import { extensionTools } from "../../../../packages/extensions/editor";
+import {
+  extensionPanels,
+  extensionTools,
+} from "../../../../packages/extensions/editor";
 import {
   CommandRegistry,
   ShortcutManager,
@@ -125,7 +128,12 @@ for (const [index, workspace, title] of [
   viewport("workspace." + workspace, title, [String(index)], () => {
     useStudio
       .getState()
-      .set({ workspace, placingHotspot: false, pickEntity: null });
+      .set({
+        workspace,
+        domainTool: "",
+        placingHotspot: false,
+        pickEntity: null,
+      });
     usePreferences.getState().patch({ leftOpen: true });
   });
 commands.register({
@@ -139,15 +147,30 @@ commands.register({
   commitText: true,
   preventNativeWhenBlocked: true,
   enabled: () => Boolean(useStudio.getState().document),
-  execute: () => useStudio.getState().save(),
+  execute: async () => {
+    const state = useStudio.getState();
+    await state.save();
+    if (state.activeDocumentSave) await state.activeDocumentSave();
+  },
 });
 for (const [id, title, keys, run] of [
-  ["undo", "撤销", ["Mod+Z"], () => useStudio.getState().session?.undo()],
+  [
+    "undo",
+    "撤销",
+    ["Mod+Z"],
+    () =>
+      (
+        useStudio.getState().historyTarget ?? useStudio.getState().session
+      )?.undo(),
+  ],
   [
     "redo",
     "重做",
     ["Mod+Y", "Mod+Shift+Z"],
-    () => useStudio.getState().session?.redo(),
+    () =>
+      (
+        useStudio.getState().historyTarget ?? useStudio.getState().session
+      )?.redo(),
   ],
   [
     "duplicate",
@@ -179,8 +202,10 @@ for (const [id, title, keys, run] of [
     enabled: (context) => {
       if (!edit(context)) return false;
       const state = useStudio.getState();
-      if (id === "undo") return Boolean(state.session?.canUndo);
-      if (id === "redo") return Boolean(state.session?.canRedo);
+      if (id === "undo")
+        return Boolean((state.historyTarget ?? state.session)?.canUndo);
+      if (id === "redo")
+        return Boolean((state.historyTarget ?? state.session)?.canRedo);
       return (
         context.selectedIds.length > 0 &&
         context.selectedIds.every((selectedId) =>
@@ -252,6 +277,10 @@ commands.register({
       void document.exitPointerLock();
       return;
     }
+    if (state.domainTool) {
+      state.set({ domainTool: "" });
+      return;
+    }
     if (state.view?.cancelInteraction()) return;
     if (state.runtime?.cancelInteraction()) return;
     if (state.cancelTool?.()) return;
@@ -320,3 +349,25 @@ viewport(
       .patch({ statistics: !usePreferences.getState().statistics }),
   () => true,
 );
+
+for (const panel of extensionPanels)
+  if (panel.workspace)
+    commands.register({
+      id: "workspace." + panel.workspace.id,
+      title: panel.workspace.title,
+      category: "工作空间",
+      scope: "global",
+      shortcuts: [],
+      enabled: edit,
+      execute: () => {
+        useStudio
+          .getState()
+          .set({
+            workspace: panel.workspace!.id,
+            domainTool: "",
+            placingHotspot: false,
+            pickEntity: null,
+          });
+        usePreferences.getState().patch({ leftOpen: true });
+      },
+    });

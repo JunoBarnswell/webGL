@@ -1,3 +1,4 @@
+import { editablePoint } from "../shell/DocumentPoint";
 import { current as draftValue } from "immer";
 import * as THREE from "three";
 import {
@@ -14,6 +15,11 @@ import {
   type JsonValue,
   type FieldSchema,
 } from "@studio/scene-schema";
+import {
+  prefabForEntity,
+  revertPrefabOverride,
+} from "../../../../packages/editor-core/src/prefab";
+import { prefabOverrideKey } from "../../../../packages/scene-schema/src/prefab";
 import { reparentEntity } from "@studio/editor-core";
 import { useStudio } from "../state/studio";
 import { Field, Fields, TextField } from "../components/Fields";
@@ -32,6 +38,14 @@ export function Inspector() {
     transforms = useStudio((s) => s.transforms);
   const entity = document?.entities.find((e) => e.id === selected[0]);
   const command = useStudio.getState().command;
+  const instance = entity && prefabForEntity(document!, entity.id),
+    localId =
+      instance &&
+      Object.keys(instance.bindings.entity).find(
+        (id) => instance.bindings.entity[id] === entity?.id,
+      );
+  const overrides =
+    instance?.overrides.filter((o) => o.localId === localId) ?? [];
   if (!document) return <div className="empty-state">打开工程后开始编辑</div>;
   const mutate = (label: string, fn: (current: Entity) => void) =>
     command({
@@ -98,6 +112,34 @@ export function Inspector() {
           <p>已选择 {selected.length} 个节点，视口变换同时应用</p>
         )}
       </div>
+      {instance && (
+        <details className="prefab-override-inspector" open>
+          <summary>◇ 模板实例 · {overrides.length} 个字段覆盖</summary>
+          <small>LocalId {localId}</small>
+          {overrides.map((o) => (
+            <div key={prefabOverrideKey(o)}>
+              <span>
+                ● {o.componentType} {o.path.join(".")}
+              </span>
+              <button
+                disabled={mode === "play"}
+                onClick={() =>
+                  command(
+                    revertPrefabOverride(instance.id, [prefabOverrideKey(o)]),
+                  )
+                }
+              >
+                恢复此字段
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => useStudio.getState().set({ workspace: "prefab" })}
+          >
+            打开实例与源模板 Diff
+          </button>
+        </details>
+      )}
       <fieldset disabled={mode === "play" || Boolean(entity?.locked)}>
         {!entity ? (
           <>
@@ -293,35 +335,24 @@ export function Inspector() {
                     value={component.data}
                     path={component.type}
                     onSpatialEdit={(path, _value, space, targetField) =>
-                      useStudio
-                        .getState()
-                        .set({
-                          editingPoint: {
-                            path: [
-                              "entities",
-                              { id: entity.id },
-                              "components",
-                              { type: component.type },
-                              "data",
-                              ...path,
-                            ],
-                            label: definition.title + " · 路径点",
-                            ...(space === "world"
-                              ? {}
-                              : {
-                                  basis: {
-                                    entityId: String(
-                                      targetField
-                                        ? component.data[targetField] ||
-                                            entity.id
-                                        : entity.id,
-                                    ),
-                                    space,
-                                  },
-                                }),
-                          },
-                          tool: "translate",
-                        })
+                      useStudio.getState().set({
+                        editingPoint: editablePoint(
+                          document,
+                          [
+                            "entities",
+                            { id: entity.id },
+                            "components",
+                            { type: component.type },
+                            "data",
+                            ...path,
+                          ],
+                          definition.title + " · 路径点",
+                          space,
+                          entity.id,
+                          targetField,
+                        ),
+                        tool: "translate",
+                      })
                     }
                     onChange={(key, value) =>
                       mutate("修改" + definition.title, (current) => {

@@ -33,3 +33,5 @@ import { AnnotationPanel } from "./panel";
 export const panels = [
   { id: "annotation", title: "标注批量编辑与修复", Component: AnnotationPanel },
 ];
+
+export const commands = [];

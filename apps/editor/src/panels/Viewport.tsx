@@ -1,4 +1,5 @@
 import { pointWorld, pointValue, pointFrame } from "../shell/DocumentPoint";
+import { instantiatePrefab } from "@studio/editor-core";
 import { writeDocumentValue } from "@studio/editor-core";
 import { surfaceAnchor } from "../../../../packages/extensions/annotation/anchors";
 import { usePreferences } from "../shell/preferences";
@@ -60,6 +61,24 @@ function readTransform(runtime: SceneRuntime, id: string): Transform {
 }
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null);
+  const prefabGhost = useRef<{
+    helper: THREE.Box3Helper;
+    engine: ShowroomEngine;
+    position: THREE.Vector3;
+  } | null>(null);
+  const clearPrefabGhost = () => {
+    const ghost = prefabGhost.current;
+    if (!ghost) return;
+    ghost.helper.removeFromParent();
+    ghost.engine.resourceRegistry.release(ghost.helper.geometry);
+    for (const material of Array.isArray(ghost.helper.material)
+      ? ghost.helper.material
+      : [ghost.helper.material])
+      ghost.engine.resourceRegistry.release(material);
+    prefabGhost.current = null;
+  };
+  useEffect(() => () => clearPrefabGhost(), []);
+
   const controls = useRef<{
     orbit: OrbitControls;
     gizmo: TransformControls;
@@ -118,6 +137,8 @@ export function Viewport() {
           "/files/" +
           path.split("/").map(encodeURIComponent).join("/"),
         headers: authHeaders,
+        recordsUrl: (id, parameters) =>
+          "/api/semantics/" + id + "?" + parameters,
       },
       {
         onSelect: (id) => {
@@ -140,7 +161,9 @@ export function Viewport() {
           }),
         isToolActive: () =>
           Boolean(
-            useStudio.getState().placingAnnotation ||
+            useStudio.getState().domainTool ||
+              useStudio.getState().draggingPrefab ||
+              useStudio.getState().placingAnnotation ||
               useStudio.getState().placingHotspot,
           ),
         onIssue: (id, error) =>
@@ -680,9 +703,91 @@ export function Viewport() {
         systems: Object.fromEntries(runtimeReference?.systemMetrics ?? []),
       })}
       data-load-phase={runtimeState.load.phase}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => {
+        event.preventDefault();
+        const state = useStudio.getState(),
+          current = controls.current;
+        if (!state.draggingPrefab || !current || state.mode !== "edit") return;
+        const rect = current.engine.renderer.domElement.getBoundingClientRect(),
+          x = ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          y = (-(event.clientY - rect.top) / rect.height) * 2 + 1;
+        const hit = current.runtime.pickIntersection(x, y),
+          point = hit?.point.clone() ?? new THREE.Vector3(),
+          ray = new THREE.Raycaster();
+        ray.setFromCamera(new THREE.Vector2(x, y), current.engine.camera);
+        if (
+          !hit &&
+          !ray.ray.intersectPlane(
+            new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+            point,
+          )
+        )
+          return;
+        if (state.snap) {
+          point.x = Math.round(point.x / 100) * 100;
+          point.y = Math.round(point.y / 100) * 100;
+          point.z = Math.round(point.z / 100) * 100;
+        }
+        if (!prefabGhost.current) {
+          const helper = new THREE.Box3Helper(
+            new THREE.Box3(
+              new THREE.Vector3(-500, 0, -500),
+              new THREE.Vector3(500, 1000, 500),
+            ),
+            0x5de6bd,
+          );
+          helper.userData.editorHelper = true;
+          helper.renderOrder = 100;
+          current.engine.resourceRegistry.retain(helper.geometry);
+          for (const material of Array.isArray(helper.material)
+            ? helper.material
+            : [helper.material])
+            current.engine.resourceRegistry.retain(material);
+          current.engine.scene.add(helper);
+          prefabGhost.current = {
+            helper,
+            engine: current.engine,
+            position: point.clone(),
+          };
+        }
+        prefabGhost.current.position.copy(point);
+        prefabGhost.current.helper.box.min.set(-500, 0, -500).add(point);
+        prefabGhost.current.helper.box.max.set(500, 1000, 500).add(point);
+        current.engine.requestRender();
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          clearPrefabGhost();
+      }}
       onDrop={(event) => {
         event.preventDefault();
+        const prefabData = event.dataTransfer.getData(
+          "application/x-studio-prefab",
+        );
+        if (prefabData) {
+          try {
+            const revision =
+                useStudio.getState().draggingPrefab ?? JSON.parse(prefabData),
+              position = prefabGhost.current?.position.toArray() ?? [0, 0, 0],
+              result = instantiatePrefab(
+                revision,
+                position as [number, number, number],
+              );
+            if (useStudio.getState().command(result.command))
+              useStudio
+                .getState()
+                .select([
+                  result.instance.bindings.entity[result.instance.rootLocalId],
+                ]);
+          } catch (error) {
+            useStudio.getState().set({ message: String(error) });
+          } finally {
+            clearPrefabGhost();
+            useStudio.getState().set({ draggingPrefab: null });
+          }
+          return;
+        }
+        clearPrefabGhost();
         const materialId = event.dataTransfer.getData("studio/material");
         if (materialId) {
           const current = controls.current;
@@ -903,7 +1008,10 @@ export function Viewport() {
         />
       )}
       {mode === "play" && runtimeReference && document && (
-        <PlayerUI runtime={runtimeReference} document={document} />
+        <PlayerUI
+          runtime={runtimeReference}
+          document={runtimeReference.document ?? document}
+        />
       )}
       {mode === "play" && (
         <div className="preview-session-bar">

@@ -55,7 +55,14 @@ export interface AssetPreview {
 export interface SceneAsset {
   id: string;
   name: string;
-  kind: "mesh" | "model" | "image" | "audio" | "texture";
+  kind:
+    | "mesh"
+    | "model"
+    | "image"
+    | "audio"
+    | "texture"
+    | "source"
+    | "semantic";
   entry: string;
   files: string[];
   sha256: string;
@@ -207,6 +214,10 @@ export interface Behavior {
   actions: BehaviorAction[];
 }
 export type UiKind =
+  | "configurator"
+  | "storyboard"
+  | "industrial"
+  | "projectNavigation"
   | "text"
   | "image"
   | "icon"
@@ -308,6 +319,7 @@ export interface UiDocument {
   };
 }
 export interface SceneDocument {
+  prefabs?: import("./prefab").PrefabInstance[];
   documentVersion: 2;
   requiredExtensions: { id: string; version: string }[];
   sceneId: string;
@@ -365,7 +377,7 @@ export interface FieldSchema {
   "x-source-element-id"?: boolean;
   "x-publish-enum"?: string[];
   "x-sum"?: number;
-  "x-coordinate"?: "world" | "local" | "parent-offset";
+  "x-coordinate"?: "world" | "local" | "parent-offset" | "parent";
   "x-coordinate-target"?: string;
   "x-unique-by"?: string;
   "x-target-components"?: string[];
@@ -386,7 +398,7 @@ export interface FieldSchema {
   "x-unique"?: boolean;
   "x-less-than"?: string;
   "x-required-publish"?: boolean;
-  "x-required-when"?: { field: string; value: string };
+  "x-required-when"?: { field: string; value?: string; values?: string[] };
 }
 export interface ComponentDefinition {
   anchor?: boolean;

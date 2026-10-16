@@ -53,8 +53,10 @@ public sealed class ObjectStore : IDisposable
     { using var response = await client.GetObjectAsync(bucket, key, ct); await response.ResponseStream.CopyToAsync(output, ct); }
     public async Task Confirm(AssetResponse asset, CancellationToken ct)
     {
-        foreach (var file in asset.Files) await client.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = "assets/" + asset.Id + "/" + file }, ct);
+        try { foreach (var file in asset.Files) await client.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = "assets/" + asset.Id + "/" + file }, ct); }
+        catch(AmazonS3Exception error) when(error.StatusCode==System.Net.HttpStatusCode.NotFound) { throw new ApiException(422,"资源对象缺失："+asset.Id); }
     }
+    public AssetResponse VerifyMetadata(JsonElement source) { var asset=Get(DocumentContract.Text(source,"id")); if(asset.Sha256!=DocumentContract.Text(source,"sha256")||asset.Kind!=DocumentContract.Text(source,"kind")||asset.Entry!=DocumentContract.Text(source,"entry")||!asset.Files.Order(StringComparer.Ordinal).SequenceEqual(source.GetProperty("files").EnumerateArray().Select(f=>f.GetString()!).Order(StringComparer.Ordinal)))throw new ApiException(422,"资源元数据不一致："+asset.Id);return asset; }
     public static AssetResponse ToAsset(AssetRow row) => new(row.Id, row.Name, row.Kind, row.Entry, JsonSerializer.Deserialize(row.FilesJson, ApiJson.Default.StringArray)!, row.Sha256, row.PreviewJson == null ? null : JsonSerializer.Deserialize(row.PreviewJson, ApiJson.Default.AssetPreview), row.ImportTaskId);
     public AssetResponse Get(string id)
     {
@@ -66,7 +68,7 @@ public sealed class ObjectStore : IDisposable
     public async Task<AssetResponse> Upload(Stream input, string name, string kind, string entry, CancellationToken ct, string? importTaskId = null)
     {
         if (importTaskId != null && !System.Text.RegularExpressions.Regex.IsMatch(importTaskId,"^[a-zA-Z0-9_-]{1,100}$")) throw new ApiException(400,"导入任务 ID 无效");
-        if (name.Length is < 1 or > 255 || !new[] { "mesh", "model", "image", "audio", "texture" }.Contains(kind) || !ValidPath(entry)) throw new ApiException(400, "资源名称、类型或入口无效");
+        if (name.Length is < 1 or > 255 || !new[] { "mesh", "model", "image", "audio", "texture", "source", "semantic" }.Contains(kind) || !ValidPath(entry)) throw new ApiException(400, "资源名称、类型或入口无效");
         if(importTaskId!=null){using var jobDb=database.Open();jobDb.Ado.ExecuteCommand("INSERT IGNORE INTO ImportJobs(Id) VALUES(@task)",P("task",importTaskId));if(jobDb.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM ImportJobs WHERE Id=@task AND Cancelled=1",P("task",importTaskId))[0].Value>0)throw new ApiException(409,"导入任务已取消");}
         var stage = Path.Combine(Path.GetTempPath(), "studio-upload-" + Id()); Directory.CreateDirectory(stage);
         try {

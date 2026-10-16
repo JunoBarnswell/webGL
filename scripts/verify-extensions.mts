@@ -177,6 +177,7 @@ objects.get(part.id)!.position.set(3, 5, 7);
 const index = new EntityIndex();
 index.reset(assemblyDoc);
 const runtime = {
+  generation: 1,
   spatial: { invalidate: () => {} },
   actionScopes: new Map(),
   mode: "play",
@@ -184,22 +185,17 @@ const runtime = {
   index,
   getObject: (id: string) => objects.get(id),
   sourceUnits: () => 1,
-  visual: {
-    reset: () => {},
-    setVisibility: (id: string, visible: boolean) => {
-      const object = objects.get(id);
-      if (object) object.visible = visible;
-    },
-  },
   state: { patch: () => {} },
   getSnapshot: () => ({ extensions: {} }),
   engine: {
+    renderer: { localClippingEnabled: false },
     scene: new THREE.Scene(),
     resourceRegistry: { retain: () => {}, release: () => {} },
     requestRender: () => {},
     onUpdate: () => () => {},
   },
 } as unknown as SceneRuntime;
+Object.assign(runtime, { visual: new VisualStateSystem(runtime) });
 runtime.actionScope = SceneRuntime.prototype.actionScope.bind(runtime);
 const assembly = new AssemblySystem(runtime);
 assembly.attach(assemblyDoc);
@@ -586,8 +582,10 @@ const visualMesh = new THREE.Mesh(
 const originalMaterial = visualMesh.material;
 const retained = new Set();
 const visualRuntime = {
+  generation: 1,
   getObject: () => visualMesh,
   engine: {
+    renderer: { localClippingEnabled: false },
     requestRender: () => {},
     resourceRegistry: {
       retain: (r: unknown) => retained.add(r),
@@ -603,7 +601,9 @@ for (let i = 0; i < 20; i++) {
   assert.equal(visualMesh.material, originalMaterial);
 }
 visual.isolate("test", [], ["mesh"]);
-visual.setVisibility("mesh", false);
+visual.rebase(() => {
+  visualMesh.visible = false;
+});
 visual.reset();
 assert.equal(visualMesh.visible, false);
 assert.equal(retained.size, 0);

@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import {
+  visualPriorities,
+  type VisualOverride,
+} from "../../scene-runtime/src/systems/VisualStateSystem";
+import {
   getComponent,
   type SceneDocument,
   type ChangeSet,
@@ -144,23 +148,43 @@ export class AssemblySystem implements RuntimeSystem {
   seek(id: string, progress: number): void {
     const sequence = this.sequence(id);
     sequence.progress = THREE.MathUtils.clamp(progress, 0, 1);
-    for (const [partId, part] of sequence.parts) {
+    const overrides = this.evaluate(id, sequence.progress);
+    this.runtime.visual.setScope(
+      "assembly-pose:" + id,
+      overrides,
+      visualPriorities.assembly,
+    );
+    this.publish(id);
+  }
+  evaluate(id: string, progress: number): VisualOverride[] {
+    const overrides: VisualOverride[] = [];
+    for (const [partId, part] of this.sequence(id).parts) {
       const object = this.runtime.getObject(partId);
       if (!object) continue;
       const pose = evaluatePose(
         part.base,
         part.stages,
-        sequence.progress,
+        THREE.MathUtils.clamp(progress, 0, 1),
         part.units,
       );
-      object.position.copy(pose.position);
-      object.quaternion.copy(pose.rotation);
-      object.scale.copy(pose.scale);
-      this.runtime.visual.setVisibility(partId, pose.visible);
+      overrides.push({
+        targetId: partId,
+        channel: "transform",
+        composition: "replace",
+        value: {
+          position: pose.position.toArray(),
+          rotation: pose.rotation.toArray() as [number, number, number, number],
+          scale: pose.scale.toArray(),
+        },
+      });
+      overrides.push({
+        targetId: partId,
+        channel: "visibility",
+        composition: "and",
+        value: pose.visible,
+      });
     }
-    this.runtime.spatial.invalidate();
-    this.runtime.engine.requestRender();
-    this.publish(id);
+    return overrides;
   }
   private publish(id: string, force = false): void {
     const s = this.sequence(id),
@@ -353,7 +377,9 @@ export class AssemblySystem implements RuntimeSystem {
     for (const [id, s] of this.sequences) {
       s.playing = false;
       s.complete?.();
-      this.seek(id, 0);
+      s.progress = 0;
+      this.runtime.visual.reset("assembly-pose:" + id);
+      this.publish(id, true);
     }
     for (const id of this.sequences.keys())
       this.runtime.visual.reset("assembly:" + id);

@@ -24,7 +24,7 @@ export interface StudioCommand {
   allowDuringNavigation?: boolean;
   commitText?: boolean;
   preventNativeWhenBlocked?: boolean;
-  scope: "global" | "editor" | "viewport" | "preview";
+  scope: "global" | "editor" | "viewport" | "preview" | "timeline";
   enabled?: (ctx: CommandContext) => boolean;
   execute: (ctx: CommandContext) => void | Promise<void>;
 }
@@ -156,6 +156,8 @@ export class ShortcutManager {
           }
           return;
         }
+        if (command.scope === "timeline" && context.surface !== "timeline")
+          continue;
         if (command.scope === "viewport" && context.surface !== "viewport")
           continue;
         if (command.scope === "preview" && context.editingAllowed) continue;
@@ -164,7 +166,8 @@ export class ShortcutManager {
           !event.metaKey &&
           !event.altKey &&
           key !== "Escape" &&
-          (!this.characterKeys() || context.surface !== "viewport")
+          (!this.characterKeys() ||
+            !["viewport", "timeline"].includes(context.surface))
         )
           continue;
         event.preventDefault();

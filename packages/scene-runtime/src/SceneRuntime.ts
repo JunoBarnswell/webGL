@@ -1,8 +1,10 @@
+import { CameraOwnership } from "./CameraOwnership";
 import { VisualStateSystem } from "./systems/VisualStateSystem";
 import * as THREE from "three";
 import { ShowroomEngine } from "@o2vr/engine";
 import {
   assertDocument,
+  compilePrefabs,
   actionDefinitions,
   createAction,
   getComponent,
@@ -84,6 +86,8 @@ const number = (value: JsonValue | undefined): number => Number(value ?? 0);
 
 export class SceneRuntime {
   readonly index = new EntityIndex();
+  readonly capabilities = new Map<string, unknown>();
+  readonly cameraOwnership = new CameraOwnership();
   readonly spatial: SpatialSystem;
   readonly visual: VisualStateSystem;
   readonly graph: SceneGraphSystem;
@@ -174,6 +178,8 @@ export class SceneRuntime {
       (id) => this.resolveViewpoint(id),
       (pose) => this.applyCameraPose(pose),
       (tour) => {
+        if (tour.status !== "playing")
+          this.cameraOwnership.releaseOwner("tour");
         const previous = this.state.getSnapshot().tour;
         const now = performance.now();
         if (
@@ -194,6 +200,7 @@ export class SceneRuntime {
       },
     );
     this.navigation.onInterrupt = () => {
+      this.cameraOwnership.reset();
       this.tour.pause();
       this.cancelFlight();
     };
@@ -366,6 +373,7 @@ export class SceneRuntime {
     options: LoadOptions = {},
   ): Promise<void> {
     assertDocument(document);
+    document = compilePrefabs(document);
     this.unloadScene();
     const generation = this.generation,
       controller = new AbortController();
@@ -408,6 +416,7 @@ export class SceneRuntime {
       document,
       this.source,
       this.engine.resourceRegistry,
+      this.engine.renderer,
     );
     this.engine.frameScheduler.stop();
     try {
@@ -789,6 +798,7 @@ export class SceneRuntime {
     this.playAbort = new AbortController();
     this.rules.reset();
     this.navigation.pause();
+    this.cameraOwnership.reset();
     this.tour.stop();
     this.cancelFlight();
     this.mode = mode;
@@ -1023,6 +1033,7 @@ export class SceneRuntime {
     });
   }
   cancelFlight(): void {
+    this.cameraOwnership.releaseOwner("flight");
     if (this.flight) {
       const flight = this.flight;
       this.flight = null;
@@ -1062,6 +1073,9 @@ export class SceneRuntime {
   ): Promise<void> {
     this.tour.pause();
     this.cancelFlight();
+    const lease = this.cameraOwnership.acquire("flight", () =>
+      this.cancelFlight(),
+    );
     const camera = this.engine.camera.clone();
     camera.position.fromArray(pose.position);
     camera.lookAt(new THREE.Vector3().fromArray(pose.target));
@@ -1082,7 +1096,10 @@ export class SceneRuntime {
           arrived?.();
         },
         reject,
-        cleanup: () => signal.removeEventListener("abort", cancel),
+        cleanup: () => {
+          this.cameraOwnership.release(lease);
+          signal.removeEventListener("abort", cancel);
+        },
       };
       this.engine.requestRender();
     });
@@ -1146,40 +1163,23 @@ export class SceneRuntime {
   }
   applyDisplay(): void {
     if (!this.document) return;
-    for (const entity of this.document.entities) {
-      const component = getComponent(entity, "DisplayLayer");
-      const instance = this.objects.get(entity.id);
-      if (!component || !instance) continue;
-      const xray =
-        this.displayMode === "xray" && component.data.layer === "shell";
-      const target = getComponent(entity, "ModelNode")
-        ? instance.root
-        : instance.visual;
-      target.traverse((node) => {
-        if (!(node instanceof THREE.Mesh)) return;
-        for (const material of Array.isArray(node.material)
-          ? node.material
-          : [node.material]) {
-          if (!material.userData.baseDisplay)
-            material.userData.baseDisplay = {
-              opacity: material.opacity,
-              transparent: material.transparent,
-              depthWrite: material.depthWrite,
-            };
-          const base = material.userData.baseDisplay as {
-            opacity: number;
-            transparent: boolean;
-            depthWrite: boolean;
-          };
-          material.opacity = xray
-            ? number(component.data.xrayOpacity)
-            : base.opacity;
-          material.transparent = xray || base.transparent;
-          material.depthWrite = xray ? false : base.depthWrite;
-          material.needsUpdate = true;
-        }
-      });
-    }
+    this.visual.setScope(
+      "display:xray",
+      this.document.entities.flatMap((entity) => {
+        const component = getComponent(entity, "DisplayLayer");
+        return this.displayMode === "xray" && component?.data.layer === "shell"
+          ? [
+              {
+                targetId: entity.id,
+                channel: "opacity" as const,
+                composition: "replace" as const,
+                value: Number(component.data.xrayOpacity),
+              },
+            ]
+          : [];
+      }),
+      30,
+    );
   }
   update(dt: number): boolean {
     let active = false;
@@ -1197,7 +1197,7 @@ export class SceneRuntime {
     }
     if (active) this.spatial.invalidate();
     if (this.mode !== "play" || !this.document) return active;
-    if (this.flight) {
+    if (this.flight && this.cameraOwnership.owner === "flight") {
       const flight = this.flight;
       flight.time = Math.min(flight.duration, flight.time + dt);
       const t = flight.time / flight.duration;
@@ -1220,9 +1220,15 @@ export class SceneRuntime {
         flight.resolve();
       }
       active = true;
-    } else if (this.tour.state.status === "playing")
+    } else if (
+      this.tour.state.status === "playing" &&
+      this.cameraOwnership.owner === "tour"
+    )
       active = this.tour.update(dt);
-    else if (!this.state.getSnapshot().contentId)
+    else if (
+      !this.state.getSnapshot().contentId &&
+      this.cameraOwnership.owner === "navigation"
+    )
       active = this.navigation.update(dt);
     for (const id of new Set(
       ["Model", "Avatar", "Trigger", "Audio"].flatMap((type) =>
@@ -1492,6 +1498,7 @@ export class SceneRuntime {
     this.playAbort.abort();
     this.rules.reset();
     this.navigation.pause();
+    this.cameraOwnership.reset();
     this.tour.stop();
     this.cancelFlight();
     for (const instance of this.objects.values()) {
@@ -1513,6 +1520,15 @@ export class SceneRuntime {
   }
   dispose(): void {
     this.disposed = true;
+    for (const capability of this.capabilities.values())
+      if (
+        capability &&
+        typeof capability === "object" &&
+        "dispose" in capability &&
+        typeof capability.dispose === "function"
+      )
+        capability.dispose();
+    this.capabilities.clear();
     this.unloadScene();
     this.state.dispose();
     this.input.abort();

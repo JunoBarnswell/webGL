@@ -25,7 +25,10 @@ export function semanticFields(
     if (
       publish &&
       (spec["x-required-publish"] ||
-        (when && value[when.field] === when.value)) &&
+        (when &&
+          (when.values ?? [when.value]).some(
+            (expected) => value[when.field] === expected,
+          ))) &&
       (data === undefined || data === null || data === "")
     )
       errors.push(where + " 尚未配置");

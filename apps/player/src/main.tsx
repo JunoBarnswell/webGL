@@ -1,3 +1,8 @@
+import {
+  ProjectNavigation,
+  publishedSceneLoader,
+} from "../../../packages/extensions/virtual-tour/navigation";
+import type { ProjectManifest } from "../../../packages/extensions/virtual-tour/core";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ShowroomEngine } from "@o2vr/engine";
@@ -16,10 +21,59 @@ function Player() {
     [error, setError] = useState("");
   useEffect(() => {
     const abort = new AbortController();
-    let engine: ShowroomEngine | undefined, instance: SceneRuntime | undefined;
+    let engine: ShowroomEngine | undefined,
+      instance: SceneRuntime | undefined,
+      navigation: ProjectNavigation | undefined;
     void (async () => {
       const scene = new URLSearchParams(location.search).get("scene");
-      if (!scene) throw new Error("缺少场景地址");
+      const project = new URLSearchParams(location.search).get("project");
+      if (project) {
+        const response = await fetch(
+          "/api/player/projects/" + encodeURIComponent(project) + "/manifest",
+          { signal: abort.signal },
+        );
+        if (!response.ok) throw Error("项目无法读取 HTTP " + response.status);
+        const projectManifest = (await response.json()) as ProjectManifest;
+        if (abort.signal.aborted) return;
+        engine = new ShowroomEngine({ container: host.current! });
+        instance = new SceneRuntime(engine, {
+          url: (id, path) =>
+            "/api/player/projects/" +
+            project +
+            "/versions/" +
+            projectManifest.versionId +
+            "/assets/" +
+            id +
+            "/files/" +
+            path.split("/").map(encodeURIComponent).join("/"),
+          recordsUrl: (id, parameters) =>
+            "/api/player/projects/" +
+            project +
+            "/versions/" +
+            projectManifest.versionId +
+            "/semantics/" +
+            id +
+            "?" +
+            parameters,
+        });
+        const current = instance;
+        navigation = new ProjectNavigation(
+          current,
+          projectManifest,
+          (node, signal) => publishedSceneLoader(projectManifest, node, signal),
+        );
+        setRuntime(current);
+        await navigation.navigate(projectManifest.document.entryNodeId);
+        setManifest({
+          versionId: projectManifest.versionId,
+          publishedAt: projectManifest.publishedAt,
+          document: current.document!,
+          runtimeBuild: projectManifest.runtimeBuild,
+          extensionCatalogHash: projectManifest.extensionCatalogHash ?? "",
+        });
+        return;
+      }
+      if (!scene) throw new Error("缺少场景或项目地址");
       const response = await fetch(
         "/api/player/" + encodeURIComponent(scene) + "/manifest",
         { signal: abort.signal },
@@ -37,6 +91,15 @@ function Player() {
       if (abort.signal.aborted) return;
       engine = new ShowroomEngine({ container: host.current! });
       instance = new SceneRuntime(engine, {
+        recordsUrl: (id, parameters) =>
+          "/api/player/" +
+          scene +
+          "/versions/" +
+          manifest.versionId +
+          "/semantics/" +
+          id +
+          "?" +
+          parameters,
         url: (id, path) =>
           "/api/player/" +
           scene +
@@ -55,6 +118,7 @@ function Player() {
     });
     return () => {
       abort.abort();
+      navigation?.dispose();
       instance?.dispose();
       engine?.dispose();
     };
@@ -63,7 +127,10 @@ function Player() {
     <main className="standalone-player">
       <div ref={host} className="player-viewport" />
       {runtime && manifest && (
-        <PlayerUI runtime={runtime} document={manifest.document} />
+        <PlayerUI
+          runtime={runtime}
+          document={runtime.document ?? manifest.document}
+        />
       )}
       <div className="player-system-status" role={error ? "alert" : "status"}>
         {error || (!manifest ? "正在连接展厅…" : "")}

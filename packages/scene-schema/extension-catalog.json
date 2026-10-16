@@ -1,6 +1,6 @@
 {
-  "runtimeBuild": "2.0.0",
-  "hash": "e97c74bf1ef31dd04f81007a98d39dff90aab643217c8ae668d0b2d52b200765",
+  "runtimeBuild": "2.2.0",
+  "hash": "aec336d22d228af7d36bd949b10e3cc0ae3787ad55db567391fa0879446026c4",
   "manifests": [
     {
       "id": "studio.annotation",
@@ -17,6 +17,56 @@
       "permissions": []
     },
     {
+      "id": "studio.configurator",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "configurator"
+        ],
+        "documentKinds": [
+          "studio.configurator.Catalog"
+        ],
+        "compilerPasses": [],
+        "playerWidgets": [
+          "configurator"
+        ]
+      }
+    },
+    {
+      "id": "studio.industrial",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "industrial"
+        ],
+        "documentKinds": [],
+        "compilerPasses": [],
+        "playerWidgets": [
+          "industrial"
+        ]
+      }
+    },
+    {
+      "id": "studio.optimization",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "optimization"
+        ],
+        "documentKinds": [],
+        "compilerPasses": []
+      }
+    },
+    {
       "id": "studio.piping",
       "version": "2.0.0",
       "minRuntimeVersion": "2.0.0",
@@ -24,11 +74,65 @@
       "permissions": []
     },
     {
+      "id": "studio.prefab",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "prefab"
+        ],
+        "documentKinds": [
+          "studio.prefab.Definition"
+        ],
+        "compilerPasses": [
+          "prefab"
+        ]
+      }
+    },
+    {
       "id": "studio.sample",
       "version": "2.0.0",
       "minRuntimeVersion": "2.0.0",
       "dependsOn": {},
       "permissions": []
+    },
+    {
+      "id": "studio.storyboard",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "storyboard"
+        ],
+        "documentKinds": [],
+        "compilerPasses": [],
+        "playerWidgets": [
+          "storyboard"
+        ]
+      }
+    },
+    {
+      "id": "studio.virtualTour",
+      "version": "2.2.0",
+      "minRuntimeVersion": "2.2.0",
+      "dependsOn": {},
+      "permissions": [],
+      "contributions": {
+        "workspaces": [
+          "virtual-tour"
+        ],
+        "documentKinds": [
+          "studio.virtualTour.Project"
+        ],
+        "compilerPasses": [],
+        "playerWidgets": [
+          "projectNavigation"
+        ]
+      }
     }
   ]
 }

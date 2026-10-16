@@ -43,6 +43,7 @@ export function ContextMenu() {
       {[
         "view.selection",
         "document.duplicate",
+        "workspace.prefab",
         "document.delete",
         "panel.inspector",
         "annotation.label",

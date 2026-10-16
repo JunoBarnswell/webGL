@@ -42,3 +42,5 @@ import { PipingPanel } from "./panel";
 export const panels = [
   { id: "piping", title: "管网查询与 CSV 映射", Component: PipingPanel },
 ];
+
+export const commands = [];

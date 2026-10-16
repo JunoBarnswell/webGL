@@ -1,3 +1,5 @@
+import { ActionList } from "./ActionList";
+import type { BehaviorAction } from "@studio/scene-schema";
 import { fieldOptions } from "@studio/scene-schema";
 import { useStudio } from "../state/studio";
 import type { DocumentPath } from "@studio/editor-core";
@@ -5,7 +7,7 @@ import type { Vec3 } from "@studio/scene-schema";
 type SpatialEdit = (
   path: DocumentPath,
   value: Vec3,
-  space: "world" | "local" | "parent-offset",
+  space: "world" | "local" | "parent-offset" | "parent",
   targetField?: string,
 ) => void;
 import { useEffect, useId, useState, useRef } from "react";
@@ -156,6 +158,15 @@ export function Field({
   onSpatialEdit?: SpatialEdit;
 }) {
   const title = field.title ?? path;
+  if (field["x-editor"] === "actions")
+    return (
+      <ActionList
+        actions={
+          (Array.isArray(value) ? value : []) as unknown as BehaviorAction[]
+        }
+        onChange={(actions) => onChange(actions as unknown as JsonValue)}
+      />
+    );
   if (options)
     return (
       <label className="field">

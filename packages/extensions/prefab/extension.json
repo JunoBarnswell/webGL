@@ -1,0 +1,49 @@
+{
+  "manifest": {
+    "id": "studio.prefab",
+    "version": "2.2.0",
+    "minRuntimeVersion": "2.2.0",
+    "dependsOn": {},
+    "permissions": [],
+    "contributions": {
+      "workspaces": [
+        "prefab"
+      ],
+      "documentKinds": [
+        "studio.prefab.Definition"
+      ],
+      "compilerPasses": [
+        "prefab"
+      ]
+    }
+  },
+  "components": {},
+  "actions": {},
+  "documents": {
+    "studio.prefab.Definition": {
+      "title": "预制体源定义",
+      "fields": {
+        "rootLocalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document": {
+          "$ref": "#"
+        },
+        "category": {
+          "type": "string",
+          "title": "分类",
+          "default": "通用",
+          "x-optional": true
+        },
+        "thumbnailAssetId": {
+          "type": "string",
+          "title": "缩略图",
+          "default": "",
+          "x-reference": "asset",
+          "x-optional": true
+        }
+      }
+    }
+  }
+}

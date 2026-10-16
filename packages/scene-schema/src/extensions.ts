@@ -7,6 +7,12 @@ export interface ExtensionManifest {
   minRuntimeVersion: string;
   dependsOn: Record<string, string>;
   permissions: string[];
+  contributions?: {
+    workspaces?: string[];
+    documentKinds?: string[];
+    playerWidgets?: string[];
+    compilerPasses?: string[];
+  };
 }
 export function orderExtensions(
   manifests: readonly ExtensionManifest[],
@@ -17,7 +23,7 @@ export function orderExtensions(
     if (
       !/^\d+\.\d+\.\d+$/.test(manifest.version) ||
       !/^\d+\.\d+\.\d+$/.test(manifest.minRuntimeVersion) ||
-      compareVersions(manifest.minRuntimeVersion, "2.0.0") > 0 ||
+      compareVersions(manifest.minRuntimeVersion, "2.2.0") > 0 ||
       manifest.permissions.length
     )
       throw Error("不支持的扩展版本/权限 " + manifest.id);

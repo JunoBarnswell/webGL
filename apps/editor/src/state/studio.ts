@@ -1,11 +1,17 @@
 import { create } from "zustand";
 import {
   createDocument,
+  sourceDocument,
   type SceneDocument,
   type Transform,
   type Vec3,
 } from "@studio/scene-schema";
-import { EditorSession, type EditorCommand } from "@studio/editor-core";
+import {
+  EditorSession,
+  changesBetween,
+  type HistoryTarget,
+  type EditorCommand,
+} from "@studio/editor-core";
 import type { SceneRuntime } from "@studio/scene-runtime";
 import type { EditorCamera } from "../panels/EditorCamera";
 import { ApiError, request, type CloudDraft, type Project } from "./api";
@@ -17,10 +23,34 @@ export type Workspace =
   | "content"
   | "tour"
   | "interaction"
-  | "interface";
+  | "interface"
+  | (string & {});
 type SaveState = "saved" | "dirty" | "saving" | "offline" | "conflict";
 interface StudioState {
   session: EditorSession | null;
+  domainTool: string;
+  draggingPrefab: import("@studio/scene-schema").PrefabRevision | null;
+  previewController: { stop: () => Promise<void>; dispose: () => void } | null;
+  historyTarget: HistoryTarget | null;
+  activeDocumentSave: (() => Promise<void>) | null;
+  scratchActive: boolean;
+  beginScratch: () => Promise<void>;
+  cancelScratch: () => Promise<SceneDocument>;
+  editingLibrary: {
+    id: string;
+    name: string;
+    rootLocalId: string;
+    metadata?: { category?: string; thumbnailAssetId?: string };
+  } | null;
+  editSource: (
+    record: import("../../../../packages/extensions/library").LibraryRecord<{
+      rootLocalId: string;
+      document: SceneDocument;
+      category?: string;
+      thumbnailAssetId?: string;
+    }>,
+  ) => Promise<void>;
+  returnToScene: () => Promise<void>;
   document: SceneDocument | null;
   runtime: SceneRuntime | null;
   projectId: string;
@@ -59,18 +89,115 @@ interface StudioState {
   set: (patch: Partial<StudioState>) => void;
   command: (command: EditorCommand) => boolean;
   select: (ids: string[], add?: boolean) => void;
-  open: (draft: CloudDraft, restore?: boolean) => Promise<void>;
+  open: (
+    draft: CloudDraft,
+    restore?: boolean,
+    resumeSession?: EditorSession,
+  ) => Promise<void>;
   close: () => void;
   save: () => Promise<void>;
   refreshProjects: () => Promise<void>;
   switchMode: () => Promise<void>;
   run: (label: string, action: () => Promise<void>) => Promise<void>;
 }
+let scratchSession: { session: EditorSession; unsubscribe: () => void } | null =
+  null;
+let suspendedScene: {
+  draft: CloudDraft;
+  session: EditorSession;
+  selected: string[];
+} | null = null;
 let unsubscribe: (() => void) | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saveQueue = Promise.resolve();
 let sessionGeneration = 0;
 export const useStudio = create<StudioState>((set, get) => ({
+  domainTool: "",
+  draggingPrefab: null,
+  previewController: null,
+  historyTarget: null,
+  activeDocumentSave: null,
+  scratchActive: false,
+  async beginScratch() {
+    await get().save();
+    const s = get();
+    if (!s.session || s.scratchActive) throw Error("当前不能进入试摆");
+    clearTimeout(saveTimer);
+    const temporary = new EditorSession(s.session.document);
+    const cleanup = temporary.subscribe((change) => {
+      set({ document: change.after });
+      void get().runtime?.applyChangeSet(change);
+    });
+    scratchSession = { session: s.session, unsubscribe: cleanup };
+    set({
+      session: temporary,
+      document: temporary.document,
+      scratchActive: true,
+    });
+  },
+  async cancelScratch() {
+    if (!scratchSession) throw Error("当前没有试摆会话");
+    const { session, unsubscribe: cleanup } = scratchSession;
+    cleanup();
+    scratchSession = null;
+    const before = get().document!;
+    set({ session, document: session.document, scratchActive: false });
+    await get().runtime?.applyChangeSet(
+      changesBetween(before, session.document),
+    );
+    return session.document;
+  },
+  editingLibrary: null,
+  async editSource(record) {
+    const s = get();
+    if (s.editingLibrary) throw Error("请先返回当前场景");
+    await s.save();
+    if (get().saveState !== "saved" || !s.document || !s.session)
+      throw Error("请先保存当前场景");
+    suspendedScene = {
+      draft: {
+        projectId: s.projectId,
+        sceneId: s.document.sceneId,
+        revision: get().revision,
+        document: s.document,
+        publishedVersionId: null,
+      },
+      session: s.session,
+      selected: s.selected,
+    };
+    await get().open(
+      {
+        projectId: s.projectId,
+        sceneId: record.document.document.sceneId,
+        revision: record.revision,
+        document: record.document.document,
+        publishedVersionId: null,
+      },
+      true,
+    );
+    set({
+      editingLibrary: {
+        id: record.id,
+        name: record.name,
+        rootLocalId: record.document.rootLocalId,
+        metadata: record.document,
+      },
+      workspace: "prefab",
+    });
+  },
+  async returnToScene() {
+    if (!suspendedScene) return;
+    await get().save();
+    if (get().saveState !== "saved") throw Error("模板未保存，当前编辑已保留");
+    const resume = suspendedScene;
+    await get().open(resume.draft, true, resume.session);
+    set({
+      selected: resume.selected,
+      editingLibrary: null,
+      workspace: "prefab",
+    });
+    suspendedScene = null;
+  },
   session: null,
   document: null,
   runtime: null,
@@ -137,6 +264,19 @@ export const useStudio = create<StudioState>((set, get) => ({
     get().runtime?.selectionChanged(get().selected);
   },
   close() {
+    get().previewController?.dispose();
+    scratchSession?.unsubscribe();
+    scratchSession = null;
+    suspendedScene = null;
+    set({
+      editingLibrary: null,
+      scratchActive: false,
+      domainTool: "",
+      draggingPrefab: null,
+      previewController: null,
+      historyTarget: null,
+      activeDocumentSave: null,
+    });
     clearTimeout(saveTimer);
     unsubscribe?.();
     unsubscribe = undefined;
@@ -162,14 +302,26 @@ export const useStudio = create<StudioState>((set, get) => ({
       message: "",
     });
   },
-  async open(draft, restore = false) {
+  async open(draft, restore = false, resumeSession) {
+    get().previewController?.dispose();
+    scratchSession?.unsubscribe();
+    scratchSession = null;
+    set({
+      scratchActive: false,
+      domainTool: "",
+      draggingPrefab: null,
+      previewController: null,
+      historyTarget: null,
+      activeDocumentSave: null,
+    });
     const local = restore ? undefined : await localDraft(draft.sceneId);
     clearTimeout(saveTimer);
     unsubscribe?.();
     sessionGeneration++;
-    const session = new EditorSession(draft.document);
+    const session = resumeSession ?? new EditorSession(draft.document);
     set({
       session,
+      editingLibrary: null,
       document: session.document,
       projectId: draft.projectId,
       revision: draft.revision,
@@ -240,6 +392,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     localStorage.setItem("studio-last-scene", draft.sceneId);
   },
   async save() {
+    if (get().scratchActive) throw Error("请先录制或放弃试摆，再保存作者文档");
     const generation = sessionGeneration;
     const perform = async () => {
       const state = get();
@@ -255,13 +408,25 @@ export const useStudio = create<StudioState>((set, get) => ({
       const revision = state.revision;
       set({ saveState: "saving" });
       try {
-        const saved = await request<CloudDraft>(
-          "/scenes/" + snapshot.sceneId + "/draft",
+        const target = state.editingLibrary;
+        const saved = await request<{ revision: number }>(
+          target
+            ? "/library/prefab/" + target.id
+            : "/scenes/" + snapshot.sceneId + "/draft",
           {
             method: "PUT",
             body: JSON.stringify({
               expectedRevision: revision,
-              document: snapshot,
+              ...(target
+                ? {
+                    name: snapshot.name,
+                    document: {
+                      ...target.metadata,
+                      rootLocalId: target.rootLocalId,
+                      document: sourceDocument(snapshot),
+                    },
+                  }
+                : { document: sourceDocument(snapshot) }),
             }),
           },
         );
@@ -305,6 +470,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
   async switchMode() {
     const state = get();
+    if (state.previewController && state.mode === "play") {
+      await state.previewController.stop();
+      return;
+    }
     if (!state.runtime) return;
     const mode = state.mode === "edit" ? "play" : "edit";
     state.view?.setEnabled(mode === "edit" && state.workspace !== "interface");

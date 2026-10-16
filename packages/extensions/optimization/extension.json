@@ -1,0 +1,18 @@
+{
+  "manifest": {
+    "id": "studio.optimization",
+    "version": "2.2.0",
+    "minRuntimeVersion": "2.2.0",
+    "dependsOn": {},
+    "permissions": [],
+    "contributions": {
+      "workspaces": [
+        "optimization"
+      ],
+      "documentKinds": [],
+      "compilerPasses": []
+    }
+  },
+  "components": {},
+  "actions": {}
+}

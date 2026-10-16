@@ -69,11 +69,13 @@ export class PresentationSystem {
         }
         meshes.push(node);
       });
-      for (const mesh of meshes) mesh.material = material;
-      if (meshes.length === 0) store.disposeUnowned(material);
-      this.runtime.graph.scope(
-        this.runtime.graph.modelOwner(entity) ?? instance,
-      );
+      this.runtime.visual.rebase(() => {
+        for (const mesh of meshes) mesh.material = material;
+        if (meshes.length === 0) store.disposeUnowned(material);
+        this.runtime.graph.scope(
+          this.runtime.graph.modelOwner(entity) ?? instance,
+        );
+      });
       const artwork = getComponent(entity, "Artwork");
       if (artwork) await this.artwork(entity, artwork);
       this.runtime.applyDisplay();

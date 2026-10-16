@@ -5,6 +5,7 @@ const base = new URL("../", import.meta.url);
 const read = async (path: string) =>
   JSON.parse(await readFile(new URL(path, base), "utf8"));
 const schema = await read("packages/scene-schema/core.schema.json");
+schema.$defs.asset = structuredClone(schema.properties.assets.items);
 const extensions = [];
 const directoryById = new Map<string, string>();
 for (const directory of (
@@ -48,7 +49,11 @@ for (const extension of extensions) {
         type: "object",
         additionalProperties: false,
         properties: definition.fields,
-        required: Object.keys(definition.fields),
+        required: Object.entries(definition.fields)
+          .filter(
+            ([, field]) => !(field as Record<string, unknown>)["x-optional"],
+          )
+          .map(([key]) => key),
       };
       if (key === "action") {
         template.properties.targetId["x-reference"] = definition.target;
@@ -58,6 +63,37 @@ for (const extension of extensions) {
       schema.$defs[key].oneOf.push(template);
     }
 }
+const libraryDocuments = [];
+const widgets: string[] = [];
+for (const extension of extensions) {
+  for (const type of extension.manifest.contributions?.documentKinds ?? []) {
+    const definition =
+      extension.documents?.[type] ?? extension.components[type];
+    if (!definition) throw Error("Missing document contribution " + type);
+    libraryDocuments.push({
+      type: "object",
+      properties: {
+        type: { const: type },
+        data: {
+          type: "object",
+          properties: definition.fields,
+          required: Object.entries(definition.fields)
+            .filter(
+              ([, field]) => !(field as Record<string, unknown>)["x-optional"],
+            )
+            .map(([key]) => key),
+          additionalProperties: false,
+        },
+      },
+      required: ["type", "data"],
+      additionalProperties: false,
+      title: definition.title,
+    });
+  }
+  widgets.push(...(extension.manifest.contributions?.playerWidgets ?? []));
+}
+schema.$defs.libraryDocument = { oneOf: libraryDocuments };
+schema.$defs.uiNode.properties.kind.enum.push(...widgets);
 const manifests = orderExtensions(extensions.map((e) => e.manifest));
 schema.properties.documentVersion = { const: 2 };
 schema.required.push("documentVersion", "requiredExtensions");
@@ -99,7 +135,7 @@ await writeFile(
 );
 await writeFile(
   new URL("packages/scene-schema/extension-catalog.json", base),
-  JSON.stringify({ runtimeBuild: "2.0.0", hash, manifests }, null, 2) + "\n",
+  JSON.stringify({ runtimeBuild: "2.2.0", hash, manifests }, null, 2) + "\n",
 );
 console.log("Composed extension catalog " + hash);
 
@@ -117,16 +153,19 @@ await writeFile(
 
 await writeFile(
   new URL("packages/extensions/editor-catalog.ts", base),
-  names
-    .map(
-      (name, i) =>
-        `import {tools as tools${i},panels as panels${i}} from './${name}/editor';`,
-    )
-    .join("\n") +
+  "import type {ExtensionPanel,ExtensionEditorCommand} from './editor-contract';\n" +
+    names
+      .map(
+        (name, i) =>
+          `import {tools as tools${i},panels as panels${i},commands as commands${i}} from './${name}/editor';`,
+      )
+      .join("\n") +
     "\nexport const extensionTools=[" +
     names.map((_name, i) => `...tools${i}`).join(",") +
-    "];\nexport const extensionPanels=[" +
+    "];\nexport const extensionPanels:ExtensionPanel[]=[" +
     names.map((_name, i) => `...panels${i}`).join(",") +
+    "];\nexport const extensionCommands:ExtensionEditorCommand[]=[" +
+    names.map((_name, i) => `...commands${i}`).join(",") +
     "];\n",
 );
 
@@ -147,4 +186,38 @@ await writeFile(
     ";\nexport type KnownActionType = " +
     known("action") +
     ";\n",
+);
+
+const validators: string[] = [],
+  players: string[] = [];
+for (const name of names) {
+  const files = await readdir(
+    new URL("packages/extensions/" + name + "/", base),
+  );
+  if (files.includes("contract.ts")) validators.push(name);
+  if (files.includes("player.tsx")) players.push(name);
+}
+await writeFile(
+  new URL("packages/extensions/validators.ts", base),
+  validators
+    .map(
+      (name, i) =>
+        `import {validate as validate${i}} from './${name}/contract';`,
+    )
+    .join("\n") +
+    "\nexport const extensionValidators=[" +
+    validators.map((_n, i) => `validate${i}`).join(",") +
+    "];\n",
+);
+await writeFile(
+  new URL("packages/player-ui/src/widgets.ts", base),
+  players
+    .map(
+      (name, i) =>
+        `import {widgets as widgets${i}} from '../../extensions/${name}/player';`,
+    )
+    .join("\n") +
+    "\nexport const playerWidgets=[" +
+    players.map((_n, i) => `...widgets${i}`).join(",") +
+    "];\n",
 );
