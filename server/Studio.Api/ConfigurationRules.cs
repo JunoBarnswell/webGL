@@ -37,18 +37,18 @@ public static class ConfigurationRules
         if(errors.Count>0)return Failed(errors);
         var byId=groups.ToDictionary(g=>g.Id);
         foreach(var group in groups) {
-            if(group.Options.Select(o=>T(o,"id")).Distinct().Count()!=group.Options.Length)errors.Add("选项 ID 重复："+group.Name);
-            if(group.Minimum>group.Maximum||group.Minimum<0||group.Maximum<1)errors.Add("选项数量范围无效："+group.Name);
+            if(group.Control!="number"&&group.Options.Select(o=>T(o,"id")).Distinct().Count()!=group.Options.Length)errors.Add("选项 ID 重复："+group.Name);
+            if(group.Control!="number"&&(group.Minimum>group.Maximum||group.Minimum<0||group.Maximum<1))errors.Add("选项数量范围无效："+group.Name);
             if(group.Control=="number"&&double.IsFinite(group.Low)&&double.IsFinite(group.High)&&double.IsFinite(group.Step)&&group.Step>0&&(!double.IsFinite((group.High-group.Low)/group.Step)||Math.Floor((group.High-group.Low)/group.Step+1e-9)>9007199254740991||group.Low<group.High&&(group.Low+group.Step==group.Low||group.High-group.Step==group.High)))errors.Add("数值范围无法用安全且互异的步长索引表示："+group.Name);
-            if(group.Defaults.Any(id=>!group.Options.Any(o=>T(o,"id")==id)))errors.Add("默认选项不存在");
+            if(group.Control!="number"&&group.Defaults.Any(id=>!group.Options.Any(o=>T(o,"id")==id)))errors.Add("默认选项不存在");
             if(group.Control=="number"&&(!double.IsFinite(group.Low)||!double.IsFinite(group.High)||group.Low>group.High||!double.IsFinite(group.Step)||group.Step<=0))errors.Add("数值范围或步长无效："+group.Name);
         }
         foreach(var rule in rules) {
-            if(!byId.TryGetValue(rule.ToGroup,out var target)||(!(rule.Type is "count" or "range")&&!target.Options.Any(o=>T(o,"id")==rule.ToOption))||(rule.FromGroup!=""&&(!byId.TryGetValue(rule.FromGroup,out var source)||source.Control=="number"||!source.Options.Any(o=>T(o,"id")==rule.FromOption))))errors.Add("规则引用选项不存在："+rule.Id);
+            if(!byId.TryGetValue(rule.ToGroup,out var target)||(!(rule.Type is "count" or "range")&&(target.Control=="number"||!target.Options.Any(o=>T(o,"id")==rule.ToOption)))||(rule.FromGroup!=""&&(!byId.TryGetValue(rule.FromGroup,out var source)||source.Control=="number"||!source.Options.Any(o=>T(o,"id")==rule.FromOption))))errors.Add("规则引用选项不存在："+rule.Id);
             if(!double.IsFinite(rule.Priority)||!new[]{"require","implies","exclude","default","count","range","bundle"}.Contains(rule.Type))errors.Add("规则类型或优先级无效："+rule.Id);
             if((rule.Type is "count" or "range")&&(!double.IsFinite(rule.Minimum)||!double.IsFinite(rule.Maximum)||rule.Minimum>rule.Maximum))errors.Add("规则范围无效："+rule.Id);
             if(rule.Type=="count"&&(byId.GetValueOrDefault(rule.ToGroup)?.Control=="number"||rule.Minimum!=Math.Truncate(rule.Minimum)||rule.Maximum!=Math.Truncate(rule.Maximum)||rule.Minimum<0))errors.Add("数量规则需要非负整数和选项属性："+rule.Id);
-            foreach(var condition in rule.Conditions)if(!new[]{"selected","notSelected","gte","lte","eq"}.Contains(T(condition,"operator"))||!byId.TryGetValue(T(condition,"groupId"),out var group)||(T(condition,"operator") is "selected" or "notSelected"?!group.Options.Any(o=>T(o,"id")==T(condition,"optionId")):group.Control!="number"||!double.IsFinite(N(condition,"value"))))errors.Add("条件字段或类型无效："+rule.Id);
+            foreach(var condition in rule.Conditions)if(!new[]{"selected","notSelected","gte","lte","eq"}.Contains(T(condition,"operator"))||!byId.TryGetValue(T(condition,"groupId"),out var group)||(T(condition,"operator") is "selected" or "notSelected"?group.Control=="number"||!group.Options.Any(o=>T(o,"id")==T(condition,"optionId")):group.Control!="number"||!double.IsFinite(N(condition,"value"))))errors.Add("条件字段或类型无效："+rule.Id);
         }
         if(errors.Count>0)return Failed(errors);
         var edges=new List<Edge>();
@@ -68,7 +68,7 @@ public static class ConfigurationRules
             }
         }
         if(errors.Count>0)return Failed(errors);
-        var original=groups.ToDictionary(g=>g.Id,g=>g.Defaults.ToList());var baseNumbers=groups.Where(g=>g.Control=="number").ToDictionary(g=>g.Id,g=>g.Default);
+        var original=groups.ToDictionary(g=>g.Id,g=>g.Control=="number"?new List<string>():g.Defaults.ToList());var baseNumbers=groups.Where(g=>g.Control=="number").ToDictionary(g=>g.Id,g=>g.Default);
         foreach(var group in groups.Where(g=>g.Control=="number"))if(!double.IsFinite(group.Default)||group.Default<group.Low||group.Default>group.High)errors.Add("数值越界："+group.Name);
         if(errors.Count>0)return Failed(errors);
         var selections=original.ToDictionary(p=>p.Key,p=>p.Value.ToList());var numbers=new Dictionary<string,double>(baseNumbers);var seen=new HashSet<string>();var converged=false;var final=new List<string>();

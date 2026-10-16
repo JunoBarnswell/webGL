@@ -14,9 +14,10 @@ public static class ConfigurationVisuals {
         var errors=new Dictionary<string,List<string>>();for(var i=0;i<catalogs.Length;i++)for(var j=i+1;j<catalogs.Length;j++){var a=catalogs[i];var b=catalogs[j];if(claims[a].Overlaps(claims[b])||targets[a].Any(id=>Under(id,targets[b]))||targets[b].Any(id=>Under(id,targets[a]))){var message="同一模型或槽位由多个目录控制："+T(entities[a],"name")+" ↔ "+T(entities[b],"name")+"；请把配置维度合并为同一目录的属性组";if(!errors.TryGetValue(a,out var first))errors[a]=first=[];if(!errors.TryGetValue(b,out var second))errors[b]=second=[];first.Add(message);second.Add(message);}}
         return errors;
     }
+    public static IEnumerable<JsonElement> ActiveMappings(JsonElement group)=>T(group,"control")=="number"?A(group,"visuals"):A(group,"options").SelectMany(option=>A(option,"visuals"));
     public static string[] ValidateCatalog(JsonElement data) {
         var errors=new List<string>();var ids=new HashSet<string>();
-        foreach(var group in A(data,"groups"))foreach(var mapping in A(group,"visuals").Concat(A(group,"options").SelectMany(o=>A(o,"visuals")))){
+        foreach(var group in A(data,"groups"))foreach(var mapping in ActiveMappings(group)){
             var id=T(mapping,"id");if(id==""||!ids.Add(id))errors.Add("视觉映射 ID 为空或重复："+id);
             var operation=T(mapping,"operation");var numeric=T(group,"control")=="number"&&A(group,"visuals").Any(m=>JsonElement.DeepEquals(m,mapping));
             if(numeric){
@@ -31,7 +32,7 @@ public static class ConfigurationVisuals {
             }else if(operation=="opacity")try{var value=Units.Number(T(mapping,"value"));if(value<0||value>1)errors.Add("透明度必须为 0～1 的数值："+id);}catch(FormatException){errors.Add("透明度必须为 0～1 的数值："+id);}
             if(operation=="visibility"&&T(mapping,"value") is not ("true" or "false"))errors.Add("可见性必须明确为 true 或 false："+id);
         }
-        foreach(var part in A(data,"groups").SelectMany(g=>A(g,"options")).SelectMany(o=>A(o,"bom")).GroupBy(p=>T(p,"partId")))if(!double.IsFinite(part.Sum(p=>p.GetProperty("quantity").GetDouble())))errors.Add("BOM 数量求和超出有限范围："+part.Key);
+        foreach(var part in A(data,"groups").Where(g=>T(g,"control")!="number").SelectMany(g=>A(g,"options")).SelectMany(o=>A(o,"bom")).GroupBy(p=>T(p,"partId")))if(!double.IsFinite(part.Sum(p=>p.GetProperty("quantity").GetDouble())))errors.Add("BOM 数量求和超出有限范围："+part.Key);
         return errors.Distinct().ToArray();
     }
     private sealed record Mapping(JsonElement Spec,string Group,string Option,double Priority,double? Number,string Unit);
@@ -45,7 +46,7 @@ public static class ConfigurationVisuals {
             void Fail(string message,string field="")=>checks.Add(new("visual","fail","error",message,field,owner,sceneId,[]));
             var selected=new List<Mapping>();
             foreach(var group in A(data,"groups")){var id=T(group,"id");if(T(group,"control")=="number")foreach(var mapping in A(group,"visuals"))selected.Add(new(mapping,id,"",mapping.TryGetProperty("priority",out var priority)?priority.GetDouble():0,solved.NumericValues[id],T(group,"numericUnit")));else foreach(var option in A(group,"options").Where(o=>solved.Selections[id].Contains(T(o,"id"))))foreach(var mapping in A(option,"visuals"))selected.Add(new(mapping,id,T(option,"id"),mapping.TryGetProperty("priority",out var priority)?priority.GetDouble():0,null,""));}
-            var authoredMappings=A(data,"groups").SelectMany(group=>A(group,"visuals").Concat(A(group,"options").SelectMany(option=>A(option,"visuals")))).ToArray();
+            var authoredMappings=A(data,"groups").SelectMany(ActiveMappings).ToArray();
             foreach(var mapping in authoredMappings.Where(m=>T(m,"operation")=="variant")){
                 var target=T(mapping,"targetId");var assets=new HashSet<string>();
                 if(entities.TryGetValue(target,out var targetEntity)){var node=Component(targetEntity,"ModelNode");var modelId=node.ValueKind==JsonValueKind.Object?T(node.GetProperty("data"),"modelEntityId"):target;if(entities.TryGetValue(modelId,out var modelEntity)){var model=Component(modelEntity,"Model");if(model.ValueKind==JsonValueKind.Object)assets.Add(T(model.GetProperty("data"),"assetId"));}}

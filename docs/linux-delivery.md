@@ -37,14 +37,14 @@ STUDIO_FAULTS=1 npm run verify:integration
 
 发布包不包含凭据、MySQL 数据目录或 MinIO 数据目录。Linux 需 glibc 2.39 或更新版本及 OpenSSL；Ubuntu 24.04 / Debian 13 可用。反向代理可提供 TLS，Editor/Player/API 维持同源。
 
-`STUDIO-2.2-ACCEPTANCE.md` 是本轮验收记录；`ACCEPTANCE.md` 保留 v1 的历史记录。Blocked 不等于通过，Windows Waived 不影响 Linux 门禁。持久化服务重启后从数据库和对象存储恢复；内存缓存不是事实来源。
+`STUDIO-2.3-ACCEPTANCE.md` 是本轮验收记录；`ACCEPTANCE.md` 保留 v1 的历史记录。Blocked 不等于通过，Windows Waived 不影响 Linux 门禁。持久化服务重启后从数据库和对象存储恢复；内存缓存不是事实来源。
 
 交付目录的 `acceptance/` 保存契约、集成、浏览器和生命周期数据及截图。`examples/showroom.studio.zip`（也单独提供）为已归档真实展厅的可移植工程包，可在工程菜单中导入；它包含 57 张作品图片，导入时无需再次访问原图片服务。`examples/` 另含多场景/全景/预制体/目录固定版工程、真实材质变体工程和合成装配/管网样例。
 
 在解压目录执行 `sha256sum -c SHA256SUMS` 可核对全部交付文件。原始迁移输入仍在源码 `public/`；运行 Player 使用数据库和 MinIO 中已归档的版本资源。
 
 
-## Studio 2.2 文档与处理工具
+## Studio 2.3 文档与处理工具
 
 工作空间选择器打开预制体、项目漫游、故事板、工业审阅、配置器和资产优化设计器。项目编排拥有独立历史、IndexedDB 恢复与 CAS 修订；保存工程同时保存当前场景和活动的项目编排。SceneDocument 仍是场景的唯一事实来源，模板实例固定源版本，公开 Player 消费展开后的场景。`?scene=<id>` 为单场景发布，`?project=<id>` 为跨场景的原子发布。
 
@@ -55,3 +55,10 @@ STUDIO_FAULTS=1 npm run verify:integration
 源代码环境可在独立目录安装 IFC 依赖：`python3 -m pip install --target .local/tools/ifc -r workers/requirements-ifc.txt`。KTX-Software 使用 4.4.2 官方 Linux x86_64 发布包，保留完整发布目录及 NOTICE。`scripts/configure-converters.py` 只发现已安装工具，不下载或执行工程中的程序。未安装必需工具时作业明确 Failed，原始资产和已发布版本不受影响。
 
 `npm run verify:studio22` 覆盖模板三方合并、视觉态、时间求值、约束规则、真实属性索引、项目版本固定、完整工程包和 Meshopt 作业；先启动原生 API。原有门禁仍可运行。当前原生构建保留 SqlSugar 等依赖的 AOT / 裁剪警告，运行证据和未完成的外部硬件验收分别记录，不将软件渲染数据称为硬件 GPU 性能。
+
+
+Studio 2.3 的预算需在资产优化工作区固定报告，或在应用派生修订时自动固定；发布 API 校验 `settings.processingReports` 的资产/作业关系、输入 SHA 和策略 Hash。旧报告、缺失后端作业账本或未设置预算时保持未验证；导入其他后端的工程后重新运行诊断。`UnmetBudget` 的结果保留报告并禁止应用。
+
+单 API 仍是首版部署建议；处理作业也已验证两实例争抢和租约恢复。不要手工把其他实例的 Running 作业改回 Queued。15 秒数据库租约、2 秒心跳和递增令牌限制写入，过期尝试的暂存目录不与接管者共用。`npm run verify:leases` 会在本机 18081/18082 启动验收实例并杀掉其 owner；运行前停止 18080 的主处理实例。
+
+新增复现命令：`npm run verify:studio23`、`npm run verify:configurator`、`npm run verify:processing`、`npm run verify:ifc`。前两项支持纯逻辑检查（Studio 2.3 使用 `-- --pure`）；处理验收连接真实 MySQL/MinIO。一次性浏览器验收脚本及原始记录在 `acceptance/studio-2.3/`，需要对应源码和 Vite。物理 GPU、手机、VR、授权生产模型及 30 分钟生产长会话保持 Blocked；软件 Chromium 的 CPU 结果不能替代这些证据。

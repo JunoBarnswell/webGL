@@ -147,6 +147,13 @@ assert.equal(
   formatNumericValue(numeric.groups[0], result.numericValues.n),
   "1000000000000007",
 );
+const dormant = structuredClone(numeric);
+dormant.groups[0].min = 3;
+dormant.groups[0].max = 2;
+dormant.groups[0].defaultIds = ["removed"];
+dormant.groups[0].options = [option("old-choice")];
+assert.deepEqual(solve(dormant).errors, []);
+assert.deepEqual(solve(dormant).selections.n, []);
 const ranges = {
   ...numeric,
   groups: [

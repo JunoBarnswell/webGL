@@ -66,7 +66,7 @@ public sealed class ReleaseReadinessService(DocumentContract contract,LibrarySer
                         }
                         if(type=="Animation") {var clips=definition.TryGetProperty("animations",out var animations)?animations.EnumerateArray().Select((a,i)=>a.TryGetProperty("name",out var name)?name.GetString()!:"animation_"+i).ToArray():[];if(!clips.Contains(DocumentContract.Text(data,"clip")))Fail("动画片段不存在","/clip");}
                     }
-                    if(type=="studio.configurator.Catalog")foreach(var group in data.GetProperty("groups").EnumerateArray())foreach(var mapping in group.GetProperty("options").EnumerateArray().SelectMany(o=>o.GetProperty("visuals").EnumerateArray()).Concat(group.TryGetProperty("visuals",out var numeric)?numeric.EnumerateArray().ToArray():[]))if(DocumentContract.Text(mapping,"operation")=="swapPart"){var asset=objects.Get(DocumentContract.Text(mapping,"assetId"));if(asset.Kind!="model")Fail("部件替换资源必须是模型");else _ = await Definition(asset.Id);}
+                    if(type=="studio.configurator.Catalog")foreach(var group in data.GetProperty("groups").EnumerateArray())foreach(var mapping in ConfigurationVisuals.ActiveMappings(group))if(DocumentContract.Text(mapping,"operation")=="swapPart"){var asset=objects.Get(DocumentContract.Text(mapping,"assetId"));if(asset.Kind!="model")Fail("部件替换资源必须是模型");else _ = await Definition(asset.Id);}
 
                 }catch(ApiException error){Fail(error.Message);}catch(KeyNotFoundException){Fail("视觉绑定的来源对象不存在");}
             }

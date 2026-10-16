@@ -5,6 +5,7 @@ import {
   createDocument,
   createEntity,
   createComponent,
+  declareExtension,
   documentReferences,
   releaseReadiness,
   type SceneDocument,
@@ -818,6 +819,67 @@ assert.ok(
 pass(
   "Shared dimensioned SI/IFC units, affine temperatures, strict numbers, original-value provenance, inherited completeness and typed port topology",
 );
+const dormantDocument = createDocument("Dormant numeric catalog"),
+  dormantEntity = createEntity("Numeric catalog"),
+  dormantComponent = createComponent("studio.configurator.Catalog");
+Object.assign(dormantComponent.data, {
+  catalogId: crypto.randomUUID(),
+  groups: [
+    {
+      id: "number",
+      name: "Numeric",
+      control: "number",
+      min: 3,
+      max: 2,
+      defaultIds: ["removed-choice"],
+      numericMinimum: 0,
+      numericMaximum: 10,
+      numericStep: 1,
+      numericDefault: 5,
+      visuals: [],
+      options: [
+        {
+          id: "old",
+          name: "Old",
+          sku: "",
+          color: "#fff",
+          description: "",
+          imageAssetId: "",
+          bom: [],
+          visuals: [
+            {
+              id: "dormant",
+              targetId: "removed-entity",
+              operation: "visibility",
+              value: "true",
+              assetId: "",
+              variant: "",
+              transform: {
+                position: [0, 0, 0],
+                rotation: [0, 0, 0, 1],
+                scale: [1, 1, 1],
+              },
+              camera: { position: [0, 0, 1000], target: [0, 0, 0], fov: 60 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+dormantEntity.components.push(dormantComponent);
+dormantDocument.entities.push(dormantEntity);
+declareExtension(dormantDocument, dormantComponent.type);
+assert.ok(
+  !documentReferences(dormantDocument).some(
+    (edge) => edge.id === "removed-entity",
+  ),
+);
+assert.deepEqual(
+  resolveConfiguration(dormantComponent.data as unknown as ProductCatalog, {})
+    .errors,
+  [],
+);
 if (!process.argv.includes("--pure")) {
   const config = JSON.parse(await readFile(".local/config.json", "utf8")),
     base = process.env.STUDIO_API ?? "http://127.0.0.1:18080";
@@ -890,6 +952,25 @@ if (!process.argv.includes("--pure")) {
       a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
     ),
     documentReferences(persisted.document),
+  );
+  const dormantDraft = await api("/projects", "POST", {
+    name: dormantDocument.name,
+    document: dormantDocument,
+  });
+  const dormantReady = await api(
+    "/scenes/" + dormantDraft.sceneId + "/readiness",
+  );
+  assert.equal(dormantReady.ready, true, JSON.stringify(dormantReady));
+  const active = structuredClone(dormantDraft.document);
+  active.entities[0].components[0].data.groups[0].control = "radio";
+  const activeReady = await api(
+    "/scenes/" + dormantDraft.sceneId + "/readiness",
+    "POST",
+    { expectedRevision: dormantDraft.revision, document: active },
+  );
+  assert.equal(activeReady.ready, false);
+  pass(
+    "Dormant choice bindings/defaults stay inactive for numeric groups; reactivation restores reference and cardinality admission in TS and Native",
   );
   pass(
     "Native readiness advisory/required policy, unsaved read-only preflight, CAS rejection and reference-path parity",

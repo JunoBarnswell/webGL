@@ -72,13 +72,21 @@
                 "type": "number",
                 "title": "最少选项",
                 "default": 1,
-                "minimum": 0
+                "minimum": 0,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["radio", "swatch", "cards", "toggle", "multi"]
+                }
               },
               "max": {
                 "type": "number",
                 "title": "最多选项",
                 "default": 1,
-                "minimum": 1
+                "minimum": 1,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["radio", "swatch", "cards", "toggle", "multi"]
+                }
               },
               "defaultIds": {
                 "type": "array",
@@ -88,7 +96,11 @@
                   "title": "",
                   "default": ""
                 },
-                "default": []
+                "default": [],
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["radio", "swatch", "cards", "toggle", "multi"]
+                }
               },
               "options": {
                 "type": "array",
@@ -395,28 +407,48 @@
                   ],
                   "additionalProperties": false
                 },
-                "default": []
+                "default": [],
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["radio", "swatch", "cards", "toggle", "multi"]
+                }
               },
               "numericMinimum": {
                 "type": "number",
                 "title": "数值下限",
-                "default": 0
+                "default": 0,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               },
               "numericMaximum": {
                 "type": "number",
                 "title": "数值上限",
-                "default": 1
+                "default": 1,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               },
               "numericStep": {
                 "type": "number",
                 "title": "数值步长",
                 "default": 0.01,
-                "minimum": 1e-6
+                "minimum": 1e-6,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               },
               "numericDefault": {
                 "type": "number",
                 "title": "数值默认值",
-                "default": 0
+                "default": 0,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               },
               "visuals": {
                 "type": "array",
@@ -640,14 +672,22 @@
                   ],
                   "additionalProperties": false
                 },
-                "default": []
+                "default": [],
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               },
               "numericUnit": {
                 "type": "string",
                 "title": "数值单位（空为操作默认单位）",
                 "default": "",
                 "x-unit": true,
-                "x-optional": true
+                "x-optional": true,
+                "x-visible-when": {
+                  "field": "control",
+                  "values": ["number"]
+                }
               }
             },
             "required": [
