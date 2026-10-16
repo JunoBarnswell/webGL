@@ -82,6 +82,7 @@ export function PrefabPanel(props: ExtensionPanelProps) {
       currentRevision,
       choices,
       migrations,
+      services.analyze,
     ),
     conflicts = planning.plan?.conflicts ?? [];
   const ancestry = useMemo(

@@ -2159,6 +2159,70 @@
                                       "field": "operation",
                                       "value": "variant"
                                     }
+                                  },
+                                  "priority": {
+                                    "type": "number",
+                                    "title": "映射优先级",
+                                    "default": 0,
+                                    "x-optional": true
+                                  },
+                                  "numericBinding": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "property": {
+                                        "type": "string",
+                                        "enum": [
+                                          "position",
+                                          "scale",
+                                          "rotation",
+                                          "opacity"
+                                        ],
+                                        "default": "scale"
+                                      },
+                                      "axis": {
+                                        "type": "string",
+                                        "enum": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                          "all"
+                                        ],
+                                        "default": "all"
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "set",
+                                          "add"
+                                        ],
+                                        "default": "set"
+                                      },
+                                      "factor": {
+                                        "type": "number",
+                                        "default": 1
+                                      },
+                                      "offset": {
+                                        "type": "number",
+                                        "default": 0
+                                      },
+                                      "reference": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "default": 0,
+                                        "title": "基准尺寸；0 表示按比例单位换算",
+                                        "x-optional": true
+                                      }
+                                    },
+                                    "required": [
+                                      "property",
+                                      "axis",
+                                      "mode",
+                                      "factor",
+                                      "offset"
+                                    ],
+                                    "title": "数值绑定（仅数值属性）",
+                                    "x-optional": true
                                   }
                                 },
                                 "required": [
@@ -2397,6 +2461,70 @@
                                 "field": "operation",
                                 "value": "variant"
                               }
+                            },
+                            "priority": {
+                              "type": "number",
+                              "title": "映射优先级",
+                              "default": 0,
+                              "x-optional": true
+                            },
+                            "numericBinding": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "property": {
+                                  "type": "string",
+                                  "enum": [
+                                    "position",
+                                    "scale",
+                                    "rotation",
+                                    "opacity"
+                                  ],
+                                  "default": "scale"
+                                },
+                                "axis": {
+                                  "type": "string",
+                                  "enum": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                    "all"
+                                  ],
+                                  "default": "all"
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "set",
+                                    "add"
+                                  ],
+                                  "default": "set"
+                                },
+                                "factor": {
+                                  "type": "number",
+                                  "default": 1
+                                },
+                                "offset": {
+                                  "type": "number",
+                                  "default": 0
+                                },
+                                "reference": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "default": 0,
+                                  "title": "基准尺寸；0 表示按比例单位换算",
+                                  "x-optional": true
+                                }
+                              },
+                              "required": [
+                                "property",
+                                "axis",
+                                "mode",
+                                "factor",
+                                "offset"
+                              ],
+                              "title": "数值绑定（仅数值属性）",
+                              "x-optional": true
                             }
                           },
                           "required": [
@@ -2412,6 +2540,13 @@
                           "additionalProperties": false
                         },
                         "default": []
+                      },
+                      "numericUnit": {
+                        "type": "string",
+                        "title": "数值单位（空为操作默认单位）",
+                        "default": "",
+                        "x-unit": true,
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -2516,6 +2651,55 @@
                         "type": "string",
                         "title": "原因",
                         "default": "此组合不兼容"
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "groupId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "operator": {
+                              "type": "string",
+                              "enum": [
+                                "selected",
+                                "notSelected",
+                                "gte",
+                                "lte",
+                                "eq"
+                              ],
+                              "default": "selected"
+                            },
+                            "optionId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "value": {
+                              "type": "number",
+                              "default": 0
+                            }
+                          },
+                          "required": [
+                            "groupId",
+                            "operator",
+                            "optionId",
+                            "value"
+                          ]
+                        },
+                        "default": [],
+                        "x-optional": true
+                      },
+                      "conditionJoin": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "any"
+                        ],
+                        "default": "all",
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -2546,6 +2730,16 @@
                   "type": "string",
                   "title": "固定目录修订",
                   "default": "",
+                  "x-optional": true
+                },
+                "variantPolicy": {
+                  "type": "string",
+                  "enum": [
+                    "compose-primitives",
+                    "global-variant"
+                  ],
+                  "default": "compose-primitives",
+                  "title": "材质变体模式",
                   "x-optional": true
                 }
               },
@@ -6655,6 +6849,48 @@
               "pattern": "^[a-zA-Z0-9_-]{1,100}$"
             },
             "type": {
+              "const": "studio.configurator.Cancel"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "取消配置准备",
+          "x-target": "entity",
+          "x-components": [
+            "studio.configurator.Catalog"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
               "const": "studio.industrial.Apply"
             },
             "targetId": {
@@ -7287,6 +7523,7 @@
                   "studio.configurator.Select",
                   "studio.configurator.Reset",
                   "studio.configurator.SetNumber",
+                  "studio.configurator.Cancel",
                   "studio.industrial.Apply",
                   "studio.industrial.RestoreView",
                   "studio.industrial.Reset",
@@ -10326,6 +10563,70 @@
                                       "field": "operation",
                                       "value": "variant"
                                     }
+                                  },
+                                  "priority": {
+                                    "type": "number",
+                                    "title": "映射优先级",
+                                    "default": 0,
+                                    "x-optional": true
+                                  },
+                                  "numericBinding": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "property": {
+                                        "type": "string",
+                                        "enum": [
+                                          "position",
+                                          "scale",
+                                          "rotation",
+                                          "opacity"
+                                        ],
+                                        "default": "scale"
+                                      },
+                                      "axis": {
+                                        "type": "string",
+                                        "enum": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                          "all"
+                                        ],
+                                        "default": "all"
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "set",
+                                          "add"
+                                        ],
+                                        "default": "set"
+                                      },
+                                      "factor": {
+                                        "type": "number",
+                                        "default": 1
+                                      },
+                                      "offset": {
+                                        "type": "number",
+                                        "default": 0
+                                      },
+                                      "reference": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "default": 0,
+                                        "title": "基准尺寸；0 表示按比例单位换算",
+                                        "x-optional": true
+                                      }
+                                    },
+                                    "required": [
+                                      "property",
+                                      "axis",
+                                      "mode",
+                                      "factor",
+                                      "offset"
+                                    ],
+                                    "title": "数值绑定（仅数值属性）",
+                                    "x-optional": true
                                   }
                                 },
                                 "required": [
@@ -10564,6 +10865,70 @@
                                 "field": "operation",
                                 "value": "variant"
                               }
+                            },
+                            "priority": {
+                              "type": "number",
+                              "title": "映射优先级",
+                              "default": 0,
+                              "x-optional": true
+                            },
+                            "numericBinding": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "property": {
+                                  "type": "string",
+                                  "enum": [
+                                    "position",
+                                    "scale",
+                                    "rotation",
+                                    "opacity"
+                                  ],
+                                  "default": "scale"
+                                },
+                                "axis": {
+                                  "type": "string",
+                                  "enum": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                    "all"
+                                  ],
+                                  "default": "all"
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "set",
+                                    "add"
+                                  ],
+                                  "default": "set"
+                                },
+                                "factor": {
+                                  "type": "number",
+                                  "default": 1
+                                },
+                                "offset": {
+                                  "type": "number",
+                                  "default": 0
+                                },
+                                "reference": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "default": 0,
+                                  "title": "基准尺寸；0 表示按比例单位换算",
+                                  "x-optional": true
+                                }
+                              },
+                              "required": [
+                                "property",
+                                "axis",
+                                "mode",
+                                "factor",
+                                "offset"
+                              ],
+                              "title": "数值绑定（仅数值属性）",
+                              "x-optional": true
                             }
                           },
                           "required": [
@@ -10579,6 +10944,13 @@
                           "additionalProperties": false
                         },
                         "default": []
+                      },
+                      "numericUnit": {
+                        "type": "string",
+                        "title": "数值单位（空为操作默认单位）",
+                        "default": "",
+                        "x-unit": true,
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -10683,6 +11055,55 @@
                         "type": "string",
                         "title": "原因",
                         "default": "此组合不兼容"
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "groupId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "operator": {
+                              "type": "string",
+                              "enum": [
+                                "selected",
+                                "notSelected",
+                                "gte",
+                                "lte",
+                                "eq"
+                              ],
+                              "default": "selected"
+                            },
+                            "optionId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "value": {
+                              "type": "number",
+                              "default": 0
+                            }
+                          },
+                          "required": [
+                            "groupId",
+                            "operator",
+                            "optionId",
+                            "value"
+                          ]
+                        },
+                        "default": [],
+                        "x-optional": true
+                      },
+                      "conditionJoin": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "any"
+                        ],
+                        "default": "all",
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -10713,6 +11134,16 @@
                   "type": "string",
                   "title": "固定目录修订",
                   "default": "",
+                  "x-optional": true
+                },
+                "variantPolicy": {
+                  "type": "string",
+                  "enum": [
+                    "compose-primitives",
+                    "global-variant"
+                  ],
+                  "default": "compose-primitives",
+                  "title": "材质变体模式",
                   "x-optional": true
                 }
               },

@@ -29,7 +29,8 @@
     "verify:model-revision": "node --import tsx scripts/verify-model-revision.mts",
     "verify:studio22": "node --import tsx scripts/verify-studio22.mts",
     "verify:studio23": "node --import tsx scripts/verify-studio23.mts",
-    "verify:ifc": "python3 scripts/verify-ifc.py"
+    "verify:ifc": "python3 scripts/verify-ifc.py",
+    "verify:configurator": "node --import tsx scripts/verify-configurator23.mts"
   },
   "dependencies": {
     "@gltf-transform/core": "4.2.1",
