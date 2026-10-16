@@ -4,6 +4,7 @@ import { RuntimeAssetImage } from "../../player-ui/src/RuntimeAssetImage";
 import type { PlayerWidget, PlayerWidgetProps } from "../player-contract";
 import type { ProjectNavigation, ProjectNavigationState } from "./navigation";
 import { directionAngles } from "./core";
+import { worldToFloor } from "./spatial";
 const empty: ProjectNavigationState = {
     nodeId: "",
     status: "idle",
@@ -27,7 +28,8 @@ function ProjectWidget({ runtime, design }: PlayerWidgetProps) {
     [routeId, setRouteId] = useState(""),
     [floorId, setFloorId] = useState(""),
     [error, setError] = useState(""),
-    radar = useRef<SVGPathElement>(null);
+    radar = useRef<SVGPathElement>(null),
+    radarPosition = useRef<SVGGElement>(null);
   const graph = navigation?.graph,
     node = graph?.nodes.find((n) => n.id === state.nodeId),
     floor = graph?.floors.find((f) => f.id === (floorId || node?.floorId));
@@ -37,13 +39,32 @@ function ProjectWidget({ runtime, design }: PlayerWidgetProps) {
       const direction = runtime.engine.camera.getWorldDirection(
           new THREE.Vector3(),
         ),
-        angle = directionAngles(direction.toArray()).yaw - (floor?.north ?? 0);
+        angle =
+          directionAngles(direction.toArray()).yaw -
+          (floor?.north ?? 0) -
+          (floor?.rotation ?? 0);
       if (radar.current) radar.current.style.transform = `rotate(${angle}deg)`;
+      if (
+        floor?.calibrated &&
+        floor.imageWidth &&
+        floor.imageHeight &&
+        radarPosition.current
+      ) {
+        const point = worldToFloor(
+          floor,
+          runtime.engine.camera.position.x,
+          runtime.engine.camera.position.z,
+        );
+        radarPosition.current.setAttribute(
+          "transform",
+          `translate(${point[0] * 100} ${point[1] * 100})`,
+        );
+      }
     });
     return () => {
       cleanup();
     };
-  }, [runtime, floor?.north]);
+  }, [runtime, floor]);
   if (!navigation || !graph) return null;
   const run = (action: () => void | Promise<void>) =>
     void Promise.resolve()
@@ -60,6 +81,18 @@ function ProjectWidget({ runtime, design }: PlayerWidgetProps) {
       )}
       <header>
         <strong>{node?.name ?? "项目入口"}</strong>
+        <button
+          disabled={design || state.status !== "ready"}
+          onClick={() =>
+            run(async () => {
+              const url = navigation.shareUrl();
+              await navigator.clipboard.writeText(url);
+              setError("已复制当前视点与固定项目修订地址");
+            })
+          }
+        >
+          分享当前视点
+        </button>
         <button
           disabled={!state.history.length || design}
           onClick={() => run(() => navigation.back())}
@@ -91,7 +124,7 @@ function ProjectWidget({ runtime, design }: PlayerWidgetProps) {
             <button
               key={link.id}
               disabled={design || state.status === "loading"}
-              onClick={() => run(() => navigation.navigate(link.toNodeId))}
+              onClick={() => run(() => navigation.followLink(link.id))}
             >
               前往 {graph.nodes.find((n) => n.id === link.toNodeId)?.name}
             </button>
@@ -142,6 +175,7 @@ function ProjectWidget({ runtime, design }: PlayerWidgetProps) {
                   .map((n) => (
                     <g
                       key={n.id}
+                      ref={n.id === node?.id ? radarPosition : undefined}
                       transform={`translate(${n.floorX * 100} ${n.floorY * 100})`}
                     >
                       <circle

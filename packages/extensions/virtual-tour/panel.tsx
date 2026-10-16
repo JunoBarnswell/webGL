@@ -1,3 +1,6 @@
+import { ProjectDiagram } from "./ProjectDiagram";
+import { HotspotCanvas } from "./HotspotCanvas";
+import { FloorEditor } from "./FloorEditor";
 import { useEffect, useState } from "react";
 import {
   createDocument,
@@ -14,52 +17,6 @@ import {
   type ProjectGraph,
   type TourHotspot,
 } from "./core";
-function MediaImage({
-  assetId,
-  graph,
-  services,
-  onPoint,
-}: {
-  assetId: string;
-  graph: ProjectGraph;
-  services: ExtensionPanelProps["services"];
-  onPoint?: (x: number, y: number) => void;
-}) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    const asset = graph.assets.find((a) => a.id === assetId);
-    if (!asset) return;
-    const abort = new AbortController();
-    let objectUrl = "";
-    void services
-      .assetBytes(asset.id, asset.entry, abort.signal)
-      .then((bytes) => {
-        if (abort.signal.aborted) return;
-        objectUrl = URL.createObjectURL(new Blob([bytes]));
-        setUrl(objectUrl);
-      });
-    return () => {
-      abort.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [assetId]);
-  return url ? (
-    <img
-      className="tour-media-editor"
-      alt="场景媒体或楼层平面图"
-      src={url}
-      onClick={(event) => {
-        const r = event.currentTarget.getBoundingClientRect();
-        onPoint?.(
-          (event.clientX - r.left) / r.width,
-          (event.clientY - r.top) / r.height,
-        );
-      }}
-    />
-  ) : (
-    <p>选择已归档的图像</p>
-  );
-}
 export function VirtualTourPanel(props: ExtensionPanelProps) {
   const { services } = props,
     initial = () => {
@@ -127,7 +84,26 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
     if (!file) return;
     void services.run("导入项目媒体", async () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      if (kind === "panorama") {
+      const video =
+        /^video\//.test(file.type) || /\.(mp4|webm)$/i.test(file.name);
+      if (kind === "panorama" && video) {
+        const url = URL.createObjectURL(file),
+          element = document.createElement("video");
+        try {
+          await new Promise<void>((resolve, reject) => {
+            element.onloadedmetadata = () => resolve();
+            element.onerror = () => reject(Error("视频元数据无法读取"));
+            element.preload = "metadata";
+            element.src = url;
+          });
+          if (element.videoWidth !== element.videoHeight * 2)
+            throw Error("全景视频必须为 2:1 等距柱状投影");
+        } finally {
+          element.removeAttribute("src");
+          element.load();
+          URL.revokeObjectURL(url);
+        }
+      } else if (kind === "panorama") {
         const image = await createImageBitmap(file);
         const valid = image.width === image.height * 2;
         image.close();
@@ -135,14 +111,14 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
       }
       const asset = await services.upload(
         file.name,
-        "image",
+        video ? "video" : "image",
         file.name,
         new Map([[file.name, bytes]]),
       );
       edit("归档项目媒体", (g) => {
         g.assets.push(asset);
         if (kind === "panorama") {
-          const n = newTourNode(file.name, "panorama");
+          const n = newTourNode(file.name, video ? "pano-video" : "panorama");
           n.assetId = asset.id;
           g.nodes.push(n);
           setActive(n.id);
@@ -273,7 +249,7 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
                     导入 2:1 全景
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,video/mp4,video/webm"
                       hidden
                       onChange={(e) => uploadMedia(e.target.files, "panorama")}
                     />
@@ -354,46 +330,12 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
           )}
           {tab === "graph" && (
             <section>
-              <svg
-                className="tour-graph"
-                viewBox="0 0 900 440"
-                role="img"
-                aria-label="场景连接图"
-              >
-                {graph.links.map((link) => {
-                  const a = graph.nodes.findIndex(
-                      (n) => n.id === link.fromNodeId,
-                    ),
-                    b = graph.nodes.findIndex((n) => n.id === link.toNodeId);
-                  return (
-                    <path
-                      key={link.id}
-                      d={`M ${90 + (a % 5) * 175} ${60 + Math.floor(a / 5) * 130} L ${90 + (b % 5) * 175} ${60 + Math.floor(b / 5) * 130}`}
-                      stroke="#6bd9bc"
-                      strokeWidth="2"
-                    />
-                  );
-                })}
-                {graph.nodes.map((n, i) => (
-                  <g
-                    role="button"
-                    tabIndex={0}
-                    key={n.id}
-                    onClick={() => setActive(n.id)}
-                    transform={`translate(${20 + (i % 5) * 175} ${30 + Math.floor(i / 5) * 130})`}
-                  >
-                    <rect
-                      width="140"
-                      height="60"
-                      rx="8"
-                      fill={n.id === node?.id ? "#236253" : "#253644"}
-                    />
-                    <text x="8" y="32" fill="white">
-                      {n.name.slice(0, 15)}
-                    </text>
-                  </g>
-                ))}
-              </svg>
+              <ProjectDiagram
+                graph={graph}
+                active={node?.id ?? ""}
+                onSelect={setActive}
+                edit={edit}
+              />
               {node && (
                 <label>
                   从 {node.name} 双向连接到
@@ -433,7 +375,7 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
                   </select>
                 </label>
               )}
-              {fields(["links"])}
+              {fields(["links", "diagram"])}
             </section>
           )}
           {tab === "hotspots" && node && (
@@ -465,7 +407,9 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
                 在等距柱状图上点击放置。多边形逐点添加后闭合；±180°
                 拼接点按球面坐标保存。
               </p>
-              <MediaImage
+              <HotspotCanvas
+                node={node}
+                edit={edit}
                 assetId={node.assetId}
                 graph={graph}
                 services={services}
@@ -543,28 +487,14 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
                 />
               </label>
               {graph.floors.map((f) => (
-                <section key={f.id}>
-                  <h3>
-                    {f.name} · {f.calibrated ? "已标定" : "未标定"}
-                  </h3>
-                  <MediaImage
-                    assetId={f.assetId}
-                    graph={graph}
-                    services={services}
-                    onPoint={(x, y) =>
-                      node &&
-                      edit("在楼层图定位节点", (g) => {
-                        const n = g.nodes.find((n) => n.id === node.id)!;
-                        n.floorId = f.id;
-                        n.floorX = x;
-                        n.floorY = y;
-                      })
-                    }
-                  />
-                  <p>
-                    选择节点后点击地图放置；比例和北向在下方标定。地图可保留明确的“未标定”状态。
-                  </p>
-                </section>
+                <FloorEditor
+                  key={f.id}
+                  floor={f}
+                  graph={graph}
+                  activeNode={node?.id ?? ""}
+                  services={services}
+                  edit={edit}
+                />
               ))}
               {fields(["floors", "nodes"])}
             </section>
@@ -579,7 +509,12 @@ export function VirtualTourPanel(props: ExtensionPanelProps) {
           )}
           {tab === "skin" && (
             <section>
-              {fields(["skinSceneId", "skinLayoutId"])}
+              {fields([
+                "skinSceneId",
+                "skinLayoutId",
+                "locales",
+                "releasePolicy",
+              ])}
               <p>
                 场景皮肤使用当前
                 InterfaceCanvas。项目导航、楼层雷达和缩略导航由同一 Player

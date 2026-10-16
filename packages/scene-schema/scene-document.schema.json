@@ -41,6 +41,7 @@
               "mesh",
               "model",
               "image",
+              "video",
               "audio",
               "texture",
               "source",
@@ -4171,6 +4172,208 @@
                               "default": 1,
                               "minimum": 0,
                               "maximum": 1
+                            },
+                            "bezier": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 4,
+                              "maxItems": 4,
+                              "default": [
+                                0.25,
+                                0.1,
+                                0.25,
+                                1
+                              ],
+                              "x-optional": true
+                            },
+                            "keyframes": {
+                              "type": "array",
+                              "default": [],
+                              "x-optional": true,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "time": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector",
+                                        "x-coordinate": "parent",
+                                        "x-coordinate-target": "targetId"
+                                      },
+                                      "rotation": {
+                                        "type": "array",
+                                        "title": "",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0,
+                                          1
+                                        ],
+                                        "minItems": 4,
+                                        "maxItems": 4
+                                      },
+                                      "scale": {
+                                        "type": "array",
+                                        "title": "缩放",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          1,
+                                          1,
+                                          1
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector"
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "rotation",
+                                      "scale"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "camera": {
+                                    "type": "object",
+                                    "title": "",
+                                    "properties": {
+                                      "position": {
+                                        "type": "array",
+                                        "title": "相机位置",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          1000,
+                                          3000
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector",
+                                        "x-coordinate": "world"
+                                      },
+                                      "target": {
+                                        "type": "array",
+                                        "title": "目标",
+                                        "items": {
+                                          "type": "number",
+                                          "title": "",
+                                          "default": 0
+                                        },
+                                        "default": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "minItems": 3,
+                                        "maxItems": 3,
+                                        "x-editor": "vector",
+                                        "x-coordinate": "world"
+                                      },
+                                      "fov": {
+                                        "type": "number",
+                                        "title": "FOV",
+                                        "default": 60,
+                                        "minimum": 10,
+                                        "maximum": 150
+                                      }
+                                    },
+                                    "required": [
+                                      "position",
+                                      "target",
+                                      "fov"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  },
+                                  "easing": {
+                                    "type": "string",
+                                    "title": "缓动",
+                                    "default": "smooth",
+                                    "enum": [
+                                      "linear",
+                                      "smooth",
+                                      "easeIn",
+                                      "easeOut"
+                                    ]
+                                  },
+                                  "bezier": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    },
+                                    "minItems": 4,
+                                    "maxItems": 4,
+                                    "default": [
+                                      0.25,
+                                      0.1,
+                                      0.25,
+                                      1
+                                    ],
+                                    "x-optional": true
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "time",
+                                  "transform",
+                                  "camera",
+                                  "value",
+                                  "easing"
+                                ]
+                              }
+                            },
+                            "waveform": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "maxItems": 2048,
+                              "default": [],
+                              "x-optional": true
                             }
                           },
                           "required": [
@@ -9461,6 +9664,7 @@
             "mesh",
             "model",
             "image",
+            "video",
             "audio",
             "texture",
             "source",
@@ -10653,6 +10857,31 @@
                         "title": "毫米/像素",
                         "default": 1,
                         "minimum": 0.0001
+                      },
+                      "originX": {
+                        "type": "number",
+                        "default": 0,
+                        "x-optional": true
+                      },
+                      "originY": {
+                        "type": "number",
+                        "default": 0,
+                        "x-optional": true
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "default": 0,
+                        "x-optional": true
+                      },
+                      "imageWidth": {
+                        "type": "number",
+                        "default": 0,
+                        "x-optional": true
+                      },
+                      "imageHeight": {
+                        "type": "number",
+                        "default": 0,
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -10703,6 +10932,70 @@
                         "type": "string",
                         "title": "反向链接",
                         "default": ""
+                      },
+                      "entrance": {
+                        "type": "object",
+                        "title": "",
+                        "properties": {
+                          "position": {
+                            "type": "array",
+                            "title": "相机位置",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              1000,
+                              3000
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "target": {
+                            "type": "array",
+                            "title": "目标",
+                            "items": {
+                              "type": "number",
+                              "title": "",
+                              "default": 0
+                            },
+                            "default": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "x-editor": "vector"
+                          },
+                          "fov": {
+                            "type": "number",
+                            "title": "FOV",
+                            "default": 60,
+                            "minimum": 10,
+                            "maximum": 150
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "target",
+                          "fov"
+                        ],
+                        "additionalProperties": false,
+                        "x-optional": true
+                      },
+                      "preload": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "media",
+                          "scene"
+                        ],
+                        "default": "none",
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -10848,6 +11141,137 @@
                   "type": "string",
                   "title": "固定皮肤场景版本",
                   "default": ""
+                },
+                "diagram": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "nodeId": {
+                            "type": "string",
+                            "default": ""
+                          },
+                          "x": {
+                            "type": "number",
+                            "default": 0
+                          },
+                          "y": {
+                            "type": "number",
+                            "default": 0
+                          }
+                        },
+                        "required": [
+                          "nodeId",
+                          "x",
+                          "y"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "default": ""
+                          },
+                          "name": {
+                            "type": "string",
+                            "default": ""
+                          },
+                          "nodeIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "default": []
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "nodeIds"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "viewport": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "default": 0
+                        },
+                        "y": {
+                          "type": "number",
+                          "default": 0
+                        },
+                        "zoom": {
+                          "type": "number",
+                          "minimum": 0.1,
+                          "maximum": 4,
+                          "default": 1
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "zoom"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "positions",
+                    "groups",
+                    "viewport"
+                  ],
+                  "x-optional": true
+                },
+                "locales": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z]{2,8}(-[a-zA-Z0-9]{1,8})*$"
+                  },
+                  "default": [],
+                  "x-optional": true
+                },
+                "releasePolicy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "hardware": {
+                      "type": "string",
+                      "enum": [
+                        "advisory",
+                        "required"
+                      ],
+                      "default": "advisory"
+                    },
+                    "budget": {
+                      "type": "string",
+                      "enum": [
+                        "advisory",
+                        "required"
+                      ],
+                      "default": "advisory"
+                    }
+                  },
+                  "required": [
+                    "hardware",
+                    "budget"
+                  ],
+                  "x-optional": true
                 }
               },
               "required": [

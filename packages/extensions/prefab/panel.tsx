@@ -6,8 +6,9 @@ import {
   newPrefabInstance,
   instantiatePrefab,
   prefabForEntity,
-  previewPrefabUpdate,
-  updatePrefabInstances,
+  prefabSourcePath,
+  applyPrefabUpdatePlan,
+  type PrefabReferenceMigration,
   revertPrefabOverride,
   detachPrefab,
 } from "../../editor-core/src/prefab";
@@ -19,6 +20,7 @@ import type { SceneDocument } from "../../scene-schema/src/types";
 import type { ExtensionPanelProps } from "../editor-contract";
 import { captureThumbnail, AssetThumbnail } from "../designer";
 import { useLibrary, type LibraryRecord } from "../library";
+import { usePrefabPlan } from "./usePrefabPlan";
 type Definition = {
   rootLocalId: string;
   document: SceneDocument;
@@ -46,6 +48,17 @@ export function PrefabPanel(props: ExtensionPanelProps) {
     >([]),
     [choices, setChoices] = useState<Record<string, "instance" | "source">>({}),
     [selectedInstances, setSelectedInstances] = useState<string[]>([]);
+  const [migrations, setMigrations] = useState<PrefabReferenceMigration[]>([]),
+    [sourcePath, setSourcePath] = useState(""),
+    [impact, setImpact] = useState<{
+      uses: {
+        ownerType: string;
+        ownerId: string;
+        historical: boolean;
+        requiresAncestorRevision: boolean;
+        references: { path: string; ownerId: string }[];
+      }[];
+    } | null>(null);
   const record = library.items.find((i) => i.id === active) ?? library.items[0],
     instance = prefabForEntity(document, selectedIds[0]);
   const candidates = useMemo(
@@ -55,14 +68,28 @@ export function PrefabPanel(props: ExtensionPanelProps) {
         : [],
     [document.prefabs, record],
   );
-  const conflicts = record
-    ? candidates.flatMap((i) =>
-        previewPrefabUpdate(i, revision(record)).map((c) => ({
-          ...c,
-          instanceId: i.id,
-        })),
-      )
-    : [];
+  const currentRevision = useMemo(
+    () => (record && tab === "diff" ? revision(record) : null),
+    [record, tab],
+  );
+  const selectedCandidates = useMemo(
+    () => selectedInstances.filter((id) => candidates.some((i) => i.id === id)),
+    [selectedInstances, candidates],
+  );
+  const planning = usePrefabPlan(
+      document,
+      selectedCandidates,
+      currentRevision,
+      choices,
+      migrations,
+    ),
+    conflicts = planning.plan?.conflicts ?? [];
+  const ancestry = useMemo(
+      () => prefabSourcePath(document, selectedIds[0] ?? ""),
+      [document, selectedIds],
+    ),
+    sourceLevel =
+      ancestry.find((level) => level.path === sourcePath) ?? ancestry[0];
   const run = (label: string, fn: () => Promise<void>) =>
     void services.run(label, fn);
   const applyFields = (keys: string[]) =>
@@ -299,6 +326,57 @@ export function PrefabPanel(props: ExtensionPanelProps) {
       {tab === "instance" &&
         (instance ? (
           <section>
+            <fieldset>
+              <legend>明确选择 Apply 的源祖先</legend>
+              <select
+                aria-label="Apply 源祖先"
+                value={sourceLevel?.path ?? ""}
+                onChange={(event) => setSourcePath(event.target.value)}
+              >
+                {ancestry.map((level, index) => (
+                  <option key={level.path} value={level.path}>
+                    {"↳ ".repeat(index)}
+                    {level.instance.name} · {level.instance.prefabId}@
+                    {level.instance.revisionId.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+              <p>
+                保存子模板的新修订会保留父模板固定的旧修订。父模板需要单独更新并保存新修订。
+              </p>
+              <button
+                disabled={!sourceLevel}
+                onClick={() =>
+                  run("应用到选定源祖先", async () => {
+                    if (!sourceLevel) return;
+                    const source = library.items.find(
+                      (record) => record.id === sourceLevel.instance.prefabId,
+                    );
+                    if (!source) throw Error("选定源未载入");
+                    const effective = revisionFromInstance(
+                      sourceLevel.document,
+                      sourceLevel.instance,
+                      source.name,
+                    );
+                    await services.request("/library/prefab/" + source.id, {
+                      method: "PUT",
+                      body: JSON.stringify({
+                        name: source.name,
+                        expectedRevision: source.revision,
+                        document: {
+                          ...source.document,
+                          rootLocalId: effective.rootLocalId,
+                          document: effective.document,
+                        },
+                      }),
+                    });
+                    await library.refresh();
+                  })
+                }
+              >
+                将当前有效覆盖保存到选定源的新修订
+              </button>
+            </fieldset>
             <h3>
               {instance.name} · {instance.prefabId}@
               {instance.revisionId.slice(0, 8)}
@@ -462,17 +540,193 @@ export function PrefabPanel(props: ExtensionPanelProps) {
               ))}
             </tbody>
           </table>
+          <div className="button-group">
+            <span>
+              {planning.status === "planning"
+                ? "正在生成完整变更计划…"
+                : planning.status === "cancelled"
+                  ? "已取消计划，文档未修改"
+                  : `${planning.plan?.changes.length ?? 0} 项源变更 · ${planning.plan?.impactedReferences.length ?? 0} 处引用影响`}
+            </span>
+            <button
+              onClick={planning.cancel}
+              disabled={planning.status !== "planning"}
+            >
+              取消计划
+            </button>
+            <button
+              onClick={planning.retry}
+              disabled={!selectedCandidates.length}
+            >
+              重新生成
+            </button>
+            <button
+              disabled={!record}
+              onClick={() =>
+                record &&
+                run("查询跨场景模板影响", async () =>
+                  setImpact(
+                    await services.request(
+                      "/library/prefab/" +
+                        record.id +
+                        "/impact?version=" +
+                        record.versionId,
+                    ),
+                  ),
+                )
+              }
+            >
+              查询跨场景影响
+            </button>
+          </div>
+          {planning.error && <p role="alert">{planning.error}</p>}
+          {planning.plan && (
+            <>
+              <details>
+                <summary>完整源树、资源与嵌套修订 Diff</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>实例 / 类型</th>
+                      <th>对象与字段</th>
+                      <th>旧源</th>
+                      <th>新源</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {planning.plan.changes.map((change, index) => (
+                      <tr key={index}>
+                        <td>
+                          {change.instanceId.slice(0, 8)} · {change.kind}
+                        </td>
+                        <td>
+                          {change.collection} / {change.localId} /{" "}
+                          {change.path.join(".")}
+                        </td>
+                        <td>
+                          <details>
+                            <summary>旧值</summary>
+                            <code>{JSON.stringify(change.base)}</code>
+                          </details>
+                        </td>
+                        <td>
+                          <details>
+                            <summary>新值</summary>
+                            <code>{JSON.stringify(change.source)}</code>
+                          </details>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+              {planning.plan.impactedReferences.map((edge) => (
+                <article key={edge.path}>
+                  <strong>
+                    {edge.ownerId} · {edge.componentType}
+                  </strong>
+                  <code>
+                    {edge.path} → {edge.id}
+                  </code>
+                  <select
+                    aria-label={"引用迁移 " + edge.path}
+                    value={
+                      migrations.find(
+                        (m) => m.kind === edge.kind && m.fromId === edge.id,
+                      )?.retain
+                        ? "retain"
+                        : (migrations.find(
+                            (m) => m.kind === edge.kind && m.fromId === edge.id,
+                          )?.toId ?? "")
+                    }
+                    onChange={(event) =>
+                      setMigrations((previous) => [
+                        ...previous.filter(
+                          (m) => m.kind !== edge.kind || m.fromId !== edge.id,
+                        ),
+                        ...(event.target.value
+                          ? [
+                              {
+                                kind: edge.kind,
+                                fromId: edge.id,
+                                ...(event.target.value === "retain"
+                                  ? { retain: true }
+                                  : { toId: event.target.value }),
+                              },
+                            ]
+                          : []),
+                      ])
+                    }
+                  >
+                    <option value="">选择如何处理引用</option>
+                    {edge.kind === "entity" && (
+                      <option value="retain">
+                        保留已删除节点为实例本地增项
+                      </option>
+                    )}
+                    {(edge.kind === "entity"
+                      ? document.entities
+                      : edge.kind === "material"
+                        ? document.materials
+                        : edge.kind === "asset"
+                          ? document.assets
+                          : edge.kind === "content"
+                            ? document.contents
+                            : edge.kind === "viewpoint"
+                              ? document.viewpoints
+                              : edge.kind === "tour"
+                                ? document.tours
+                                : edge.kind === "ui"
+                                  ? document.ui.nodes
+                                  : edge.kind === "layout"
+                                    ? document.ui.layouts
+                                    : []
+                    )
+                      .filter((item) => item.id !== edge.id)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          重定向：{item.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      select([edge.ownerId]);
+                      props.inspect(edge.ownerId);
+                    }}
+                  >
+                    定位引用对象
+                  </button>
+                </article>
+              ))}
+              {planning.plan.validationErrors.map((error, i) => (
+                <p className="danger" key={i}>
+                  {error}
+                </p>
+              ))}
+            </>
+          )}
+          {impact && (
+            <details open>
+              <summary>跨场景及历史固定修订影响</summary>
+              {impact.uses.map((owner, i) => (
+                <article key={i}>
+                  {owner.ownerType} / {owner.ownerId} ·{" "}
+                  {owner.historical ? "历史固定版本，保持原修订" : "草稿"}
+                  {owner.requiresAncestorRevision ? " · 需创建父源新修订" : ""}
+                  {owner.references.map((ref, i) => (
+                    <code key={i}>
+                      {ref.ownerId} {ref.path}
+                    </code>
+                  ))}
+                </article>
+              ))}
+            </details>
+          )}
           <button
-            disabled={!record || !selectedInstances.length}
+            disabled={!planning.plan?.ready || planning.status !== "ready"}
             onClick={() =>
-              record &&
-              command(
-                updatePrefabInstances(
-                  selectedInstances,
-                  revision(record),
-                  choices,
-                ),
-              )
+              planning.plan && command(applyPrefabUpdatePlan(planning.plan))
             }
           >
             原子升级所选实例（可撤销）

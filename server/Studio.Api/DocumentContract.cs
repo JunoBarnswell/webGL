@@ -51,7 +51,7 @@ public sealed class DocumentContract
         var declared=new HashSet<string>();
         foreach(var requirement in document.GetProperty("requiredExtensions").EnumerateArray()) {
             var id=Text(requirement,"id");if(!declared.Add(id))errors.Add("扩展声明重复");
-            if(publish&&(!available.TryGetValue(id,out var manifest)||Text(manifest,"version")!=Text(requirement,"version")))errors.Add("缺失或不兼容扩展 "+id);
+            if(publish&&(!available.TryGetValue(id,out var manifest)||!SupportsExtension(Text(manifest,"version"),Text(requirement,"version"))))errors.Add("缺失或不兼容扩展 "+id);
         }
         if(publish)foreach(var entity in document.GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray()) {
             var type=Text(component,"type");var known=schema.GetProperty("$defs").GetProperty("component").GetProperty("oneOf").EnumerateArray().Any(s=>s.GetProperty("properties").GetProperty("type").TryGetProperty("const",out var identity)&&identity.GetString()==type);
@@ -109,7 +109,7 @@ public sealed class DocumentContract
                     if(!sameParent)errors.Add(Text(entity,"name")+" 必须属于同一模型实例的层级");
                     if(Text(data,"sourceStatus")!="unresolved"&&!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
                 }
-                var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio",_=>""};
+                var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio","studio.virtualTour.Panorama"=>data.GetProperty("video").GetBoolean()?"video":"image",_=>""};
                 if(expected!="") {
                     var asset=document.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>Text(a,"id")==Text(data,"assetId"));
                     if(asset.ValueKind==JsonValueKind.Object&&Text(asset,"kind")!=expected&&!(expected=="image"&&Text(asset,"kind")=="texture"))errors.Add(Text(entity,"name")+"/"+type+" 资源类型不匹配");
@@ -178,6 +178,7 @@ public sealed class DocumentContract
         }
     }
     public static string RuntimeVersion=>Catalog.GetProperty("runtimeBuild").GetString()!;
+    public static bool SupportsExtension(string installed,string requested)=>Regex.IsMatch(requested,@"^\d+\.\d+\.\d+$")&&Version.TryParse(installed,out var current)&&Version.TryParse(requested,out var needed)&&current.Major==needed.Major&&needed<=current;
     public sealed record ReferenceEdge(string Kind,string Id,string Path,string SceneId="",string OwnerId="",string OwnerKind="",string ComponentType="",string ModelRevision="",string SourceElementId="",string LibraryRevision="");
     public ReferenceEdge[] ReferenceEdges(JsonElement document) {
         var scene=Text(document,"sceneId");var entities=document.GetProperty("entities").EnumerateArray().ToDictionary(e=>Text(e,"id"));
@@ -189,7 +190,7 @@ public sealed class DocumentContract
                 if(document.TryGetProperty("prefabs",out var instances))foreach(var instance in instances.EnumerateArray())if(instance.GetProperty("bindings").GetProperty("entity").EnumerateObject().Any(p=>p.Value.GetString()==edge.OwnerId)){libraryRevision=Text(instance,"revisionId");break;}
             }
             return edge with {SceneId=scene,ModelRevision=revision,SourceElementId=source,LibraryRevision=libraryRevision};
-        }).ToArray();
+        }).OrderBy(edge=>edge.Path,StringComparer.Ordinal).ThenBy(edge=>edge.Kind,StringComparer.Ordinal).ToArray();
     }
     private IEnumerable<ReferenceEdge> References(JsonElement value,JsonElement raw,string path="",string owner="",string ownerKind="",string component="",JsonElement parent=default,string propertyKey="") {
         var spec=Resolve(raw);

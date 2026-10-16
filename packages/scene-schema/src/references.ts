@@ -43,7 +43,7 @@ export function resolveReferenceSchema(
     : raw;
   if (spec.oneOf) {
     const matches = spec.oneOf
-      .map((s) => resolveReferenceSchema(s))
+      .map((s) => resolveReferenceSchema(s, value))
       .filter((s) => {
         if (s.const !== undefined) return s.const === value;
         if (s.type === "null") return value === null;
@@ -230,7 +230,17 @@ export function documentReferenceEdges(
   for (const edge of edges)
     if (edge.ownerKind === "entities")
       edge.libraryRevision = ownership.get(edge.ownerId) ?? "";
-  return edges;
+  return edges.sort((a, b) =>
+    a.path < b.path
+      ? -1
+      : a.path > b.path
+        ? 1
+        : a.kind < b.kind
+          ? -1
+          : a.kind > b.kind
+            ? 1
+            : 0,
+  );
 }
 export function entityReferenceEdges(entity: Entity): ReferenceEdge[] {
   const edges: ReferenceEdge[] = [];
@@ -255,7 +265,17 @@ export function entityReferenceEdges(entity: Entity): ReferenceEdge[] {
       return edge.id;
     },
   );
-  return edges;
+  return edges.sort((a, b) =>
+    a.path < b.path
+      ? -1
+      : a.path > b.path
+        ? 1
+        : a.kind < b.kind
+          ? -1
+          : a.kind > b.kind
+            ? 1
+            : 0,
+  );
 }
 /** Remapping visits the same contract, including dormant fields, without touching local snapshots. */
 export function remapSceneReferences(

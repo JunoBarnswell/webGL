@@ -68,7 +68,7 @@ public sealed class ObjectStore : IDisposable
     public async Task<AssetResponse> Upload(Stream input, string name, string kind, string entry, CancellationToken ct, string? importTaskId = null)
     {
         if (importTaskId != null && !System.Text.RegularExpressions.Regex.IsMatch(importTaskId,"^[a-zA-Z0-9_-]{1,100}$")) throw new ApiException(400,"导入任务 ID 无效");
-        if (name.Length is < 1 or > 255 || !new[] { "mesh", "model", "image", "audio", "texture", "source", "semantic" }.Contains(kind) || !ValidPath(entry)) throw new ApiException(400, "资源名称、类型或入口无效");
+        if (name.Length is < 1 or > 255 || !new[] { "mesh", "model", "image", "video", "audio", "texture", "source", "semantic" }.Contains(kind) || !ValidPath(entry)) throw new ApiException(400, "资源名称、类型或入口无效");
         if(importTaskId!=null){using var jobDb=database.Open();jobDb.Ado.ExecuteCommand("INSERT IGNORE INTO ImportJobs(Id) VALUES(@task)",P("task",importTaskId));if(jobDb.Ado.SqlQuery<CountRow>("SELECT COUNT(*) AS Value FROM ImportJobs WHERE Id=@task AND Cancelled=1",P("task",importTaskId))[0].Value>0)throw new ApiException(409,"导入任务已取消");}
         var stage = Path.Combine(Path.GetTempPath(), "studio-upload-" + Id()); Directory.CreateDirectory(stage);
         try {

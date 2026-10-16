@@ -201,7 +201,7 @@ export class SceneRuntime {
         void this.emit("tourEnd", id, "tour");
       },
     );
-    this.navigation.onInterrupt = (active) => {
+    this.navigation.onInputChanged((active) => {
       if (active) {
         if (this.cameraOwnership.owner !== "manual")
           this.manualCameraLease = this.cameraOwnership.acquire(
@@ -215,7 +215,7 @@ export class SceneRuntime {
         this.cameraOwnership.release(this.manualCameraLease);
         this.manualCameraLease = 0;
       }
-    };
+    });
     this.cleanup.push(
       engine.onUpdate((dt: number) => this.update(dt)),
       engine.onRender(() => {

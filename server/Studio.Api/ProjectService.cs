@@ -35,7 +35,10 @@ public sealed class ProjectService(Database database,LibraryService library,Stud
  }
  private void ValidateContexts(JsonElement document,Dictionary<string,JsonElement> documents,Dictionary<string,AssetResponse> assets) {
   var nodes=document.GetProperty("nodes").EnumerateArray().ToArray();
-  foreach(var node in nodes)if(DocumentContract.Text(node,"kind")!="scene3d"&&!assets.ContainsKey(DocumentContract.Text(node,"assetId")))throw new ApiException(422,"全景资源未归档到项目");
+  foreach(var node in nodes)if(DocumentContract.Text(node,"kind")!="scene3d") {
+   if(!assets.TryGetValue(DocumentContract.Text(node,"assetId"),out var asset))throw new ApiException(422,"全景资源未归档到项目");
+   var expected=DocumentContract.Text(node,"kind")=="pano-video"?"video":"image";if(asset.Kind!=expected&&!(expected=="image"&&asset.Kind=="texture"))throw new ApiException(422,"项目全景媒体类型不匹配");
+  }
   foreach(var node in nodes)foreach(var hotspot in node.GetProperty("hotspots").EnumerateArray()){
    var contentId=DocumentContract.Text(hotspot,"contentId");if(contentId=="")continue;var sourceScene=DocumentContract.Text(node,"kind")=="scene3d"?DocumentContract.Text(node,"sceneId"):DocumentContract.Text(document,"skinSceneId");
    if(!documents.TryGetValue(sourceScene,out var source)||!source.GetProperty("contents").EnumerateArray().Any(c=>DocumentContract.Text(c,"id")==contentId))throw new ApiException(422,"热点内容来源不存在："+contentId);
@@ -85,8 +88,15 @@ public sealed class ProjectService(Database database,LibraryService library,Stud
   return document.ValueKind==JsonValueKind.Object?ProjectReport(id,document,entries):ReleaseReadinessService.Summarize("project",id,entries);
  }
  public static void ValidateGraph(JsonElement document){
-  var nodes=document.GetProperty("nodes").EnumerateArray().ToDictionary(n=>DocumentContract.Text(n,"id"));if(!nodes.ContainsKey(DocumentContract.Text(document,"entryNodeId")))throw new ApiException(422,"项目入口节点不存在");
+  var nodes=new Dictionary<string,JsonElement>();foreach(var node in document.GetProperty("nodes").EnumerateArray())if(!nodes.TryAdd(DocumentContract.Text(node,"id"),node))throw new ApiException(422,"节点 ID 重复");if(!nodes.ContainsKey(DocumentContract.Text(document,"entryNodeId")))throw new ApiException(422,"项目入口节点不存在");
   var floors=document.GetProperty("floors").EnumerateArray().Select(f=>DocumentContract.Text(f,"id")).ToHashSet();
+  if(floors.Count!=document.GetProperty("floors").GetArrayLength())throw new ApiException(422,"楼层 ID 重复");
+  foreach(var floor in document.GetProperty("floors").EnumerateArray())if(floor.GetProperty("calibrated").GetBoolean()&&(floor.GetProperty("mmPerPixel").GetDouble()<=0||!floor.TryGetProperty("imageWidth",out var width)||width.GetDouble()<=0||!floor.TryGetProperty("imageHeight",out var height)||height.GetDouble()<=0))throw new ApiException(422,"楼层标定缺少有效图像尺寸或比例");
+  if(document.TryGetProperty("diagram",out var diagram)) {
+   var positioned=new HashSet<string>();foreach(var position in diagram.GetProperty("positions").EnumerateArray()){var id=DocumentContract.Text(position,"nodeId");if(!nodes.ContainsKey(id)||!positioned.Add(id))throw new ApiException(422,"连接图位置指向缺失或重复节点");}
+   var groups=new HashSet<string>();foreach(var group in diagram.GetProperty("groups").EnumerateArray())if(!groups.Add(DocumentContract.Text(group,"id"))||group.GetProperty("nodeIds").EnumerateArray().Any(id=>!nodes.ContainsKey(id.GetString()!)))throw new ApiException(422,"节点分组重复或指向缺失节点");
+  }
+  var links=document.GetProperty("links").EnumerateArray().ToArray();foreach(var link in links)if(DocumentContract.Text(link,"reverseLinkId") is {Length:>0} reverseId&&!links.Any(reverse=>DocumentContract.Text(reverse,"id")==reverseId&&DocumentContract.Text(reverse,"reverseLinkId")==DocumentContract.Text(link,"id")&&DocumentContract.Text(reverse,"fromNodeId")==DocumentContract.Text(link,"toNodeId")&&DocumentContract.Text(reverse,"toNodeId")==DocumentContract.Text(link,"fromNodeId")))throw new ApiException(422,"双向连接修订不一致");
   foreach(var node in nodes.Values){var floor=DocumentContract.Text(node,"floorId");if(floor!=""&&!floors.Contains(floor))throw new ApiException(422,"节点楼层不存在");foreach(var hotspot in node.GetProperty("hotspots").EnumerateArray()){var target=DocumentContract.Text(hotspot,"toNodeId");if(target!=""&&!nodes.ContainsKey(target))throw new ApiException(422,"热点目标断链");if(DocumentContract.Text(hotspot,"kind")=="polygon"&&hotspot.GetProperty("points").GetArrayLength()<3)throw new ApiException(422,"多边形热点至少需要三个顶点");}}
   foreach(var link in document.GetProperty("links").EnumerateArray())if(!nodes.ContainsKey(DocumentContract.Text(link,"fromNodeId"))||!nodes.ContainsKey(DocumentContract.Text(link,"toNodeId")))throw new ApiException(422,"项目链接断链");
   foreach(var route in document.GetProperty("routes").EnumerateArray())foreach(var stop in route.GetProperty("stops").EnumerateArray())if(!nodes.ContainsKey(DocumentContract.Text(stop,"nodeId")))throw new ApiException(422,"自动导览引用缺失节点");

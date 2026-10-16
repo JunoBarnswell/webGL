@@ -9,10 +9,16 @@ import type { SceneRuntime } from "../../scene-runtime/src/SceneRuntime";
 import type { RuntimeSystem } from "../../scene-runtime/src/systems/RuntimeSystem";
 import type { VisualOverride } from "../../scene-runtime/src/systems/VisualStateSystem";
 import type { CameraPose } from "../../scene-runtime/src/RuntimeState";
-import { evaluateStoryboard, type Storyboard } from "./core";
+import {
+  evaluateStoryboard,
+  compileStoryboard,
+  type CompiledStoryboard,
+  type Storyboard,
+} from "./core";
 import type { AssemblySystem } from "../assembly/runtime";
 interface Playback {
   story: Storyboard;
+  compiled: CompiledStoryboard;
   time: number;
   speed: number;
   playing: boolean;
@@ -31,6 +37,7 @@ export default class StoryboardSystem implements RuntimeSystem {
       if (c)
         this.sequences.set(e.id, {
           story: c.data as unknown as Storyboard,
+          compiled: compileStoryboard(c.data as unknown as Storyboard),
           time: 0,
           speed: 1,
           playing: false,
@@ -61,7 +68,7 @@ export default class StoryboardSystem implements RuntimeSystem {
       activeAudio = new Set<HTMLAudioElement>();
     let caption = "",
       content = "";
-    for (const sample of evaluateStoryboard(s.story, s.time)) {
+    for (const sample of evaluateStoryboard(s.story, s.time, s.compiled)) {
       const { track, transform, value } = sample,
         targetId = track.targetId;
       if (track.channel === "transform") {
@@ -151,6 +158,7 @@ export default class StoryboardSystem implements RuntimeSystem {
             playing: s.playing,
             speed: s.speed,
             duration: s.story.duration,
+            audioPolicy: s.speed < 0 ? "reverse-muted" : "forward-original",
             caption,
             content,
           },
@@ -160,7 +168,8 @@ export default class StoryboardSystem implements RuntimeSystem {
   }
   play(id: string, speed = 1, time?: number): void {
     const s = this.sequence(id);
-    if (speed === 0) throw Error("播放速度不能为零");
+    if (!Number.isFinite(speed) || speed === 0)
+      throw Error("播放速度必须为有限非零数值");
     s.speed = speed;
     s.playing = true;
     if (time !== undefined) s.time = time;

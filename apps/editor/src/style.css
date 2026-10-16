@@ -3042,3 +3042,7 @@ textarea:focus-visible {
 .readiness-list article { border:1px solid var(--border, #343b48); padding:12px; border-radius:6px; }
 .readiness-list p { margin:6px 0; }
 .readiness-list code { overflow-wrap:anywhere; }
+
+.project-asset-plane{position:relative;width:100%;line-height:0;overflow:hidden;background:#09111b}.project-asset-plane .tour-media-editor{display:block;width:100%;height:auto;max-height:none;object-fit:initial}.project-image-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.project-image-overlay circle[role=button]{pointer-events:all;cursor:move;touch-action:none}.tour-graph{touch-action:none;min-height:320px;max-height:none;user-select:none}.project-diagram-editor>svg{border:1px solid #31485a}.project-diagram-editor>svg:focus-visible{outline:2px solid #64d6b7}
+
+.clip-waveform{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.4}.timeline-keyframe{position:absolute;z-index:2;padding:0;border:0;background:transparent;color:#fff6bb;transform:translateX(-50%);height:24px;min-width:14px}.timing-curve{width:180px;height:100px;background:#0d1722}.timeline-marker{color:#ffd39d!important;top:10px;z-index:3;background:#152331!important}

@@ -353,6 +353,40 @@ export function revisionFromInstance(
     document: sourceDocument(source),
   };
 }
+export interface PrefabSourceLevel {
+  path: string;
+  instance: PrefabInstance;
+  document: SceneDocument;
+  parentRevision: string;
+}
+/** Resolve ancestry in each source's own ID space; outer edits become overrides of its pinned child. */
+export function prefabSourcePath(
+  document: SceneDocument,
+  entityId: string,
+): PrefabSourceLevel[] {
+  const levels: PrefabSourceLevel[] = [];
+  let context = document,
+    selected = entityId,
+    parentRevision = "",
+    path = "";
+  for (let depth = 0; depth < 8; depth++) {
+    const instance = prefabForEntity(context, selected);
+    if (!instance) break;
+    path += (path ? "/" : "") + instance.id;
+    levels.push({ path, instance, document: context, parentRevision });
+    const local = Object.entries(instance.bindings.entity ?? {}).find(
+      ([, global]) => global === selected,
+    )?.[0];
+    if (!local) break;
+    const before = compilePrefabs(instance.source),
+      effective = effectivePrefab(instance);
+    capturePrefabEdits(before, effective);
+    parentRevision = instance.revisionId;
+    context = effective;
+    selected = local;
+  }
+  return levels;
+}
 export function previewPrefabUpdate(
   instance: PrefabInstance,
   revision: PrefabRevision,
@@ -556,6 +590,33 @@ const preparedPrefabPlans = new WeakMap<
   PrefabUpdatePlan,
   { base: SceneDocument; source: SceneDocument }
 >();
+export interface PreparedPrefabUpdate {
+  plan: PrefabUpdatePlan;
+  source: SceneDocument;
+}
+/** Transfer a derived plan from the editor's cancellable worker, never into authored documents. */
+export function exportPrefabPlan(plan: PrefabUpdatePlan): PreparedPrefabUpdate {
+  const prepared = preparedPrefabPlans.get(plan);
+  if (!prepared) throw Error("未知模板计划");
+  return { plan: plain(plan), source: plain(prepared.source) };
+}
+export function acceptPrefabPlan(
+  base: SceneDocument,
+  prepared: PreparedPrefabUpdate,
+): PrefabUpdatePlan {
+  if (
+    base.sceneId !== prepared.source.sceneId ||
+    prepared.plan.selectedInstances.some(
+      (id) =>
+        base.prefabs?.find((i) => i.id === id)?.revisionId !==
+        prepared.plan.oldRevisions[id],
+    )
+  )
+    throw Error("计划来源场景或固定修订已变化");
+  const plan = freeze(prepared.plan, true);
+  preparedPrefabPlans.set(plan, { base, source: prepared.source });
+  return plan;
+}
 export function prefabRevisionDiff(
   instance: PrefabInstance,
   revision: PrefabRevision,
@@ -584,7 +645,17 @@ export function prefabRevisionDiff(
           source: b ?? null,
         });
       else if (collection === "entities")
-        for (const field of prefabFieldDiff(a as Entity, b as Entity))
+        for (const field of prefabFieldDiff(a as Entity, b as Entity)) {
+          let previous: unknown = field.componentType
+            ? (a as Entity).components.find(
+                (c) => c.type === field.componentType,
+              )
+            : a;
+          for (const key of field.path)
+            previous =
+              previous && typeof previous === "object"
+                ? (previous as Record<string, unknown>)[key]
+                : undefined;
           changes.push({
             instanceId: instance.id,
             collection,
@@ -600,9 +671,10 @@ export function prefabRevisionDiff(
               ...(field.componentType ? [field.componentType] : []),
               ...field.path,
             ],
-            base: a,
+            base: previous ?? null,
             source: field.remove ? null : field.value,
           });
+        }
       else if (!eq(a, b))
         changes.push({
           instanceId: instance.id,
@@ -622,6 +694,7 @@ export function prefabRevisionDiff(
     group(key, base[key], next[key]);
   group("ui.nodes", base.ui.nodes, next.ui.nodes);
   group("ui.layouts", base.ui.layouts, next.ui.layouts);
+  group("prefabs", base.prefabs ?? [], next.prefabs ?? []);
   return changes;
 }
 /** Plan generation is pure. Every reference impact is known before any edit is submitted. */

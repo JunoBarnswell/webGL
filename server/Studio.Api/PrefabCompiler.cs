@@ -83,7 +83,7 @@ public static class PrefabCompiler
             }
             foreach(var (group,kind) in new[]{("nodes","ui"),("layouts","layout")})foreach(var item in Array(mapped["ui"]?[group])) {var id=Text(bindings[kind]?[Text(item?["id"])]);if(id=="")throw new ApiException(422,"预制体 UI 映射缺失");item!["id"]=id;Array(document["ui"]?[group]).Add(item.DeepClone());}
             foreach(var asset in Array(source["assets"]))if(!Array(document["assets"]).Any(a=>Text(a?["id"])==Text(asset?["id"])))Array(document["assets"]).Add(asset?.DeepClone());
-            foreach(var requirement in Array(source["requiredExtensions"]))if(!Array(document["requiredExtensions"]).Any(r=>Text(r?["id"])==Text(requirement?["id"])))Array(document["requiredExtensions"]).Add(requirement?.DeepClone());
+            foreach(var requirement in Array(source["requiredExtensions"])) {var declared=Array(document["requiredExtensions"]).FirstOrDefault(r=>Text(r?["id"])==Text(requirement?["id"]));if(declared==null)Array(document["requiredExtensions"]).Add(requirement?.DeepClone());else if(DocumentContract.SupportsExtension(Text(requirement?["version"]),Text(declared["version"])))declared["version"]=requirement?["version"]?.DeepClone();else if(!DocumentContract.SupportsExtension(Text(declared["version"]),Text(requirement?["version"])))throw new ApiException(422,"嵌套模板扩展主版本不兼容");}
             if(Array(document["entities"]).Count>100000)throw new ApiException(422,"预制体实体限额超出");
         }
         return document;
