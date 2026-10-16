@@ -13,6 +13,7 @@
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
+    <EmbeddedResource Include="../../packages/scene-schema/extension-catalog.json" LogicalName="extension-catalog.json" />
     <RdXmlFile Include="rd.xml" />
     <EmbeddedResource Include="../../packages/scene-schema/scene-document.schema.json" LogicalName="scene-document.schema.json" />
     <Content Include="../migrations/*.sql" Link="migrations/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

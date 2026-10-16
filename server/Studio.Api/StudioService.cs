@@ -10,7 +10,7 @@ namespace Studio;
 public sealed class StudioService(Database database, DocumentContract contract, ObjectStore objects, IMemoryCache cache)
 {
     private static JsonElement Parse(string json) => JsonDocument.Parse(json).RootElement.Clone();
-    private static DraftResponse Draft(SceneRow row) => new(row.ProjectId, row.Id, row.Revision, Parse(row.Document), row.PublishedVersionId);
+    private static DraftResponse Draft(SceneRow row) => new(row.ProjectId, row.Id, row.Revision, DocumentContract.Migrate(Parse(row.Document)), row.PublishedVersionId);
     private static SceneRow Scene(SqlSugarClient db, string id, bool locked = false) => db.Ado.SqlQuery<SceneRow>("SELECT * FROM Scenes WHERE Id=@id" + (locked ? " FOR UPDATE" : ""), P("id", id)).SingleOrDefault() ?? throw new ApiException(404, "场景不存在");
     public DraftResponse Read(string id) { using var db = database.Open(); return Draft(Scene(db, id)); }
     public ProjectResponse[] Projects()
@@ -28,10 +28,11 @@ public sealed class StudioService(Database database, DocumentContract contract, 
     public DraftResponse Create(ProjectRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 255) throw new ApiException(400, "工程名称无效");
+        request=request with { Document=DocumentContract.Migrate(request.Document) };
         contract.Assert(request.Document);
         var projectId = Id(); var sceneId = Id(); var now = Now();
         var document = JsonNode.Parse(request.Document.GetRawText())!.AsObject(); document["sceneId"] = sceneId; document["name"] = request.Name;
-        var element = Parse(document.ToJsonString());
+        var element = DocumentContract.Migrate(Parse(document.ToJsonString()));
         using var db = database.Open(); db.Ado.BeginTran();
         try {
             db.Ado.ExecuteCommand("INSERT INTO Projects(Id,Name,CreatedAt) VALUES(@id,@name,@now)", P("id", projectId), P("name", request.Name), P("now", now));
@@ -128,7 +129,7 @@ public sealed class StudioService(Database database, DocumentContract contract, 
         }
         if (errors.Count > 0) throw new ApiException(422, "发布依赖校验失败", errors.ToArray());
         var versionId = Id(); var now = Now(); var key = "manifests/" + id + "/" + versionId + ".json";
-        var manifest = new ManifestResponse( versionId, now, draft.Document);
+        var manifest = new ManifestResponse(versionId,now,draft.Document,"2.0.0",DocumentContract.CatalogHash);
         await objects.PutManifest(key, JsonSerializer.SerializeToUtf8Bytes(manifest, ApiJson.Default.ManifestResponse), ct);
         using var db = database.Open(); db.Ado.BeginTran();
         try {
@@ -180,7 +181,7 @@ public sealed class StudioService(Database database, DocumentContract contract, 
             using var zip = ZipFile.OpenRead(temp);
             if (zip.Entries.Count > 20000 || zip.Entries.Sum(x => x.Length) > 2L * 1024 * 1024 * 1024) throw new ApiException(413, "工程包过大");
             var entry = zip.GetEntry("document.json") ?? throw new ApiException(422, "工程包缺少 document.json");
-            using var source = entry.Open(); var doc = await JsonDocument.ParseAsync(source, cancellationToken: ct); var document = doc.RootElement.Clone(); contract.Assert(document);
+            using var source = entry.Open(); var doc = await JsonDocument.ParseAsync(source, cancellationToken: ct); var document = DocumentContract.Migrate(doc.RootElement); contract.Assert(document);
             foreach (var item in document.GetProperty("assets").EnumerateArray()) {
                 var id = DocumentContract.Text(item, "id"); var assetPath = Path.Combine(Path.GetTempPath(), "studio-asset-" + Id() + ".zip");
                 try {

@@ -5,19 +5,27 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/extensions/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @studio/editor",
     "dev:player": "npm run dev -w @studio/player",
     "build": "npm run build -w @studio/editor && npm run build -w @studio/player",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint apps packages/scene-schema packages/scene-runtime packages/editor-core packages/asset-pipeline packages/player-ui scripts --max-warnings 0",
+    "lint": "eslint apps packages/scene-schema packages/scene-runtime packages/editor-core packages/asset-pipeline packages/player-ui packages/extensions scripts --max-warnings 0",
     "import:showroom": "tsx scripts/import-showroom.mts",
     "verify:integration": "tsx scripts/verify-integration.mts",
     "verify:contracts": "tsx scripts/verify-contracts.mts",
     "package:linux": "bash scripts/package-linux.sh",
-    "verify:experience": "tsx scripts/verify-experience.mts"
+    "verify:experience": "tsx scripts/verify-experience.mts",
+    "schema:generate": "tsx scripts/compose-extensions.mts",
+    "prebuild": "npm run schema:generate",
+    "verify:extensions": "tsx scripts/verify-extensions.mts",
+    "verify:browser": "tsx scripts/verify-browser.mts",
+    "benchmark:studio": "tsx scripts/benchmark-studio.mts",
+    "examples:industry": "tsx scripts/create-industry-samples.mts",
+    "verify:delivery": "tsx scripts/verify-delivery.mts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
@@ -41,6 +49,7 @@
     "typescript-eslint": "^8.0.0",
     "vite": "^6.1.0",
     "tsx": "^4.20.0",
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "playwright-core": "1.58.2"
   }
 }

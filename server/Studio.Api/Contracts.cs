@@ -16,7 +16,7 @@ public record AssetPreview(string File, int Width, int Height);
 public record AssetResponse(string Id, string Name, string Kind, string Entry, string[] Files, string Sha256, AssetPreview? Preview = null, string? ImportTaskId = null);
 public record AssetStatusResponse(AssetResponse Asset, string Status);
 public record VersionResponse(string Id, string SceneId, string CreatedAt, bool Published);
-public record ManifestResponse( string VersionId, string PublishedAt, JsonElement Document);
+public record ManifestResponse( string VersionId, string PublishedAt, JsonElement Document, string RuntimeBuild = "1.0.0", string ExtensionCatalogHash = "");
 public record PublishResponse(string VersionId, string PlayerUrl);
 public record HealthResponse(string Status, string Platform, string Storage);
 public record ErrorResponse(string Error, string[] Details);

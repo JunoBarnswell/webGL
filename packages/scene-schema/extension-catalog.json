@@ -1,0 +1,34 @@
+{
+  "runtimeBuild": "2.0.0",
+  "hash": "33a60754c0c2e74ec3540a2c12f920264bf360c0a7496fe243d1f76de99b8177",
+  "manifests": [
+    {
+      "id": "studio.annotation",
+      "version": "2.0.0",
+      "minRuntimeVersion": "2.0.0",
+      "dependsOn": {},
+      "permissions": []
+    },
+    {
+      "id": "studio.assembly",
+      "version": "2.0.0",
+      "minRuntimeVersion": "2.0.0",
+      "dependsOn": {},
+      "permissions": []
+    },
+    {
+      "id": "studio.piping",
+      "version": "2.0.0",
+      "minRuntimeVersion": "2.0.0",
+      "dependsOn": {},
+      "permissions": []
+    },
+    {
+      "id": "studio.sample",
+      "version": "2.0.0",
+      "minRuntimeVersion": "2.0.0",
+      "dependsOn": {},
+      "permissions": []
+    }
+  ]
+}

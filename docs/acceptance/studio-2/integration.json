@@ -1,0 +1,19 @@
+{
+  "status": "Pass",
+  "evidence": [
+    "JWT authentication and anonymous boundary",
+    "native API and MySQL query",
+    "real MinIO upload, confirmation, SHA-256 identity and byte-exact download",
+    "concurrent CAS: exactly one commit, one 409",
+    "failed contract leaves draft and transaction unchanged",
+    "immutable snapshot and restore creates a new revision",
+    "publication manifest and public version-scoped asset access",
+    "missing dependency blocks publication and retains old pointer",
+    "referenced asset deletion is rejected",
+    "portable project export/import preserves asset identities",
+    "unpublish revokes public manifests and resource access",
+    "references release after project deletion"
+  ],
+  "at": "2026-10-16T04:09:26.249Z",
+  "faults": false
+}

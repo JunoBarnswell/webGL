@@ -1,0 +1,126 @@
+{
+  "manifest": {
+    "id": "studio.assembly",
+    "version": "2.0.0",
+    "minRuntimeVersion": "2.0.0",
+    "dependsOn": {},
+    "permissions": []
+  },
+  "components": {
+    "studio.assembly.Part": {
+      "title": "装配零件",
+      "fields": {
+        "partNo": {
+          "type": "string",
+          "title": "零件号",
+          "default": ""
+        },
+        "sourceElementId": {
+          "type": "string",
+          "title": "来源元素",
+          "default": ""
+        },
+        "groupId": {
+          "type": "string",
+          "title": "装配组",
+          "default": "",
+          "x-reference": "entity",
+          "x-target-component": "studio.assembly.Root"
+        },
+        "direction": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            1,
+            0,
+            0
+          ],
+          "x-editor": "vector",
+          "title": "拆解方向"
+        },
+        "distance": {
+          "type": "number",
+          "title": "距离 mm",
+          "default": 500
+        },
+        "start": {
+          "type": "number",
+          "title": "起始进度",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 1,
+          "x-less-than": "end"
+        },
+        "end": {
+          "type": "number",
+          "title": "结束进度",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "studio.assembly.Root": {
+      "title": "装配序列",
+      "fields": {
+        "duration": {
+          "type": "number",
+          "title": "时长 s",
+          "default": 5,
+          "minimum": 0.01
+        },
+        "loop": {
+          "type": "boolean",
+          "title": "循环",
+          "default": false
+        }
+      }
+    }
+  },
+  "actions": {
+    "studio.assembly.SetProgress": {
+      "title": "装配进度",
+      "target": "entity",
+      "components": [
+        "studio.assembly.Root"
+      ],
+      "fields": {
+        "progress": {
+          "type": "number",
+          "title": "进度",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "studio.assembly.Play": {
+      "title": "播放拆解",
+      "target": "entity",
+      "components": [
+        "studio.assembly.Root"
+      ],
+      "fields": {}
+    },
+    "studio.assembly.Pause": {
+      "title": "暂停拆解",
+      "target": "entity",
+      "components": [
+        "studio.assembly.Root"
+      ],
+      "fields": {}
+    },
+    "studio.assembly.Restore": {
+      "title": "恢复装配",
+      "target": "entity",
+      "components": [
+        "studio.assembly.Root"
+      ],
+      "fields": {}
+    }
+  }
+}

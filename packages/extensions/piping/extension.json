@@ -1,0 +1,152 @@
+{
+  "manifest": {
+    "id": "studio.piping",
+    "version": "2.0.0",
+    "minRuntimeVersion": "2.0.0",
+    "dependsOn": {},
+    "permissions": []
+  },
+  "components": {
+    "studio.piping.Line": {
+      "title": "逻辑管线",
+      "fields": {
+        "lineNo": {
+          "type": "string",
+          "title": "管线号",
+          "default": "",
+          "x-unique": true,
+          "x-required-publish": true
+        },
+        "service": {
+          "type": "string",
+          "title": "介质",
+          "default": ""
+        },
+        "spec": {
+          "type": "string",
+          "title": "规格",
+          "default": ""
+        },
+        "nominalDiameter": {
+          "type": "string",
+          "title": "公称直径及单位",
+          "default": ""
+        },
+        "material": {
+          "type": "string",
+          "title": "材质",
+          "default": ""
+        },
+        "pressureClass": {
+          "type": "string",
+          "title": "压力等级",
+          "default": ""
+        },
+        "insulation": {
+          "type": "string",
+          "title": "保温",
+          "default": ""
+        },
+        "fromEquipment": {
+          "type": "string",
+          "title": "起点设备",
+          "default": ""
+        },
+        "toEquipment": {
+          "type": "string",
+          "title": "终点设备",
+          "default": ""
+        },
+        "sourceSystem": {
+          "type": "string",
+          "title": "所属系统",
+          "default": ""
+        }
+      }
+    },
+    "studio.piping.Segment": {
+      "title": "管段 / 管件",
+      "fields": {
+        "lineId": {
+          "type": "string",
+          "title": "逻辑管线",
+          "default": "",
+          "x-reference": "entity",
+          "x-target-component": "studio.piping.Line",
+          "x-required-publish": true
+        },
+        "sourceElementId": {
+          "type": "string",
+          "title": "来源元素",
+          "default": ""
+        },
+        "kind": {
+          "type": "string",
+          "title": "种类",
+          "default": "segment",
+          "enum": [
+            "segment",
+            "fitting",
+            "valve"
+          ]
+        },
+        "start": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "x-editor": "vector",
+          "title": "起点"
+        },
+        "end": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            1000,
+            0,
+            0
+          ],
+          "x-editor": "vector",
+          "title": "终点"
+        }
+      }
+    }
+  },
+  "actions": {
+    "studio.piping.Highlight": {
+      "title": "高亮管线",
+      "target": "entity",
+      "components": [
+        "studio.piping.Line"
+      ],
+      "fields": {}
+    },
+    "studio.piping.Isolate": {
+      "title": "隔离管线",
+      "target": "entity",
+      "components": [
+        "studio.piping.Line"
+      ],
+      "fields": {}
+    },
+    "studio.piping.Restore": {
+      "title": "恢复管网",
+      "target": "entity",
+      "components": [
+        "studio.piping.Line"
+      ],
+      "fields": {}
+    }
+  }
+}
