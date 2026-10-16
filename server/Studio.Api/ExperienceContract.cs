@@ -23,13 +23,14 @@ public static class ExperienceContract
             if(Text(c,"source")=="variable") Ref("variable",Text(c,"key"));
             else if(!new[]{"viewMode","displayMode","tour.status","contentId"}.Contains(Text(c,"key"))) errors.Add("未知运行状态字段");
         }
-        var definitions = schema.GetProperty("$defs").GetProperty("action").GetProperty("oneOf").EnumerateArray().ToDictionary(a => a.GetProperty("properties").GetProperty("type").GetProperty("const").GetString()!);
+        var definitions = schema.GetProperty("$defs").GetProperty("action").GetProperty("oneOf").EnumerateArray().Where(a=>a.GetProperty("properties").GetProperty("type").TryGetProperty("const",out _)).ToDictionary(a => a.GetProperty("properties").GetProperty("type").GetProperty("const").GetString()!);
         void Actions(JsonElement actions, int depth=0) {
             if(depth>12) { errors.Add("动作分支嵌套超过 12 层"); return; }
             var ids=new HashSet<string>();
             foreach(var a in actions.EnumerateArray()) {
                 if(!ids.Add(Text(a,"id"))) errors.Add("动作 ID 重复");
-                var type=Text(a,"type"); var definition=definitions[type]; var target=Text(a,"targetId");
+                var type=Text(a,"type"); if(!definitions.TryGetValue(type,out var definition)){if(publish)errors.Add("未知动作 "+type);continue;} var target=Text(a,"targetId");
+                SemanticContract.ActionOptions(doc,definition,a,errors,publish);
                 var kind=Text(definition,"x-target"); if(kind!="") { Ref(kind,target); if(publish && target=="") errors.Add(type+" 未指定目标"); }
                 var capabilities=definition.GetProperty("x-components").EnumerateArray().Select(c=>c.GetString()!).ToArray();
                 if(target!="" && capabilities.Length>0 && !capabilities.Any(c=>Has(target,c))) errors.Add(type+" 目标能力不匹配");

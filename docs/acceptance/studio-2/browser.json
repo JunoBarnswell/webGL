@@ -1,0 +1,44 @@
+{
+  "status": "Pass",
+  "canvasRetained": true,
+  "layoutCycles": 100,
+  "annotationDragUndoCancel": true,
+  "escapeCancelsFlight": true,
+  "nativeFullscreen": true,
+  "inputEscapeAndSave": true,
+  "stepSelection": true,
+  "layouts": [
+    {
+      "layout": "standard",
+      "ratio": 0.6677083333333333
+    },
+    {
+      "layout": "compact",
+      "ratio": 0.975
+    },
+    {
+      "layout": "focus",
+      "ratio": 1
+    }
+  ],
+  "responsive": [
+    {
+      "width": 1366,
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "overflow": false
+    },
+    {
+      "width": 767,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "errors": []
+}

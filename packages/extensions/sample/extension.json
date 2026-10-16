@@ -1,0 +1,49 @@
+{
+  "manifest": {
+    "id": "studio.sample",
+    "version": "2.0.0",
+    "minRuntimeVersion": "2.0.0",
+    "dependsOn": {},
+    "permissions": []
+  },
+  "components": {
+    "studio.sample.Pulse": {
+      "title": "示例脉冲",
+      "fields": {
+        "amplitude": {
+          "type": "number",
+          "title": "幅度",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "speed": {
+          "type": "number",
+          "title": "速度",
+          "default": 1,
+          "minimum": 0
+        },
+        "active": {
+          "type": "boolean",
+          "title": "启用脉冲",
+          "default": true
+        }
+      }
+    }
+  },
+  "actions": {
+    "studio.sample.SetPulse": {
+      "title": "设置脉冲",
+      "target": "entity",
+      "components": [
+        "studio.sample.Pulse"
+      ],
+      "fields": {
+        "active": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

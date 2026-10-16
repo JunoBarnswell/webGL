@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace Studio;
@@ -8,6 +9,13 @@ namespace Studio;
 public sealed class DocumentContract
 {
     private readonly JsonElement schema;
+    public static readonly JsonElement Catalog = ReadCatalog();
+    public static string CatalogHash => Text(Catalog,"hash");
+    private static JsonElement ReadCatalog() { using var stream=typeof(DocumentContract).Assembly.GetManifestResourceStream("extension-catalog.json")!;return JsonDocument.Parse(stream).RootElement.Clone(); }
+    public static JsonElement Migrate(JsonElement input) {
+        if(input.TryGetProperty("documentVersion",out var version)) { if(version.ValueKind!=JsonValueKind.Number||version.GetInt32()!=2)throw new ApiException(422,"不支持的文档版本");return input; }
+        var document=JsonNode.Parse(input.GetRawText())!.AsObject();document["documentVersion"]=2;document["requiredExtensions"]=new JsonArray();return JsonDocument.Parse(document.ToJsonString()).RootElement.Clone();
+    }
     public DocumentContract()
     {
         using var stream = typeof(DocumentContract).Assembly.GetManifestResourceStream("scene-document.schema.json")!;
@@ -20,6 +28,17 @@ public sealed class DocumentContract
         var errors = new List<string>();
         Check(document, schema, "$", errors);
         if (errors.Count > 0) return errors.Take(30).ToArray();
+        var available=Catalog.GetProperty("manifests").EnumerateArray().ToDictionary(m=>Text(m,"id"));
+        var declared=new HashSet<string>();
+        foreach(var requirement in document.GetProperty("requiredExtensions").EnumerateArray()) {
+            var id=Text(requirement,"id");if(!declared.Add(id))errors.Add("扩展声明重复");
+            if(publish&&(!available.TryGetValue(id,out var manifest)||Text(manifest,"version")!=Text(requirement,"version")))errors.Add("缺失或不兼容扩展 "+id);
+        }
+        if(publish)foreach(var entity in document.GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray()) {
+            var type=Text(component,"type");var known=schema.GetProperty("$defs").GetProperty("component").GetProperty("oneOf").EnumerateArray().Any(s=>s.GetProperty("properties").GetProperty("type").TryGetProperty("const",out var identity)&&identity.GetString()==type);
+            if(!known)errors.Add("缺失组件扩展 "+type);
+            foreach(var manifest in available.Values)if(type.StartsWith(Text(manifest,"id")+".",StringComparison.Ordinal)&&!declared.Contains(Text(manifest,"id")))errors.Add("未声明扩展 "+Text(manifest,"id"));
+        }
         var groups = new Dictionary<string, HashSet<string>>();
         foreach (var (kind, property) in new[] { ("entity", "entities"), ("asset", "assets"), ("material", "materials"), ("behavior", "behaviors"), ("content", "contents"), ("viewpoint", "viewpoints"), ("tour", "tours"), ("variable", "variables") }) {
             var ids = new HashSet<string>();
@@ -69,7 +88,7 @@ public sealed class DocumentContract
                     var sameParent=parentId==modelId;
                     if(entities.TryGetValue(parentId,out var parent))sameParent|=parent.GetProperty("components").EnumerateArray().Any(c=>Text(c,"type")=="ModelNode"&&Text(c.GetProperty("data"),"modelEntityId")==modelId);
                     if(!sameParent)errors.Add(Text(entity,"name")+" 必须属于同一模型实例的层级");
-                    if(!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
+                    if(Text(data,"sourceStatus")!="unresolved"&&!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
                 }
                 var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio",_=>""};
                 if(expected!="") {
@@ -87,6 +106,7 @@ public sealed class DocumentContract
         }
         var settings = document.GetProperty("settings");
         if (settings.GetProperty("near").GetDouble() >= settings.GetProperty("far").GetDouble()) errors.Add("近裁剪面必须小于远裁剪面");
+        SemanticContract.Validate(document,schema,errors,publish);
         ExperienceContract.Validate(document, schema, groups, errors, publish);
         return errors.Distinct().Take(30).ToArray();
     }
@@ -101,6 +121,7 @@ public sealed class DocumentContract
             if (matches != 1) errors.Add(path + " 不符合唯一组件/动作结构");
             return;
         }
+        if(spec.TryGetProperty("not",out var excluded)){var local=new List<string>();Check(value,excluded,path,local);if(local.Count==0)errors.Add(path+" 不允许该值");}
         if (spec.TryGetProperty("const", out var constant) && !Equal(value, constant)) errors.Add(path + " 常量不匹配");
         if (spec.TryGetProperty("enum", out var options) && !options.EnumerateArray().Any(x => Equal(value, x))) errors.Add(path + " 枚举值无效");
         bool Type(string type) => type switch { "object" => value.ValueKind == JsonValueKind.Object, "array" => value.ValueKind == JsonValueKind.Array, "string" => value.ValueKind == JsonValueKind.String, "number" => value.ValueKind == JsonValueKind.Number, "integer" => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _), "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False, "null" => value.ValueKind == JsonValueKind.Null, _ => false };
@@ -140,7 +161,10 @@ public sealed class DocumentContract
                 if (check.Count == 0) foreach (var reference in References(value, alternative)) yield return reference;
             }
         } else if (value.ValueKind == JsonValueKind.Object && spec.TryGetProperty("properties", out var properties)) {
-            foreach (var property in properties.EnumerateObject()) if (value.TryGetProperty(property.Name, out var child)) foreach (var reference in References(child, property.Value)) yield return reference;
+            foreach (var property in properties.EnumerateObject()) {
+                if(property.Value.TryGetProperty("x-reference-when",out var predicate)&&(!value.TryGetProperty(Text(predicate,"field"),out var discriminator)||!predicate.GetProperty("values").EnumerateArray().Any(item=>JsonElement.DeepEquals(item,discriminator))))continue;
+                if(value.TryGetProperty(property.Name,out var child))foreach(var reference in References(child,property.Value))yield return reference;
+            }
         } else if (value.ValueKind == JsonValueKind.Array && spec.TryGetProperty("items", out var items)) foreach (var child in value.EnumerateArray()) foreach (var reference in References(child, items)) yield return reference;
     }
 }

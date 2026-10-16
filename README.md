@@ -49,3 +49,27 @@ npm run build
 所有编辑通过命令提交；播放会话不写工程。云端按 expectedRevision 保存，冲突返回 409 并保留当前窗口的本地事务；可恢复或另存。不可变 Manifest 先写入 MinIO，最后以数据库事务切换发布指针。缺失资源及未完成业务配置阻止发布。
 
 门禁为 typecheck、lint、build 和真实浏览器操作；不引入前端测试框架。`verify:experience` 检查命令与业务调度契约，`verify:contracts` 比较前后端契约，`verify:integration` 连接真实数据库和 MinIO。故障注入命令与结果见验收记录。
+
+## Studio 2
+
+统一扩展、沉浸布局与命令中心说明见 [架构设计](docs/studio-2-design.md) 和 [扩展开发](docs/extensions.md)。新增受信任扩展只需在 `packages/extensions` 提供 Schema、RuntimeSystem、EditorCommand 工具及可选任务面板，构建生成两端目录；未知扩展数据保留，未解析依赖阻止发布。
+
+紧凑布局默认收起停靠面板，Space 在视口焦点时切换专注模式，Ctrl+. 搜索命令，? 打开快捷键帮助与重映射。输入法、输入框和右键飞行具有输入优先级。预览复用已有 Canvas 与 Runtime，会话停止后恢复编辑状态。
+
+```bash
+npm ci
+npm run schema:generate
+npm run typecheck
+npm run lint
+npm run verify:extensions
+npm run verify:experience
+npm run build
+# 完整 API / MySQL / MinIO 环境启动后
+npm run verify:contracts
+npm run verify:integration
+# Vite 编辑器运行时验证模型映射与选面修复
+npm run verify:model-revision
+npm run verify:browser
+```
+
+[可移植行业样例](examples/README.md) 使用合成几何，包含 50 零件的汽车拆解和 100 管线 / 1000 管段 / 500 标签的管网。它们可通过工程导入、编辑、预览和发布。真实 CAD/IFC 双向编辑不在当前产品边界内。

@@ -1,0 +1,54 @@
+name: Studio contracts
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run schema:generate
+      - run: git diff --exit-code -- packages/scene-schema/scene-document.schema.json packages/scene-schema/extension-catalog.json packages/scene-runtime/src/systems/catalog.ts packages/extensions/editor-catalog.ts packages/scene-schema/src/known-types.ts
+      - run: npm run typecheck && npm run lint
+      - run: npm run verify:extensions && npm run verify:experience
+      - run: npm run build
+  native-integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci && npm run schema:generate
+      - run: bash scripts/services.sh build && bash scripts/services.sh up
+      - run: bash scripts/package-linux.sh
+      - name: API, contracts and public Player
+        run: |
+          bash scripts/start-linux.sh > .local/logs/api-ci.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:18080/api/health
+          npm run verify:contracts
+          npm run verify:integration
+          npm exec -- playwright-core install --with-deps chromium
+          STUDIO_CHROMIUM="$(node --input-type=module -e 'import {chromium} from "playwright-core"; process.stdout.write(chromium.executablePath());')" npm run verify:browser
+          npm run dev -- --host 127.0.0.1 --port 5173 > .local/logs/editor-ci.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5173/editor/ > /dev/null; then break; fi
+            sleep 1
+          done
+          STUDIO_CHROMIUM="$(node --input-type=module -e 'import {chromium} from "playwright-core"; process.stdout.write(chromium.executablePath());')" npm run verify:model-revision
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-validation
+          path: .local/acceptance

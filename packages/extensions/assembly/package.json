@@ -1,0 +1,10 @@
+{
+  "name": "@studio/assembly-extension",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "exports": {
+    "./runtime": "./runtime.ts",
+    "./editor": "./editor.ts"
+  }
+}

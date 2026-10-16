@@ -1,0 +1,158 @@
+{
+  "status": "Pass",
+  "publicSamples": "passed",
+  "results": [
+    {
+      "name": "showroom",
+      "publicPlayer": true,
+      "errors": []
+    },
+    {
+      "name": "assembly",
+      "publicPlayer": true,
+      "errors": []
+    },
+    {
+      "name": "piping",
+      "publicPlayer": true,
+      "errors": []
+    },
+    {
+      "lifecycle": {
+        "before": {
+          "objects": 80,
+          "resources": 345,
+          "textures": 62,
+          "geometries": 34,
+          "pending": 0,
+          "contexts": 1,
+          "listeners": 6
+        },
+        "afterPreview": {
+          "objects": 80,
+          "resources": 345,
+          "textures": 62,
+          "geometries": 34,
+          "pending": 0,
+          "contexts": 1,
+          "listeners": 6
+        },
+        "cycles": [
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          },
+          {
+            "objects": 0,
+            "resources": 0,
+            "textures": 0,
+            "geometries": 1,
+            "pending": 0,
+            "contexts": 1,
+            "listeners": 6
+          }
+        ],
+        "after": {
+          "objects": 80,
+          "resources": 345,
+          "textures": 62,
+          "geometries": 34,
+          "pending": 0,
+          "contexts": 1,
+          "listeners": 6
+        }
+      }
+    },
+    {
+      "baseline": {
+        "viewportRatio": 0.6927083333333334,
+        "resources": {
+          "objects": 80,
+          "resources": 345,
+          "textures": 62,
+          "geometries": 31,
+          "pending": 0,
+          "contexts": 1,
+          "listeners": 6
+        }
+      }
+    }
+  ]
+}

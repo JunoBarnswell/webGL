@@ -266,6 +266,28 @@
     },
     "ui": {
       "$ref": "#/$defs/ui"
+    },
+    "documentVersion": {
+      "const": 2
+    },
+    "requiredExtensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ]
+      }
     }
   },
   "required": [
@@ -281,7 +303,9 @@
     "viewpoints",
     "tours",
     "variables",
-    "ui"
+    "ui",
+    "documentVersion",
+    "requiredExtensions"
   ],
   "$defs": {
     "component": {
@@ -362,7 +386,7 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 1e-06
+                  "minimum": 0.000001
                 }
               },
               "required": [
@@ -412,6 +436,28 @@
                   "title": "覆盖材质",
                   "default": "",
                   "x-reference": "material"
+                },
+                "sourceElementId": {
+                  "type": "string",
+                  "title": "稳定来源元素",
+                  "default": ""
+                },
+                "meshRevision": {
+                  "type": "string",
+                  "title": "模型修订",
+                  "default": ""
+                },
+                "sourceStatus": {
+                  "type": "string",
+                  "title": "来源状态",
+                  "enum": [
+                    "resolved",
+                    "unresolved"
+                  ],
+                  "default": "resolved",
+                  "x-publish-enum": [
+                    "resolved"
+                  ]
                 }
               },
               "required": [
@@ -910,7 +956,7 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 1e-06
+                  "minimum": 0.000001
                 },
                 "idleClip": {
                   "type": "string",
@@ -1150,6 +1196,966 @@
             "data"
           ],
           "title": "模型动画"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.annotation.Label"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "anchorKind": {
+                  "type": "string",
+                  "title": "锚点",
+                  "default": "entity-local",
+                  "enum": [
+                    "world",
+                    "entity-local",
+                    "surface",
+                    "path-station"
+                  ],
+                  "x-resets": [
+                    "entityId",
+                    "position",
+                    "sourceElementId",
+                    "meshRevision",
+                    "triangleIndex",
+                    "barycentric",
+                    "primitiveIndex",
+                    "routeId",
+                    "station"
+                  ]
+                },
+                "entityId": {
+                  "type": "string",
+                  "title": "附着对象",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-reference-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "entity-local",
+                      "surface"
+                    ]
+                  },
+                  "x-required-when": {
+                    "field": "anchorKind",
+                    "value": "surface"
+                  },
+                  "x-resets": [
+                    "sourceElementId",
+                    "meshRevision",
+                    "triangleIndex",
+                    "barycentric",
+                    "primitiveIndex"
+                  ]
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector",
+                  "title": "锚点位置",
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "world",
+                      "entity-local"
+                    ]
+                  }
+                },
+                "sourceElementId": {
+                  "type": "string",
+                  "title": "来源元素",
+                  "default": "",
+                  "x-required-when": {
+                    "field": "anchorKind",
+                    "value": "surface"
+                  },
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "surface"
+                    ]
+                  }
+                },
+                "meshRevision": {
+                  "type": "string",
+                  "title": "网格版本",
+                  "default": "",
+                  "x-required-when": {
+                    "field": "anchorKind",
+                    "value": "surface"
+                  },
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "surface"
+                    ]
+                  }
+                },
+                "triangleIndex": {
+                  "type": "integer",
+                  "title": "三角形",
+                  "default": 0,
+                  "minimum": 0,
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "surface"
+                    ]
+                  }
+                },
+                "barycentric": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector",
+                  "title": "重心坐标",
+                  "x-sum": 1,
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "surface"
+                    ]
+                  }
+                },
+                "routeId": {
+                  "type": "string",
+                  "title": "路径",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-target-component": "studio.piping.Segment",
+                  "x-required-when": {
+                    "field": "anchorKind",
+                    "value": "path-station"
+                  },
+                  "x-reference-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "path-station"
+                    ]
+                  }
+                },
+                "station": {
+                  "type": "number",
+                  "title": "里程",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "path-station"
+                    ]
+                  }
+                },
+                "label": {
+                  "type": "string",
+                  "title": "标签",
+                  "default": "标注"
+                },
+                "contentId": {
+                  "type": "string",
+                  "title": "内容",
+                  "default": "",
+                  "x-reference": "content"
+                },
+                "color": {
+                  "type": "string",
+                  "title": "颜色",
+                  "default": "#56d6bd"
+                },
+                "size": {
+                  "type": "number",
+                  "title": "字号",
+                  "default": 14,
+                  "minimum": 10,
+                  "maximum": 48
+                },
+                "offset": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    40,
+                    -40,
+                    0
+                  ],
+                  "x-editor": "vector",
+                  "title": "引线偏移"
+                },
+                "maxDistance": {
+                  "type": "number",
+                  "title": "显示距离 mm",
+                  "default": 100000,
+                  "minimum": 1
+                },
+                "occlusion": {
+                  "type": "boolean",
+                  "title": "遮挡检测",
+                  "default": false
+                },
+                "primitiveIndex": {
+                  "type": "integer",
+                  "title": "网格图元",
+                  "default": 0,
+                  "minimum": 0,
+                  "x-visible-when": {
+                    "field": "anchorKind",
+                    "values": [
+                      "surface"
+                    ]
+                  }
+                },
+                "style": {
+                  "type": "string",
+                  "title": "标注样式",
+                  "default": "callout",
+                  "enum": [
+                    "callout",
+                    "badge",
+                    "measurement"
+                  ]
+                },
+                "bindProperty": {
+                  "type": "string",
+                  "title": "属性绑定字段",
+                  "default": ""
+                },
+                "cluster": {
+                  "type": "boolean",
+                  "title": "允许聚合",
+                  "default": true
+                }
+              },
+              "required": [
+                "anchorKind",
+                "entityId",
+                "position",
+                "sourceElementId",
+                "meshRevision",
+                "triangleIndex",
+                "barycentric",
+                "routeId",
+                "station",
+                "label",
+                "contentId",
+                "color",
+                "size",
+                "offset",
+                "maxDistance",
+                "occlusion",
+                "primitiveIndex",
+                "style",
+                "bindProperty",
+                "cluster"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "空间标注",
+          "x-anchor": true
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.assembly.Part"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "partNo": {
+                  "type": "string",
+                  "title": "零件号",
+                  "default": ""
+                },
+                "sourceElementId": {
+                  "type": "string",
+                  "title": "来源元素",
+                  "default": "",
+                  "x-source-element-id": true
+                },
+                "groupId": {
+                  "type": "string",
+                  "title": "装配组",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-target-components": [
+                    "studio.assembly.Root",
+                    "studio.assembly.Group"
+                  ],
+                  "x-required-publish": true,
+                  "x-public": false
+                },
+                "stages": {
+                  "type": "array",
+                  "title": "拆解步骤",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "步骤 ID",
+                        "default": "",
+                        "pattern": "^[a-zA-Z0-9_-]{1,100}$",
+                        "x-editor": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "title": "步骤名称",
+                        "default": "拆解步骤"
+                      },
+                      "start": {
+                        "type": "number",
+                        "title": "开始",
+                        "default": 0,
+                        "minimum": 0,
+                        "maximum": 1,
+                        "x-less-than": "end"
+                      },
+                      "end": {
+                        "type": "number",
+                        "title": "结束",
+                        "default": 1,
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "path": {
+                        "type": "array",
+                        "title": "路径控制点 mm（起点为基准姿态）",
+                        "items": {
+                          "type": "array",
+                          "title": "向量",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "default": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "x-editor": "vector",
+                          "x-coordinate": "parent-offset"
+                        },
+                        "minItems": 1,
+                        "default": [
+                          [
+                            500,
+                            0,
+                            0
+                          ]
+                        ]
+                      },
+                      "rotation": {
+                        "type": "array",
+                        "title": "相对旋转 °",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "default": [
+                          0,
+                          0,
+                          0
+                        ],
+                        "x-editor": "vector"
+                      },
+                      "scale": {
+                        "type": "array",
+                        "title": "相对缩放",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "default": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "x-editor": "vector"
+                      },
+                      "easing": {
+                        "type": "string",
+                        "title": "缓动",
+                        "default": "smooth",
+                        "enum": [
+                          "linear",
+                          "smooth",
+                          "ease-in",
+                          "ease-out"
+                        ]
+                      },
+                      "trail": {
+                        "type": "boolean",
+                        "title": "显示轨迹",
+                        "default": false
+                      },
+                      "visibility": {
+                        "type": "string",
+                        "title": "步骤结束后可见性",
+                        "enum": [
+                          "inherit",
+                          "show",
+                          "hide"
+                        ],
+                        "default": "inherit"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "start",
+                      "end",
+                      "path",
+                      "rotation",
+                      "scale",
+                      "easing",
+                      "trail",
+                      "visibility"
+                    ]
+                  },
+                  "default": [
+                    {
+                      "id": "initial",
+                      "name": "拆解步骤",
+                      "start": 0,
+                      "end": 1,
+                      "path": [
+                        [
+                          500,
+                          0,
+                          0
+                        ]
+                      ],
+                      "rotation": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "scale": [
+                        1,
+                        1,
+                        1
+                      ],
+                      "easing": "smooth",
+                      "trail": false,
+                      "visibility": "inherit"
+                    }
+                  ],
+                  "x-unique-by": "id",
+                  "x-public": false
+                },
+                "attributes": {
+                  "type": "object",
+                  "title": "BOM 属性",
+                  "default": {},
+                  "x-editor": "json"
+                }
+              },
+              "required": [
+                "partNo",
+                "sourceElementId",
+                "groupId",
+                "stages",
+                "attributes"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "装配零件"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.assembly.Root"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "title": "时长 s",
+                  "default": 5,
+                  "minimum": 0.01
+                },
+                "loop": {
+                  "type": "boolean",
+                  "title": "循环",
+                  "default": false
+                }
+              },
+              "required": [
+                "duration",
+                "loop"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "装配序列"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.assembly.Group"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rootId": {
+                  "type": "string",
+                  "title": "装配序列",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-target-component": "studio.assembly.Root",
+                  "x-required-publish": true
+                },
+                "groupNo": {
+                  "type": "string",
+                  "title": "组号",
+                  "default": ""
+                },
+                "description": {
+                  "type": "string",
+                  "title": "说明",
+                  "default": ""
+                }
+              },
+              "required": [
+                "rootId",
+                "groupNo",
+                "description"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "装配分组"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.piping.Line"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "lineNo": {
+                  "type": "string",
+                  "title": "管线号",
+                  "default": "",
+                  "x-unique": true,
+                  "x-required-publish": true
+                },
+                "service": {
+                  "type": "string",
+                  "title": "介质",
+                  "default": ""
+                },
+                "spec": {
+                  "type": "string",
+                  "title": "规格",
+                  "default": ""
+                },
+                "nominalDiameter": {
+                  "type": "string",
+                  "title": "公称直径及单位",
+                  "default": ""
+                },
+                "material": {
+                  "type": "string",
+                  "title": "材质",
+                  "default": ""
+                },
+                "pressureClass": {
+                  "type": "string",
+                  "title": "压力等级",
+                  "default": ""
+                },
+                "insulation": {
+                  "type": "string",
+                  "title": "保温",
+                  "default": ""
+                },
+                "fromEquipment": {
+                  "type": "string",
+                  "title": "起点设备",
+                  "default": ""
+                },
+                "toEquipment": {
+                  "type": "string",
+                  "title": "终点设备",
+                  "default": ""
+                },
+                "sourceSystem": {
+                  "type": "string",
+                  "title": "所属系统",
+                  "default": ""
+                },
+                "systemId": {
+                  "type": "string",
+                  "title": "所属系统",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-target-component": "studio.piping.System"
+                },
+                "properties": {
+                  "type": "object",
+                  "title": "自定义属性",
+                  "default": {},
+                  "x-editor": "json"
+                }
+              },
+              "required": [
+                "lineNo",
+                "service",
+                "spec",
+                "nominalDiameter",
+                "material",
+                "pressureClass",
+                "insulation",
+                "fromEquipment",
+                "toEquipment",
+                "sourceSystem",
+                "systemId",
+                "properties"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "逻辑管线"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.piping.Segment"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "lineId": {
+                  "type": "string",
+                  "title": "逻辑管线",
+                  "default": "",
+                  "x-reference": "entity",
+                  "x-target-component": "studio.piping.Line",
+                  "x-required-publish": true
+                },
+                "sourceElementId": {
+                  "type": "string",
+                  "title": "来源元素",
+                  "default": "",
+                  "x-source-element-id": true
+                },
+                "kind": {
+                  "type": "string",
+                  "title": "种类",
+                  "default": "segment",
+                  "enum": [
+                    "segment",
+                    "fitting",
+                    "valve"
+                  ]
+                },
+                "start": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector",
+                  "title": "起点"
+                },
+                "end": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "default": [
+                    1000,
+                    0,
+                    0
+                  ],
+                  "x-editor": "vector",
+                  "title": "终点"
+                }
+              },
+              "required": [
+                "lineId",
+                "sourceElementId",
+                "kind",
+                "start",
+                "end"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "管段 / 管件"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.piping.System"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "systemNo": {
+                  "type": "string",
+                  "title": "系统编号",
+                  "default": ""
+                },
+                "service": {
+                  "type": "string",
+                  "title": "介质",
+                  "default": ""
+                },
+                "color": {
+                  "type": "string",
+                  "title": "颜色",
+                  "default": "#60bca3"
+                },
+                "units": {
+                  "type": "object",
+                  "title": "字段单位与类型",
+                  "default": {
+                    "nominalDiameter": {
+                      "type": "number",
+                      "unit": "mm"
+                    }
+                  },
+                  "x-editor": "json"
+                }
+              },
+              "required": [
+                "systemNo",
+                "service",
+                "color",
+                "units"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "管网系统"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "studio.sample.Pulse"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "amplitude": {
+                  "type": "number",
+                  "title": "幅度",
+                  "default": 0.1,
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "speed": {
+                  "type": "number",
+                  "title": "速度",
+                  "default": 1,
+                  "minimum": 0
+                },
+                "active": {
+                  "type": "boolean",
+                  "title": "启用脉冲",
+                  "default": true
+                }
+              },
+              "required": [
+                "amplitude",
+                "speed",
+                "active"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "示例脉冲"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*(\\.[A-Za-z][A-Za-z0-9_-]*){2,}$",
+              "not": {
+                "enum": [
+                  "Mesh",
+                  "Model",
+                  "ModelNode",
+                  "Hotspot",
+                  "Artwork",
+                  "Collider",
+                  "Ground",
+                  "Trigger",
+                  "DisplayLayer",
+                  "Light",
+                  "Audio",
+                  "Avatar",
+                  "Cruise",
+                  "Zone",
+                  "Panorama",
+                  "Animation",
+                  "studio.annotation.Label",
+                  "studio.assembly.Part",
+                  "studio.assembly.Root",
+                  "studio.assembly.Group",
+                  "studio.piping.Line",
+                  "studio.piping.Segment",
+                  "studio.piping.System",
+                  "studio.sample.Pulse"
+                ]
+              }
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "启用",
+              "default": true
+            },
+            "data": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "type",
+            "enabled",
+            "data"
+          ],
+          "title": "缺失扩展"
         }
       ]
     },
@@ -2273,6 +3279,725 @@
             "else"
           ],
           "title": "条件分支",
+          "x-target": "",
+          "x-components": []
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.annotation.Focus"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "title": "秒",
+                  "default": 1,
+                  "minimum": 0.1,
+                  "maximum": 30
+                }
+              },
+              "required": [
+                "duration"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "聚焦标注",
+          "x-target": "entity",
+          "x-components": [
+            "studio.annotation.Label"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.SetProgress"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "progress": {
+                  "type": "number",
+                  "title": "进度",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "x-runtime-binding": "progress"
+                }
+              },
+              "required": [
+                "progress"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "装配进度",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.Play"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "播放拆解",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.Pause"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "暂停拆解",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.Restore"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "恢复装配",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.SelectStep"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "stepId": {
+                  "type": "string",
+                  "title": "步骤 ID",
+                  "default": "",
+                  "x-required-publish": true,
+                  "x-options": {
+                    "component": "studio.assembly.Part",
+                    "relation": "groupId",
+                    "rootComponent": "studio.assembly.Group",
+                    "rootField": "rootId",
+                    "array": "stages",
+                    "value": "id",
+                    "label": "name",
+                    "sort": "start"
+                  }
+                }
+              },
+              "required": [
+                "stepId"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "选择装配步骤",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.HighlightPart"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "高亮零件",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Part",
+            "studio.assembly.Group"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.IsolatePart"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "隔离零件",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Part",
+            "studio.assembly.Group"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.assembly.FocusPart"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "聚焦零件",
+          "x-target": "entity",
+          "x-components": [
+            "studio.assembly.Part",
+            "studio.assembly.Group",
+            "studio.assembly.Root"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.piping.Highlight"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "高亮管线",
+          "x-target": "entity",
+          "x-components": [
+            "studio.piping.Line"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.piping.Isolate"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "隔离管线",
+          "x-target": "entity",
+          "x-components": [
+            "studio.piping.Line"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.piping.Restore"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "恢复管网",
+          "x-target": "entity",
+          "x-components": [
+            "studio.piping.Line"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.piping.Focus"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "聚焦管线",
+          "x-target": "entity",
+          "x-components": [
+            "studio.piping.Line"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "const": "studio.sample.SetPulse"
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标",
+              "x-reference": "entity"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "active": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "required": [
+                "active"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "设置脉冲",
+          "x-target": "entity",
+          "x-components": [
+            "studio.sample.Pulse"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            },
+            "type": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*(\\.[A-Za-z][A-Za-z0-9_-]*){2,}$",
+              "not": {
+                "enum": [
+                  "Show",
+                  "Hide",
+                  "Toggle",
+                  "DisplayMode",
+                  "ViewMode",
+                  "PlayAnimation",
+                  "PauseAnimation",
+                  "PlayAudio",
+                  "StopAudio",
+                  "SetVolume",
+                  "FlyTo",
+                  "OpenContent",
+                  "CloseContent",
+                  "StartCruise",
+                  "PauseCruise",
+                  "ResumeCruise",
+                  "StopCruise",
+                  "ReplayCruise",
+                  "SeekCruise",
+                  "EnterPanorama",
+                  "CapturePanorama",
+                  "SetVariable",
+                  "ToggleUi",
+                  "Delay",
+                  "If",
+                  "studio.annotation.Focus",
+                  "studio.assembly.SetProgress",
+                  "studio.assembly.Play",
+                  "studio.assembly.Pause",
+                  "studio.assembly.Restore",
+                  "studio.assembly.SelectStep",
+                  "studio.assembly.HighlightPart",
+                  "studio.assembly.IsolatePart",
+                  "studio.assembly.FocusPart",
+                  "studio.piping.Highlight",
+                  "studio.piping.Isolate",
+                  "studio.piping.Restore",
+                  "studio.piping.Focus",
+                  "studio.sample.SetPulse"
+                ]
+              }
+            },
+            "targetId": {
+              "type": "string",
+              "default": "",
+              "title": "目标"
+            },
+            "wait": {
+              "type": "boolean",
+              "title": "完成后继续",
+              "default": false
+            },
+            "data": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "targetId",
+            "wait",
+            "data"
+          ],
+          "title": "缺失扩展",
           "x-target": "",
           "x-components": []
         }
