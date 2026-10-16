@@ -188,7 +188,8 @@ export default class ConfiguratorSystem implements RuntimeSystem {
   async select(id: string, groupId: string, optionId: string): Promise<void> {
     const p = this.product(id),
       group = p.catalog.groups.find((g) => g.id === groupId);
-    if (!group) throw Error("配置属性不存在");
+    if (!group || group.control === "number")
+      throw Error("请选择选项属性；数值属性使用 SetNumber");
     const selected = p.desired.selections[groupId] ?? [];
     const next = {
       ...p.desired.selections,

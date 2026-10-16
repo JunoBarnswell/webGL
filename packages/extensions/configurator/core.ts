@@ -307,7 +307,10 @@ export function defaultConfiguration(
   catalog: ProductCatalog,
 ): Record<string, string[]> {
   return Object.fromEntries(
-    catalog.groups.map((g) => [g.id, [...g.defaultIds]]),
+    catalog.groups.map((g) => [
+      g.id,
+      g.control === "number" ? [] : [...g.defaultIds],
+    ]),
   );
 }
 export function toggleConfigurationOption(
@@ -415,7 +418,9 @@ export function optionAvailability(
 ): Record<string, string> {
   const reasons: Record<string, string> = {},
     compiled = compileRuleGraph(catalog);
-  for (const group of catalog.groups)
+  for (const group of catalog.groups.filter(
+    (group) => group.control !== "number",
+  ))
     for (const option of group.options) {
       const next = {
           ...current,
@@ -452,10 +457,9 @@ export function validateCatalog(catalog: ProductCatalog): string[] {
   const visualErrors: string[] = [],
     mappingIds = new Set<string>();
   for (const group of catalog.groups)
-    for (const mapping of [
-      ...(group.visuals ?? []),
-      ...group.options.flatMap((option) => option.visuals),
-    ]) {
+    for (const mapping of group.control === "number"
+      ? (group.visuals ?? [])
+      : group.options.flatMap((option) => option.visuals)) {
       if (!mapping.id || mappingIds.has(mapping.id))
         visualErrors.push("视觉映射 ID 为空或重复：" + mapping.id);
       mappingIds.add(mapping.id);

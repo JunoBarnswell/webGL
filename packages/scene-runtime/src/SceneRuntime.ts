@@ -790,6 +790,7 @@ export class SceneRuntime {
     }
   }
   async setMode(mode: "edit" | "play"): Promise<void> {
+    await this.changeQueue;
     if (mode === "play") {
       const available = new Set(this.systems.map((system) => system.id));
       for (const requirement of this.document?.requiredExtensions ?? [])

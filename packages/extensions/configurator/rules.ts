@@ -97,21 +97,25 @@ export function compileRuleGraph(catalog: ProductCatalog): RuleIR {
   if (new Set(catalog.rules.map((r) => r.id)).size !== catalog.rules.length)
     diagnostics.push(diagnostic("duplicate-rule", "规则 ID 重复"));
   for (const group of catalog.groups) {
-    if (new Set(group.options.map((o) => o.id)).size !== group.options.length)
+    if (
+      group.control !== "number" &&
+      new Set(group.options.map((o) => o.id)).size !== group.options.length
+    )
       diagnostics.push(
         diagnostic("duplicate-option", "选项 ID 重复：" + group.name),
       );
     if (
-      !Number.isInteger(group.min) ||
-      !Number.isInteger(group.max) ||
-      group.min > group.max ||
-      group.min < 0 ||
-      group.max < 1
+      group.control !== "number" &&
+      (!Number.isInteger(group.min) ||
+        !Number.isInteger(group.max) ||
+        group.min > group.max ||
+        group.min < 0 ||
+        group.max < 1)
     )
       diagnostics.push(
         diagnostic("cardinality", "选项数量范围无效：" + group.name),
       );
-    for (const id of group.defaultIds)
+    for (const id of group.control === "number" ? [] : group.defaultIds)
       if (!group.options.some((o) => o.id === id))
         diagnostics.push(
           diagnostic("missing-default", "默认选项不存在：" + id),
@@ -174,7 +178,8 @@ export function compileRuleGraph(catalog: ProductCatalog): RuleIR {
     if (
       !target ||
       (!["count", "range"].includes(rule.type) &&
-        !target.options.some((o) => o.id === rule.then.optionId)) ||
+        (target.control === "number" ||
+          !target.options.some((o) => o.id === rule.then.optionId))) ||
       (rule.when.groupId &&
         (!source ||
           source.control === "number" ||
@@ -233,7 +238,8 @@ export function compileRuleGraph(catalog: ProductCatalog): RuleIR {
         !g ||
         !["selected", "notSelected", "gte", "lte", "eq"].includes(c.operator) ||
         (["selected", "notSelected"].includes(c.operator)
-          ? !g.options.some((o) => o.id === c.optionId)
+          ? g.control === "number" ||
+            !g.options.some((o) => o.id === c.optionId)
           : g.control !== "number" || !Number.isFinite(c.value))
       )
         diagnostics.push(
@@ -376,13 +382,28 @@ export function resolveRuleIR(
   ) =>
     list.push({ ...diagnostic(code, message, ruleIds, optionKeys), severity });
   for (const group of catalog.groups) {
-    base[group.id] = [
-      ...new Set(
-        Object.hasOwn(input, group.id) ? input[group.id] : group.defaultIds,
-      ),
-    ];
+    base[group.id] =
+      group.control === "number"
+        ? []
+        : [
+            ...new Set(
+              Object.hasOwn(input, group.id)
+                ? input[group.id]
+                : group.defaultIds,
+            ),
+          ];
     if (base[group.id].some((id) => !group.options.some((o) => o.id === id)))
       issue(baseIssues, "unknown-option", "未知选项：" + group.name);
+    if (
+      group.control === "number" &&
+      Object.hasOwn(input, group.id) &&
+      input[group.id].length
+    )
+      issue(
+        baseIssues,
+        "numeric-choice",
+        "数值属性不接受选项选择：" + group.name,
+      );
     if (group.control === "number") {
       const value =
         (Object.hasOwn(numericInput, group.id)

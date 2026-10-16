@@ -2,6 +2,8 @@ import { RuleDesigner, ConfigurationAnalysis } from "./analysis-panel";
 import { useState } from "react";
 import {
   createUiNode,
+  createEntity,
+  createComponent,
   getComponent,
   type JsonValue,
 } from "../../scene-schema/src/index";
@@ -10,6 +12,7 @@ import type { ExtensionPanelProps } from "../editor-contract";
 import { useLibrary, type LibraryRecord } from "../library";
 import {
   validateCatalog,
+  configurationOwnership,
   type ProductCatalog,
   type ProductOption,
 } from "./core";
@@ -85,6 +88,18 @@ export function ConfiguratorPanel(props: ExtensionPanelProps) {
         },
       ];
       d.groups[0].defaultIds = [d.groups[0].options[0].id];
+      const probe = createEntity(name),
+        component = createComponent("studio.configurator.Catalog");
+      component.data = d as unknown as Record<string, JsonValue>;
+      probe.components.push(component);
+      if (
+        configurationOwnership({
+          ...props.document,
+          entities: [...props.document.entities, probe],
+        }).has(probe.id)
+      )
+        for (const group of d.groups)
+          for (const option of group.options) option.visuals = [];
     });
   return (
     <div className="domain-designer">
@@ -126,6 +141,9 @@ export function ConfiguratorPanel(props: ExtensionPanelProps) {
           {tab === "groups" && (
             <>
               <p>目录修订 {data.libraryVersionId || "未保存目录库"}</p>
+              <p>
+                每个目录配置独立模型的属性组。样例不会再次自动绑定已被其他目录控制的模型；可在原目录添加配置维度。
+              </p>
               {domain.fields(["name", "revision", "market", "groups"])}
             </>
           )}
