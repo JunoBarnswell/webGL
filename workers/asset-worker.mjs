@@ -78,6 +78,7 @@ if (task.operation === "ifc") {
     new URL("./ifc-convert.py", import.meta.url).pathname,
     input,
     output,
+    task.sourceSha256,
   ]);
   Object.assign(report, {
     ifc: JSON.parse(
@@ -86,7 +87,11 @@ if (task.operation === "ifc") {
   });
   outputs = [
     { kind: "model", entry: "derived.glb", files: ["derived.glb"] },
-    { kind: "semantic", entry: "semantics.json", files: ["semantics.json"] },
+    {
+      kind: "semantic",
+      entry: "semantics.json",
+      files: ["semantics.json", "semantic-model.json"],
+    },
   ];
 } else {
   const definition = await json(input),

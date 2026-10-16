@@ -2649,7 +2649,8 @@
                             "unit": {
                               "type": "string",
                               "title": "单位",
-                              "default": ""
+                              "default": "",
+                              "x-unit": true
                             },
                             "precision": {
                               "type": "number",
@@ -2671,7 +2672,8 @@
                             "sourceUnit": {
                               "type": "string",
                               "title": "来源单位",
-                              "default": ""
+                              "default": "",
+                              "x-unit": true
                             },
                             "emptyPolicy": {
                               "type": "string",
@@ -2704,6 +2706,14 @@
                           "additionalProperties": false
                         },
                         "default": []
+                      },
+                      "templateIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": [],
+                        "x-optional": true
                       }
                     },
                     "required": [
@@ -3334,6 +3344,252 @@
                     "additionalProperties": false
                   },
                   "default": []
+                },
+                "propertyTemplates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "name": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "title": "",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "title": "稳定 ID",
+                              "default": "",
+                              "x-editor": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "title": "字段名",
+                              "default": ""
+                            },
+                            "dataType": {
+                              "type": "string",
+                              "title": "数据类型",
+                              "default": "string",
+                              "enum": [
+                                "string",
+                                "number",
+                                "boolean"
+                              ]
+                            },
+                            "unit": {
+                              "type": "string",
+                              "title": "单位",
+                              "default": "",
+                              "x-unit": true
+                            },
+                            "precision": {
+                              "type": "number",
+                              "title": "精度",
+                              "default": 2,
+                              "minimum": 0,
+                              "maximum": 12
+                            },
+                            "required": {
+                              "type": "boolean",
+                              "title": "必填",
+                              "default": false
+                            },
+                            "sourcePath": {
+                              "type": "string",
+                              "title": "来源路径",
+                              "default": ""
+                            },
+                            "sourceUnit": {
+                              "type": "string",
+                              "title": "来源单位",
+                              "default": "",
+                              "x-unit": true
+                            },
+                            "emptyPolicy": {
+                              "type": "string",
+                              "title": "空值策略",
+                              "default": "keep",
+                              "enum": [
+                                "keep",
+                                "reject",
+                                "default"
+                              ]
+                            },
+                            "defaultValue": {
+                              "type": "string",
+                              "title": "默认值",
+                              "default": ""
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "dataType",
+                            "unit",
+                            "precision",
+                            "required",
+                            "sourcePath",
+                            "sourceUnit",
+                            "emptyPolicy",
+                            "defaultValue"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "fields"
+                    ]
+                  },
+                  "default": [],
+                  "title": "属性模板",
+                  "x-optional": true
+                },
+                "systems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "name": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "type": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "elementIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "default": ""
+                        },
+                        "default": []
+                      },
+                      "ports": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "name": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "elementId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "in",
+                                "out",
+                                "both",
+                                "unknown"
+                              ],
+                              "default": "unknown"
+                            },
+                            "type": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "systemId": {
+                              "type": "string",
+                              "default": ""
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "elementId",
+                            "direction",
+                            "type",
+                            "systemId"
+                          ]
+                        },
+                        "default": []
+                      },
+                      "connections": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "fromPortId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "toPortId": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "connects",
+                                "feeds"
+                              ],
+                              "default": "connects"
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "forward",
+                                "both"
+                              ],
+                              "default": "forward"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "fromPortId",
+                            "toPortId",
+                            "kind",
+                            "direction"
+                          ]
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "type",
+                      "elementIds",
+                      "ports",
+                      "connections"
+                    ]
+                  },
+                  "default": [],
+                  "title": "系统与端口拓扑",
+                  "x-optional": true
                 }
               },
               "required": [

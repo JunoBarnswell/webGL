@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 const base = new URL("../", import.meta.url);
 const read = async (path: string) =>
   JSON.parse(await readFile(new URL(path, base), "utf8"));
+const units = await read("packages/scene-schema/unit-catalog.json");
 const schema = await read("packages/scene-schema/core.schema.json");
 schema.$defs.asset = structuredClone(schema.properties.assets.items);
 const extensions = [];
@@ -130,7 +131,9 @@ for (const kind of ["component", "action"]) {
   schema.$defs[kind].oneOf.push(fallback);
 }
 const hash = createHash("sha256")
-  .update(JSON.stringify({ runtimeBuild: runtimeVersion, schema, manifests }))
+  .update(
+    JSON.stringify({ runtimeBuild: runtimeVersion, schema, manifests, units }),
+  )
   .digest("hex");
 await writeFile(
   new URL("packages/scene-schema/scene-document.schema.json", base),

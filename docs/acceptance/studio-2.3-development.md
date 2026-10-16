@@ -21,3 +21,19 @@ Storyboards compile track/clip ordering, curves and quaternions once, then sampl
 S2 typecheck, lint, frontend build and pure contracts passed. The 100-node/300-edge fixture, 1,000 coordinate round trips, malformed deep links, nested Apply, keyframe split invariance, ripple and subtitles passed. A synthetic Node CPU fixture with 100 tracks × 100 clips and 500 random seeks measured P95 **0.336 ms** on this environment. This is not browser/GPU/physical-device evidence. New native routes, UI interactions, worker cancellation at 1,000 instances and browser back/forward remain for consolidated S6 acceptance.
 
 Extension 2.3 changes are additive. The single current contract accepts installed-or-older minor revisions within the same major version; future or different-major requirements are rejected. Compiled nested documents declare the highest compatible required minor version. Historical immutable documents are not rewritten.
+
+## S3 industrial semantics and IFC
+
+Added one shared dimensioned unit catalog for browser, Native AOT and IFC metadata. It covers area, volume, pressure, flow, temperature offsets and common SI/IFC names. Numeric parsing rejects blanks, hexadecimal, booleans and non-finite values. Mapping preserves observed values/units, declared units, source paths, upstream provenance and revisions; default values use the target unit. Inherited classification fields retain required constraints, reusable property templates and completeness diagnostics. Typed systems/ports carry membership and directed connectivity, with a selectable topology view. Derived mappings retain semantic metadata and use keyset traversal; index creation serializes on the immutable asset when multiple callers race.
+
+The production IFC converter now uses the multicore local-geometry iterator, shared geometry identities, normals, per-node placements, a deterministic origin, and disk spooling. The complete product hierarchy and non-geometric records remain addressable. Type/instance property provenance, nullable values, units, systems and ports are retained. The original world-coordinate converter is read from Git into `.local` solely as a test oracle; it is not a production fallback.
+
+Typecheck, lint and pure contracts passed. `npm run verify:ifc` compared the same three source files using the old/new complete converter processes:
+
+| Schema | Geometry instances / unique meshes | Semantic records | Maximum world-bound difference | Old / new wall seconds | Old / new peak RSS KiB |
+| --- | --- | --- | --- | --- | --- |
+| IFC2x3 public building | 14 / 14 | 19 | 0.00124 mm | 0.412 / 0.403 | 141000 / 145724 |
+| IFC4 public basic | 3 / 3 | 8 | 0 mm | 0.293 / 0.334 | 138988 / 142288 |
+| IFC4x3 generated large coordinates | 24 / 1 | 30 | 0.01525 mm | 0.374 / 0.336 | 140160 / 143632 |
+
+The generated IFC4x3 input also passed type-property units, nullable non-geometric metadata, system/port connection preservation, and byte-identical output with one versus four iterator threads. Input hashes, reference source hash, timings, memory and issues are in `.local/acceptance/studio-2.3/ifc/results.json`. These are small CPU fixtures, not a production-model throughput or GPU claim. Native mapping parity and final browser/large-model acceptance remain in S6.
