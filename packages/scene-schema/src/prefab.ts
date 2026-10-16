@@ -1,4 +1,5 @@
 import schema from "../scene-document.schema.json";
+import { remapSceneReferences, type ReferenceSchema } from "./references";
 import type { Entity, JsonValue, SceneDocument, Transform } from "./types";
 export interface PrefabOverride {
   localId: string;
@@ -36,15 +37,6 @@ export type PrefabConflict = {
   source: JsonValue;
   instance: JsonValue;
 };
-type Schema = {
-  $ref?: string;
-  oneOf?: Schema[];
-  properties?: Record<string, Schema>;
-  items?: Schema;
-  const?: JsonValue;
-  type?: string | string[];
-  [key: string]: unknown;
-};
 export const prefabGroups = {
   entities: "entity",
   materials: "material",
@@ -57,80 +49,6 @@ export const prefabGroups = {
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const equal = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
-function resolve(spec: Schema): Schema {
-  if (!spec.$ref) return spec;
-  if (spec.$ref === "#") return schema as unknown as Schema;
-  return spec.$ref
-    .slice(2)
-    .split("/")
-    .reduce(
-      (node, key) => (node as Record<string, unknown>)[key],
-      schema as unknown,
-    ) as Schema;
-}
-function matches(value: unknown, spec: Schema): boolean {
-  spec = resolve(spec);
-  if (spec.const !== undefined) return equal(value, spec.const);
-  if (spec.type === "null") return value === null;
-  if (spec.properties?.type?.const)
-    return (value as { type?: string })?.type === spec.properties.type.const;
-  if (spec.oneOf) return spec.oneOf.some((s) => matches(value, s));
-  return value !== null;
-}
-export function remapSceneReferences(
-  value: unknown,
-  raw: Schema,
-  bindings: PrefabInstance["bindings"],
-): unknown {
-  let spec = resolve(raw);
-  if (spec.oneOf)
-    spec = resolve(spec.oneOf.find((s) => matches(value, s)) ?? spec);
-  if (typeof value === "string" && typeof spec["x-reference"] === "string")
-    return bindings[spec["x-reference"]]?.[value] ?? value;
-  if (Array.isArray(value))
-    return value.map((v) =>
-      remapSceneReferences(v, spec.items ?? {}, bindings),
-    );
-  if (value && typeof value === "object") {
-    const input = value as Record<string, unknown>;
-    const result = Object.fromEntries(
-      Object.entries(input).map(([k, v]) => [
-        k,
-        remapSceneReferences(v, spec.properties?.[k] ?? {}, bindings),
-      ]),
-    );
-    if (
-      typeof input.sourceKind === "string" &&
-      typeof input.sourceId === "string"
-    )
-      result.sourceId =
-        bindings[input.sourceKind]?.[input.sourceId] ?? input.sourceId;
-    if (
-      input.type === "compare" &&
-      input.source === "variable" &&
-      typeof input.key === "string"
-    )
-      result.key = bindings.variable?.[input.key] ?? input.key;
-    if (typeof input.kind === "string" && typeof input.targetId === "string") {
-      const kind = (
-        {
-          audioControls: "entity",
-          animationControls: "entity",
-          panoramaControls: "entity",
-          configurator: "entity",
-          storyboard: "entity",
-          industrial: "entity",
-          viewpointList: "viewpoint",
-          tourControls: "tour",
-        } as Record<string, string>
-      )[input.kind];
-      if (kind)
-        result.targetId = bindings[kind]?.[input.targetId] ?? input.targetId;
-    }
-    return result;
-  }
-  return value;
-}
 export function sourceDocument(document: SceneDocument): SceneDocument {
   const result = copy(document);
   for (const instance of result.prefabs ?? []) {
@@ -238,7 +156,7 @@ export function compilePrefabs(
     const source = effectivePrefab(instance, chain);
     const mapped = remapSceneReferences(
       source,
-      schema as Schema,
+      schema as unknown as ReferenceSchema,
       instance.bindings,
     ) as SceneDocument;
     for (const [key, kind] of Object.entries(prefabGroups)) {

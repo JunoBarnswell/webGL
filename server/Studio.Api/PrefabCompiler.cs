@@ -28,6 +28,7 @@ public static class PrefabCompiler
     }
     private static JsonNode? Remap(JsonNode? node,JsonElement raw,JsonObject bindings,JsonElement schema) {
         var spec=Resolve(raw,schema);
+        if(spec.TryGetProperty("x-reference-scope",out var scope)&&scope.GetString()=="local")return node?.DeepClone();
         if(spec.TryGetProperty("oneOf",out var choices)) { var chosen=choices.EnumerateArray().FirstOrDefault(c=>Matches(node,c,schema));if(chosen.ValueKind!=JsonValueKind.Undefined)spec=Resolve(chosen,schema); }
         string Map(string kind,string value)=>Text(bindings[kind]?[value]) is {Length:>0} mapped?mapped:value;
         if(node is JsonValue value&&value.TryGetValue<string>(out var text)&&spec.TryGetProperty("x-reference",out var kind))return JsonValue.Create(Map(kind.GetString()!,text));

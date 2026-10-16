@@ -43,8 +43,8 @@ export class ProjectNavigation {
   private pendingStop: number | null = null;
   private cleanup: () => void;
   private audio: HTMLAudioElement | null = null;
-  private previousInterrupt: (() => void) | undefined;
-  private interrupt: () => void;
+  private previousInterrupt: ((active: boolean) => void) | undefined;
+  private interrupt: (active: boolean) => void;
   readonly getSnapshot = () => this.state;
   readonly subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -63,9 +63,9 @@ export class ProjectNavigation {
     runtime.capabilities.set("studio.virtualTour.navigation", this);
     this.cleanup = runtime.engine.onUpdate((dt: number) => this.update(dt));
     this.previousInterrupt = runtime.navigation.onInterrupt;
-    this.interrupt = () => {
-      this.previousInterrupt?.();
-      if (this.state.routeStatus === "playing") this.pauseRoute();
+    this.interrupt = (active) => {
+      this.previousInterrupt?.(active);
+      if (active && this.state.routeStatus === "playing") this.pauseRoute();
     };
     runtime.navigation.onInterrupt = this.interrupt;
   }

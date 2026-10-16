@@ -255,7 +255,7 @@ export default class IndustrialSystem implements RuntimeSystem {
           overrides.push({
             targetId: entity.id,
             channel: "clipping",
-            composition: "replace",
+            composition: "and",
             value: planes,
           });
     for (const targetId of view?.hiddenIds ?? [])
@@ -266,15 +266,16 @@ export default class IndustrialSystem implements RuntimeSystem {
         value: false,
       });
     if (serial !== this.nonce) return;
-    this.runtime.visual.setScope("industrial:" + id, overrides, 60);
+    this.runtime.visual.setScope("industrial:" + id, overrides, "review");
     this.active.add(id);
     this.clips.set(id, { planes, view });
     if (view) {
       const lease = this.runtime.cameraOwnership.acquire(
         "review:" + id,
+        "review",
         () => {},
       );
-      this.runtime.applyCameraPose(view.camera);
+      if (lease) this.runtime.applyCameraPose(view.camera);
       this.runtime.cameraOwnership.release(lease);
     }
     this.drawMeasurements();

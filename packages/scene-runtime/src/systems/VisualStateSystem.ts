@@ -28,7 +28,7 @@ export interface VisualOverride {
     | THREE.Plane[];
 }
 interface Scope {
-  priority: number;
+  role: VisualRole;
   generation: number;
   overrides: readonly VisualOverride[];
 }
@@ -43,13 +43,44 @@ interface MaterialEffect {
   source: THREE.Material | THREE.Material[];
   clones: THREE.Material[];
 }
-export const visualPriorities = {
-  configuration: 20,
-  assembly: 40,
-  storyboard: 50,
-  review: 60,
-  selection: 100,
-} as const;
+export const visualChannelMatrix = {
+  configuration: {
+    transform: 20,
+    visibility: 20,
+    opacity: 20,
+    color: 20,
+    material: 20,
+    attachment: 20,
+  },
+  display: { visibility: 30, opacity: 30 },
+  assembly: { transform: 40, visibility: 40, opacity: 40 },
+  effect: { transform: 45, opacity: 45 },
+  storyboard: {
+    transform: 50,
+    visibility: 50,
+    opacity: 50,
+    color: 50,
+    material: 50,
+  },
+  review: {
+    visibility: 60,
+    opacity: 60,
+    color: 60,
+    clipping: 60,
+    highlight: 60,
+  },
+  selection: { highlight: 100 },
+  manipulation: { transform: 110 },
+} satisfies Record<string, Partial<Record<VisualChannel, number>>>;
+export type VisualRole = keyof typeof visualChannelMatrix;
+const channelPriority = (role: VisualRole, channel: VisualChannel): number => {
+  const priority = (
+    visualChannelMatrix[role] as Partial<Record<VisualChannel, number>>
+  )?.[channel];
+  if (priority === undefined)
+    throw Error("视觉角色不支持通道：" + role + " / " + channel);
+  return priority;
+};
 
 /** The sole writer of transient object and material channels. */
 export class VisualStateSystem implements RuntimeSystem {
@@ -69,12 +100,13 @@ export class VisualStateSystem implements RuntimeSystem {
   setScope(
     owner: string,
     overrides: readonly VisualOverride[],
-    priority: number,
+    role: VisualRole,
     generation = this.runtime.generation,
   ): void {
     if (generation !== this.runtime.generation) return;
     if (!owner) throw Error("视觉覆盖必须有 Owner");
     for (const override of overrides) {
+      channelPriority(role, override.channel);
       const valid =
         override.channel === "transform"
           ? ["replace", "add"]
@@ -82,12 +114,14 @@ export class VisualStateSystem implements RuntimeSystem {
             ? ["replace", "and"]
             : override.channel === "opacity"
               ? ["replace", "multiply"]
-              : ["replace"];
+              : override.channel === "clipping"
+                ? ["replace", "and"]
+                : ["replace"];
       if (!valid.includes(override.composition))
         throw Error("视觉通道不支持该合成方式 " + override.channel);
     }
     const old = this.scopes.get(owner);
-    this.scopes.set(owner, { overrides, priority, generation });
+    this.scopes.set(owner, { overrides, role, generation });
     this.apply(this.hasMaterial(old?.overrides) || this.hasMaterial(overrides));
   }
   private hasMaterial(overrides: readonly VisualOverride[] = []): boolean {
@@ -106,7 +140,7 @@ export class VisualStateSystem implements RuntimeSystem {
         composition: "replace",
         value: color,
       })),
-      visualPriorities.selection,
+      "selection",
     );
   }
   isolate(
@@ -123,7 +157,7 @@ export class VisualStateSystem implements RuntimeSystem {
         composition: "and",
         value: ids.has(targetId),
       })),
-      visualPriorities.review,
+      "review",
     );
   }
   reset(owner?: string): void {
@@ -136,20 +170,61 @@ export class VisualStateSystem implements RuntimeSystem {
   }
   describe(
     targetId: string,
-  ): { owner: string; priority: number; channel: VisualChannel }[] {
-    return this.ordered().flatMap(([owner, scope]) =>
-      scope.overrides
-        .filter((o) => o.targetId === targetId)
-        .map((o) => ({ owner, priority: scope.priority, channel: o.channel })),
+  ): {
+    owner: string;
+    role: VisualRole;
+    priority: number;
+    channel: VisualChannel;
+    composition: string;
+    conflict: boolean;
+  }[] {
+    const layers = this.ordered().filter(
+      (layer) => layer.override.targetId === targetId,
     );
+    return layers.map((layer) => ({
+      owner: layer.owner,
+      role: layer.scope.role,
+      priority: layer.priority,
+      channel: layer.override.channel,
+      composition: layer.override.composition,
+      conflict:
+        layer.override.composition === "replace" &&
+        layers.some(
+          (other) =>
+            other.owner !== layer.owner &&
+            other.priority === layer.priority &&
+            other.override.channel === layer.override.channel &&
+            other.override.composition === "replace",
+        ),
+    }));
   }
   get scopeCount(): number {
     return this.scopes.size;
   }
-  private ordered(): [string, Scope][] {
+  private ordered(): {
+    owner: string;
+    scope: Scope;
+    override: VisualOverride;
+    priority: number;
+    order: number;
+  }[] {
     return [...this.scopes]
-      .filter(([, s]) => s.generation === this.runtime.generation)
-      .sort(([a, x], [b, y]) => x.priority - y.priority || a.localeCompare(b));
+      .filter(([, scope]) => scope.generation === this.runtime.generation)
+      .flatMap(([owner, scope]) =>
+        scope.overrides.map((override, order) => ({
+          owner,
+          scope,
+          override,
+          order,
+          priority: channelPriority(scope.role, override.channel),
+        })),
+      )
+      .sort(
+        (a, b) =>
+          a.priority - b.priority ||
+          a.owner.localeCompare(b.owner) ||
+          a.order - b.order,
+      );
   }
   private restoreObjects(): void {
     for (const base of this.baselines.values()) {
@@ -174,79 +249,75 @@ export class VisualStateSystem implements RuntimeSystem {
     this.restoreObjects();
     const active = new Set<string>();
     const materialOverrides = new Map<THREE.Mesh, VisualOverride[]>();
-    for (const [, scope] of this.ordered())
-      for (const override of scope.overrides) {
-        const object =
-          override.object ?? this.runtime.getObject(override.targetId);
-        if (!object) continue;
-        if (override.channel === "attachment") {
-          const previous = this.attachments.get(override.targetId);
-          if (previous) previous.replacement.removeFromParent();
-          const children =
-            previous?.children ??
-            new Map(object.children.map((child) => [child, child.visible]));
-          for (const child of children.keys()) child.visible = false;
-          const replacement = override.value as THREE.Object3D;
-          object.add(replacement);
-          replacement.visible = true;
-          this.attachments.set(override.targetId, {
-            object,
-            children,
-            replacement,
+    for (const { override } of this.ordered()) {
+      const object =
+        override.object ?? this.runtime.getObject(override.targetId);
+      if (!object) continue;
+      if (override.channel === "attachment") {
+        const previous = this.attachments.get(override.targetId);
+        if (previous) previous.replacement.removeFromParent();
+        const children =
+          previous?.children ??
+          new Map(object.children.map((child) => [child, child.visible]));
+        for (const child of children.keys()) child.visible = false;
+        const replacement = override.value as THREE.Object3D;
+        object.add(replacement);
+        replacement.visible = true;
+        this.attachments.set(override.targetId, {
+          object,
+          children,
+          replacement,
+        });
+        continue;
+      }
+      if (
+        ["opacity", "color", "highlight", "material", "clipping"].includes(
+          override.channel,
+        )
+      ) {
+        if (materialDirty)
+          object.traverse((node) => {
+            if (!(node instanceof THREE.Mesh) || node.userData.collider) return;
+            const list = materialOverrides.get(node) ?? [];
+            list.push(override);
+            materialOverrides.set(node, list);
           });
-          continue;
-        }
-        if (
-          ["opacity", "color", "highlight", "material", "clipping"].includes(
-            override.channel,
-          )
-        ) {
-          if (materialDirty)
-            object.traverse((node) => {
-              if (!(node instanceof THREE.Mesh) || node.userData.collider)
-                return;
-              const list = materialOverrides.get(node) ?? [];
-              list.push(override);
-              materialOverrides.set(node, list);
-            });
-          continue;
-        }
-        active.add(override.targetId);
-        let base = this.baselines.get(override.targetId);
-        if (!base || base.object !== object) {
-          base = {
-            object,
-            position: object.position.clone(),
-            rotation: object.quaternion.clone(),
-            scale: object.scale.clone(),
-            visible: object.visible,
-          };
-          this.baselines.set(override.targetId, base);
-        }
-        if (override.channel === "visibility") {
-          object.visible =
-            override.composition === "and"
-              ? object.visible && Boolean(override.value)
-              : Boolean(override.value);
-        } else if (override.channel === "transform") {
-          const transform = override.value as Transform;
-          if (override.composition === "replace") {
-            object.position.fromArray(transform.position);
-            object.quaternion.fromArray(transform.rotation);
-            object.scale.fromArray(transform.scale);
-          } else {
-            object.position.add(
-              new THREE.Vector3().fromArray(transform.position),
-            );
-            object.quaternion.multiply(
-              new THREE.Quaternion().fromArray(transform.rotation),
-            );
-            object.scale.multiply(
-              new THREE.Vector3().fromArray(transform.scale),
-            );
-          }
+        continue;
+      }
+      active.add(override.targetId);
+      let base = this.baselines.get(override.targetId);
+      if (!base || base.object !== object) {
+        base = {
+          object,
+          position: object.position.clone(),
+          rotation: object.quaternion.clone(),
+          scale: object.scale.clone(),
+          visible: object.visible,
+        };
+        this.baselines.set(override.targetId, base);
+      }
+      if (override.channel === "visibility") {
+        object.visible =
+          override.composition === "and"
+            ? object.visible && Boolean(override.value)
+            : Boolean(override.value);
+      } else if (override.channel === "transform") {
+        const transform = override.value as Transform;
+        if (override.composition === "replace") {
+          object.position.fromArray(transform.position);
+          object.quaternion.fromArray(transform.rotation);
+          object.scale.fromArray(transform.scale);
+        } else {
+          object.position.add(
+            new THREE.Vector3().fromArray(transform.position),
+          );
+          object.quaternion.multiply(
+            new THREE.Quaternion().fromArray(transform.rotation),
+          );
+          object.scale.multiply(new THREE.Vector3().fromArray(transform.scale));
         }
       }
+    }
     for (const id of this.baselines.keys())
       if (!active.has(id)) this.baselines.delete(id);
     if (materialDirty) {
@@ -288,13 +359,15 @@ export class VisualStateSystem implements RuntimeSystem {
         }
 
         effect.clones.forEach((clone, index) => {
+          const oldClippingCount = clone.clippingPlanes?.length ?? 0;
           clone.copy(sources[index]);
           for (const override of overrides) {
             if (override.channel === "clipping") {
               const planes = override.value as THREE.Plane[];
-              if (clone.clippingPlanes?.length !== planes.length)
-                clone.needsUpdate = true;
-              clone.clippingPlanes = planes;
+              clone.clippingPlanes =
+                override.composition === "and"
+                  ? [...(clone.clippingPlanes ?? []), ...planes]
+                  : planes;
               clone.clipIntersection = false;
             } else if (override.channel === "material") continue;
             else if (override.channel === "opacity") {
@@ -318,6 +391,8 @@ export class VisualStateSystem implements RuntimeSystem {
                 String(override.value),
               );
           }
+          if (oldClippingCount !== (clone.clippingPlanes?.length ?? 0))
+            clone.needsUpdate = true;
         });
       }
     }
@@ -325,22 +400,20 @@ export class VisualStateSystem implements RuntimeSystem {
     this.runtime.engine.requestRender();
   }
   pointVisible(point: THREE.Vector3, object: THREE.Object3D): boolean {
-    for (const [, scope] of this.ordered())
-      for (const override of scope.overrides)
-        if (override.channel === "clipping") {
-          const target =
-            override.object ?? this.runtime.getObject(override.targetId);
-          let cursor: THREE.Object3D | null = object;
-          while (cursor && cursor !== target) cursor = cursor.parent;
-          if (
-            cursor &&
-            (override.value as THREE.Plane[]).some(
-              (plane) => plane.distanceToPoint(point) < 0,
-            )
-          )
-            return false;
-        }
-    return true;
+    let planes: THREE.Plane[] = [];
+    for (const { override } of this.ordered())
+      if (override.channel === "clipping") {
+        const target =
+          override.object ?? this.runtime.getObject(override.targetId);
+        let cursor: THREE.Object3D | null = object;
+        while (cursor && cursor !== target) cursor = cursor.parent;
+        if (cursor)
+          planes =
+            override.composition === "and"
+              ? [...planes, ...(override.value as THREE.Plane[])]
+              : (override.value as THREE.Plane[]);
+      }
+    return planes.every((plane) => plane.distanceToPoint(point) >= 0);
   }
   rebase(updateSource: () => void): void {
     this.beforeChange();

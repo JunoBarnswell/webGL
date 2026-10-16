@@ -1,4 +1,7 @@
-import { orderExtensions } from "../packages/scene-schema/src/extensions";
+import {
+  orderExtensions,
+  runtimeVersion,
+} from "../packages/scene-schema/src/extensions";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 const base = new URL("../", import.meta.url);
@@ -127,7 +130,7 @@ for (const kind of ["component", "action"]) {
   schema.$defs[kind].oneOf.push(fallback);
 }
 const hash = createHash("sha256")
-  .update(JSON.stringify({ schema, manifests }))
+  .update(JSON.stringify({ runtimeBuild: runtimeVersion, schema, manifests }))
   .digest("hex");
 await writeFile(
   new URL("packages/scene-schema/scene-document.schema.json", base),
@@ -135,7 +138,8 @@ await writeFile(
 );
 await writeFile(
   new URL("packages/scene-schema/extension-catalog.json", base),
-  JSON.stringify({ runtimeBuild: "2.2.0", hash, manifests }, null, 2) + "\n",
+  JSON.stringify({ runtimeBuild: runtimeVersion, hash, manifests }, null, 2) +
+    "\n",
 );
 console.log("Composed extension catalog " + hash);
 

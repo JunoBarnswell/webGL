@@ -18,7 +18,14 @@ export class Navigation {
   private ray = new THREE.Raycaster();
   private previousCamera = new THREE.Vector3();
   private controller = new AbortController();
-  onInterrupt?: () => void;
+  onInterrupt?: (active: boolean) => void;
+  get hasInput(): boolean {
+    return (
+      this.dragging ||
+      this.keys.size > 0 ||
+      Boolean(this.movement.forward || this.movement.right)
+    );
+  }
   constructor(
     private camera: THREE.PerspectiveCamera,
     private canvas: HTMLCanvasElement,
@@ -52,7 +59,7 @@ export class Navigation {
         ) {
           event.preventDefault();
           this.keys.add(event.code);
-          this.onInterrupt?.();
+          this.onInterrupt?.(true);
           wake();
         }
       },
@@ -62,6 +69,7 @@ export class Navigation {
       "keyup",
       (event) => {
         this.keys.delete(event.code);
+        this.onInterrupt?.(this.hasInput);
       },
       { signal },
     );
@@ -71,6 +79,7 @@ export class Navigation {
         this.keys.clear();
         this.movement = { forward: 0, right: 0 };
         this.dragging = false;
+        this.onInterrupt?.(this.hasInput);
       },
       { signal },
     );
@@ -79,6 +88,7 @@ export class Navigation {
       (event) => {
         if (!this.enabled || event.button !== 0) return;
         this.dragging = true;
+        this.onInterrupt?.(true);
         canvas.focus();
         canvas.setPointerCapture(event.pointerId);
       },
@@ -102,6 +112,7 @@ export class Navigation {
       "pointerup",
       () => {
         this.dragging = false;
+        this.onInterrupt?.(this.hasInput);
       },
       { signal },
     );
@@ -110,6 +121,7 @@ export class Navigation {
       () => {
         this.dragging = false;
         this.keys.clear();
+        this.onInterrupt?.(this.hasInput);
       },
       { signal },
     );
@@ -118,12 +130,14 @@ export class Navigation {
       (event) => {
         if (!this.enabled) return;
         event.preventDefault();
+        this.onInterrupt?.(true);
         camera.fov = THREE.MathUtils.clamp(
           camera.fov + event.deltaY * 0.02,
           20,
           110,
         );
         camera.updateProjectionMatrix();
+        this.onInterrupt?.(this.hasInput);
         wake();
       },
       { passive: false, signal },
@@ -134,7 +148,7 @@ export class Navigation {
       forward: Math.max(-1, Math.min(1, forward)),
       right: Math.max(-1, Math.min(1, right)),
     };
-    if (forward || right) this.onInterrupt?.();
+    this.onInterrupt?.(this.hasInput);
     this.wake();
   }
   reset(settings: SceneSettings): void {
@@ -268,11 +282,15 @@ export class Navigation {
         this.camera.position.distanceToSquared(this.previousCamera) > 0.01,
     );
   }
-  pause(): void {
-    this.enabled = false;
+  clearInput(): void {
     this.keys.clear();
     this.movement = { forward: 0, right: 0 };
     this.dragging = false;
+    this.onInterrupt?.(false);
+  }
+  pause(): void {
+    this.enabled = false;
+    this.clearInput();
   }
   dispose(): void {
     this.pause();

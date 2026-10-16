@@ -115,6 +115,8 @@ export interface SceneMaterial {
   envAssetIds: string[];
 }
 export interface SceneSettings {
+  releasePolicy?: import("./readiness").ReleasePolicy;
+  evidenceAssetIds?: string[];
   sprintMultiplier: number;
   lookSensitivity: number;
   pitchLimit: number;
@@ -361,6 +363,7 @@ export interface Draft {
   document: SceneDocument;
 }
 export interface PublishedManifest {
+  readiness?: import("./readiness").ReleaseReadinessReport;
   runtimeBuild: string;
   extensionCatalogHash: string;
   versionId: string;

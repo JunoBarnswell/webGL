@@ -11,6 +11,8 @@ var builder = WebApplication.CreateSlimBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options => { options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default); options.SerializerOptions.RespectRequiredConstructorParameters = true; });
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1024L * 1024 * 1024);
 builder.Services.AddMemoryCache(options => options.SizeLimit = 32 * 1024 * 1024);
+builder.Services.AddSingleton<ReleaseReadinessService>();
+builder.Services.AddSingleton<PrefabImpactService>();
 builder.Services.AddSingleton<Database>(); builder.Services.AddSingleton<DocumentContract>();
 builder.Services.AddSingleton<Authentication>(); builder.Services.AddSingleton<ObjectStore>(); builder.Services.AddSingleton<StudioService>(); builder.Services.AddSingleton<LibraryService>(); builder.Services.AddSingleton<ProjectService>(); builder.Services.AddSingleton<ProjectArchiveService>(); builder.Services.AddSingleton<SemanticService>(); builder.Services.AddSingleton<ProcessingService>(); builder.Services.AddHostedService(service=>service.GetRequiredService<ProcessingService>());
 builder.Services.AddRateLimiter(options => options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
@@ -47,6 +49,9 @@ app.MapGet("/api/projects/{id}/export", async (string id, HttpContext context, P
     finally { File.Delete(path); }
 });
 app.MapPost("/api/projects/import", async (HttpContext context, ProjectArchiveService service) => Results.Json(await service.Import(context.Request.Body, context.RequestAborted), ApiJson.Default.DraftResponse));
+app.MapGet("/api/scenes/{id}/readiness",async(string id,StudioService service,CancellationToken ct)=>Results.Json(await service.Readiness(id,ct),ApiJson.Default.ReleaseReadinessReport));
+app.MapPost("/api/scenes/{id}/readiness",async(string id,SaveRequest request,StudioService service,CancellationToken ct)=>Results.Json(await service.PreviewReadiness(id,request,ct),ApiJson.Default.ReleaseReadinessReport));
+app.MapGet("/api/scenes/{id}/references",(string id,StudioService service,DocumentContract contract)=>Results.Json(contract.ReferenceEdges(contract.Compile(service.Read(id).Document)),ApiJson.Default.ReferenceEdgeArray));
 app.MapGet("/api/scenes/{id}/draft", (string id, StudioService service) => Results.Json(service.Read(id), ApiJson.Default.DraftResponse));
 app.MapPut("/api/scenes/{id}/draft", (string id, SaveRequest request, StudioService service) => Results.Json(service.Save(id, request), ApiJson.Default.DraftResponse));
 app.MapGet("/api/scenes/{id}/versions/{version}",(string id,string version,StudioService service)=>Results.Json(service.ReadVersion(id,version),ApiJson.Default.SceneVersionResponse));
@@ -75,6 +80,7 @@ if (Directory.Exists(webRoot)) {
     app.MapGet("/", () => Results.Redirect("/editor/"));
     app.MapFallback((HttpContext context) => { var application = context.Request.Path.StartsWithSegments("/player") ? "player" : "editor"; if (context.Request.Path.StartsWithSegments("/api")) return Results.NotFound(); return Results.File(Path.Combine(webRoot, application, "index.html"), "text/html"); });
 }
+app.MapGet("/api/library/prefab/{id}/impact",(string id,string? version,PrefabImpactService service)=>Results.Json(service.Check(id,version),ApiJson.Default.PrefabImpactReport));
 app.MapGet("/api/library/{kind}",(string kind,LibraryService library)=>Results.Json(library.List(kind),ApiJson.Default.LibraryResponseArray));
 app.MapGet("/api/library/{kind}/{id}",(string kind,string id,LibraryService library)=>Results.Json(library.Read(kind,id),ApiJson.Default.LibraryResponse));
 app.MapPut("/api/library/{kind}/{id}",(string kind,string id,LibraryRequest request,LibraryService library)=>Results.Json(library.Save(kind,id,request),ApiJson.Default.LibraryResponse));
@@ -84,6 +90,7 @@ app.MapGet("/api/library/{kind}/{id}/usage",(string kind,string id,LibraryServic
 app.MapDelete("/api/library/{kind}/{id}",(string kind,string id,LibraryService library)=>{library.Delete(kind,id);return Results.NoContent();});
 app.MapGet("/api/projects/{id}/scenes",(string id,StudioService service)=>Results.Json(service.Scenes(id),ApiJson.Default.DraftResponseArray));
 app.MapPost("/api/projects/{id}/scenes",(string id,ProjectRequest request,StudioService service)=>Results.Json(service.AddScene(id,request),ApiJson.Default.DraftResponse));
+app.MapGet("/api/projects/{id}/readiness",async(string id,ProjectService service,CancellationToken ct)=>Results.Json(await service.Readiness(id,ct),ApiJson.Default.ReleaseReadinessReport));
 app.MapPost("/api/projects/{id}/publish",async(string id,ProjectPublishRequest request,ProjectService service,CancellationToken ct)=>Results.Json(await service.Publish(id,request,ct),ApiJson.Default.PublishResponse));
 app.MapDelete("/api/projects/{id}/publish",(string id,ProjectService service)=>{service.Unpublish(id);return Results.NoContent();});
 app.MapGet("/api/projects/{id}/publications",(string id,ProjectService service)=>Results.Json(service.History(id),ApiJson.Default.ProjectPublicationRowArray));

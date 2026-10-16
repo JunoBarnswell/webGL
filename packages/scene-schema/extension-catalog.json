@@ -1,6 +1,6 @@
 {
-  "runtimeBuild": "2.2.0",
-  "hash": "aec336d22d228af7d36bd949b10e3cc0ae3787ad55db567391fa0879446026c4",
+  "runtimeBuild": "2.3.0",
+  "hash": "287bdd2fc8521188ff6c1390b1b7d0e4484c39231697c71c106ae42318fec38c",
   "manifests": [
     {
       "id": "studio.annotation",

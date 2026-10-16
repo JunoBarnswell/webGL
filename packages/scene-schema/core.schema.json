@@ -3442,6 +3442,44 @@
           "default": 0.12,
           "minimum": 0.01,
           "maximum": 1
+        },
+        "releasePolicy": {
+          "type": "object",
+          "title": "发布策略",
+          "additionalProperties": false,
+          "properties": {
+            "hardware": {
+              "type": "string",
+              "title": "硬件证据",
+              "enum": [
+                "advisory",
+                "required"
+              ],
+              "default": "advisory"
+            },
+            "budget": {
+              "type": "string",
+              "title": "处理预算",
+              "enum": [
+                "advisory",
+                "required"
+              ],
+              "default": "advisory"
+            }
+          },
+          "required": [
+            "hardware",
+            "budget"
+          ]
+        },
+        "evidenceAssetIds": {
+          "type": "array",
+          "title": "验收证据资源",
+          "items": {
+            "type": "string",
+            "x-reference": "asset"
+          },
+          "default": []
         }
       },
       "required": [

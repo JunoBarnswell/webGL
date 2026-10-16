@@ -168,7 +168,7 @@ visual.setScope(
       value: "#ff0000",
     },
   ],
-  20,
+  "configuration",
 );
 const clone = mesh.material;
 visual.setScope(
@@ -181,7 +181,7 @@ visual.setScope(
       value: 0.3,
     },
   ],
-  50,
+  "storyboard",
 );
 assert.equal(mesh.material, clone);
 assert.equal(mesh.material.opacity, 0.3);
@@ -199,7 +199,7 @@ visual.setScope(
       value: { position: [4, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
     },
   ],
-  40,
+  "assembly",
 );
 visual.rebase(() => {
   mesh.position.x = 10;
@@ -217,7 +217,7 @@ visual.setScope(
       value: false,
     },
   ],
-  100,
+  "selection",
   0,
 );
 assert.equal(mesh.visible, true);
@@ -228,10 +228,10 @@ mesh.geometry.dispose();
 original.dispose();
 const camera = new CameraOwnership();
 let cameraCancelled = 0;
-const a = camera.acquire("story", () => cameraCancelled++),
-  b = camera.acquire("tour", () => {});
+const a = camera.acquire("tour", "tour", () => cameraCancelled++),
+  b = camera.acquire("story", "storyboard", () => {});
 camera.release(a);
-assert.equal(camera.owner, "tour");
+assert.equal(camera.owner, "story");
 assert.equal(cameraCancelled, 1);
 camera.release(b);
 assert.equal(camera.owner, "navigation");

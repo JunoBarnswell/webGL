@@ -208,7 +208,12 @@ export function builtinActions(
       runtime.state.patch({ contentId: "" });
       runtime.navigation.enabled = true;
       if (runtime.contentPausedTour && runtime.tour.state.status === "paused") {
-        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
+        if (
+          !runtime.cameraOwnership.acquire("tour", "tour", () =>
+            runtime.tour.pause(),
+          )
+        )
+          throw Error("相机正在由更高优先级的操作者控制");
         runtime.tour.resume();
       }
       runtime.contentPausedTour = false;
@@ -220,11 +225,15 @@ export function builtinActions(
         const tour = doc.tours.find((t) => t.id === action.targetId)!;
         if (action.wait && tour.loop)
           throw new Error("循环巡航不能等待自然完成");
-        runtime.cancelFlight();
         const scope = runtime.actionScope("tour", signal, () =>
           runtime.tour.stop(),
         );
-        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
+        if (
+          !runtime.cameraOwnership.acquire("tour", "tour", () =>
+            runtime.tour.pause(),
+          )
+        )
+          throw Error("相机正在由更高优先级的操作者控制");
         runtime.tour.start(tour);
         if (action.wait) await runtime.waitTour(tour.id, scope.signal);
         return;
@@ -236,11 +245,15 @@ export function builtinActions(
         const tour = doc.tours.find((t) => t.id === action.targetId)!;
         if (action.wait && tour.loop)
           throw new Error("循环巡航不能等待自然完成");
-        runtime.cancelFlight();
         const scope = runtime.actionScope("tour", signal, () =>
           runtime.tour.stop(),
         );
-        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
+        if (
+          !runtime.cameraOwnership.acquire("tour", "tour", () =>
+            runtime.tour.pause(),
+          )
+        )
+          throw Error("相机正在由更高优先级的操作者控制");
         runtime.tour.start(tour);
         if (action.wait) await runtime.waitTour(tour.id, scope.signal);
         return;
@@ -256,7 +269,12 @@ export function builtinActions(
       if (runtime.tour.id !== action.targetId)
         throw new Error("该巡航未在播放");
       {
-        runtime.cameraOwnership.acquire("tour", () => runtime.tour.pause());
+        if (
+          !runtime.cameraOwnership.acquire("tour", "tour", () =>
+            runtime.tour.pause(),
+          )
+        )
+          throw Error("相机正在由更高优先级的操作者控制");
         runtime.tour.resume();
       }
       return;

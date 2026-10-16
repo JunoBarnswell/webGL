@@ -1,8 +1,5 @@
 import * as THREE from "three";
-import {
-  visualPriorities,
-  type VisualOverride,
-} from "../../scene-runtime/src/systems/VisualStateSystem";
+import { type VisualOverride } from "../../scene-runtime/src/systems/VisualStateSystem";
 import {
   getComponent,
   type SceneDocument,
@@ -149,11 +146,7 @@ export class AssemblySystem implements RuntimeSystem {
     const sequence = this.sequence(id);
     sequence.progress = THREE.MathUtils.clamp(progress, 0, 1);
     const overrides = this.evaluate(id, sequence.progress);
-    this.runtime.visual.setScope(
-      "assembly-pose:" + id,
-      overrides,
-      visualPriorities.assembly,
-    );
+    this.runtime.visual.setScope("assembly-pose:" + id, overrides, "assembly");
     this.publish(id);
   }
   evaluate(id: string, progress: number): VisualOverride[] {

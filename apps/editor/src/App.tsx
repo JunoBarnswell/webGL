@@ -8,6 +8,7 @@ import { ContextMenu } from "./shell/ContextMenu";
 import { usePreferences } from "./shell/preferences";
 import { execute, shortcuts } from "./shell/commands";
 import { CommandPanel } from "./shell/CommandPanel";
+import { ReleaseReadinessDialog } from "./components/ReleaseReadinessDialog";
 import { useEffect, useRef, useState } from "react";
 import { InterfaceCanvas } from "./panels/InterfaceCanvas";
 import { clearAssetCache } from "@studio/scene-runtime";
@@ -393,6 +394,18 @@ export default function App() {
           <History />
         </button>
         <button
+          title="发布检查"
+          disabled={
+            !document ||
+            Boolean(busy) ||
+            mode === "play" ||
+            Boolean(editingLibrary)
+          }
+          onClick={() => execute("studio.readiness")}
+        >
+          检查
+        </button>
+        <button
           className="primary publish-button"
           disabled={
             !document ||
@@ -548,6 +561,7 @@ export default function App() {
       </main>
       <ContextMenu />
       <CommandPanel />
+      <ReleaseReadinessDialog />
       {preferences.layout === "focus" && mode === "edit" && (
         <div className="focus-exit">
           <button onClick={() => execute("view.focus")}>退出专注 Space</button>

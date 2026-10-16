@@ -118,7 +118,7 @@ export class SamplePulseSystem implements RuntimeSystem {
               },
             },
           ],
-          45,
+          "effect",
         );
         active = entry.enabled || active;
       }

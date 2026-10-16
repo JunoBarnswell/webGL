@@ -20,6 +20,15 @@ export function modelIdentities(
       extras?.GlobalId ??
       extras?.guid;
     const name = String(node.name ?? "");
+    if (
+      external !== undefined &&
+      external !== null &&
+      typeof external !== "string" &&
+      typeof external !== "number"
+    )
+      throw Error("模型来源身份必须为字符串或数字");
+    if (typeof external === "number" && !Number.isSafeInteger(external))
+      throw Error("数字来源身份必须为安全整数");
     const ambiguous =
       unstable ||
       !name ||

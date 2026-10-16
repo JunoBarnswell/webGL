@@ -17,7 +17,7 @@ public record AssetResponse(string Id, string Name, string Kind, string Entry, s
 public record AssetStatusResponse(AssetResponse Asset, string Status);
 public record SceneVersionResponse(string VersionId,string SceneId,JsonElement Document,string CreatedAt);
 public record VersionResponse(string Id, string SceneId, string CreatedAt, bool Published);
-public record ManifestResponse( string VersionId, string PublishedAt, JsonElement Document, string RuntimeBuild = "1.0.0", string ExtensionCatalogHash = "");
+public record ManifestResponse( string VersionId, string PublishedAt, JsonElement Document, string RuntimeBuild = "1.0.0", string ExtensionCatalogHash = "", ReleaseReadinessReport? Readiness = null);
 public record PreparedScene(DraftResponse Draft,ManifestResponse Manifest,string Key,JsonElement AuthoringDocument);
 public record PublishResponse(string VersionId, string PlayerUrl);
 public record HealthResponse(string Status, string Platform, string Storage);
@@ -48,6 +48,8 @@ public class ProjectListRow { public string Id { get; set; } = ""; public string
 [JsonSerializable(typeof(AssetResponse))][JsonSerializable(typeof(AssetResponse[]))][JsonSerializable(typeof(AssetStatusResponse[]))]
 [JsonSerializable(typeof(SceneVersionResponse))]
 [JsonSerializable(typeof(VersionResponse))][JsonSerializable(typeof(VersionResponse[]))]
+[JsonSerializable(typeof(PrefabImpactReport))]
+[JsonSerializable(typeof(ReleaseReadinessReport))][JsonSerializable(typeof(DocumentContract.ReferenceEdge[]))]
 [JsonSerializable(typeof(ManifestResponse))][JsonSerializable(typeof(PublishResponse))]
 [JsonSerializable(typeof(CountResponse))][JsonSerializable(typeof(HealthResponse))][JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(AssetPreview))]
