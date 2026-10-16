@@ -354,14 +354,83 @@ add("wrong extension target capability", (doc) => {
 add("invalid assembly interval", (doc) => {
   const e = createEntity("part"),
     c = createComponent("studio.assembly.Part");
-  c.data.start = 1;
-  c.data.end = 0;
+  (c.data.stages as { start: number; end: number }[])[0].start = 1;
+  (c.data.stages as { start: number; end: number }[])[0].end = 0;
   e.components.push(c);
   doc.entities.push(e);
 });
 add("future document version", (doc) => {
   Object.assign(doc, { documentVersion: 3 });
 });
+
+add("duplicate nested assembly stage IDs", (doc) => {
+  const root = createEntity("root");
+  root.components.push(createComponent("studio.assembly.Root"));
+  const part = createEntity("part"),
+    c = createComponent("studio.assembly.Part");
+  c.data.groupId = root.id;
+  c.data.stages = [...(c.data.stages as []), ...(c.data.stages as [])];
+  part.components.push(c);
+  doc.entities.push(root, part);
+  declareExtension(doc, c.type);
+});
+add(
+  "unfinished assembly step selection",
+  (doc) => {
+    const root = createEntity("root");
+    root.components.push(createComponent("studio.assembly.Root"));
+    doc.entities.push(root);
+    declareExtension(doc, "studio.assembly.Root");
+    const behavior = createBehavior("missing step");
+    behavior.event = "ready";
+    behavior.sourceKind = "scene";
+    const action = createAction("studio.assembly.SelectStep");
+    action.targetId = root.id;
+    behavior.actions.push(action);
+    doc.behaviors.push(behavior);
+  },
+  true,
+);
+add("unknown assembly step selection", (doc) => {
+  const root = createEntity("root");
+  root.components.push(createComponent("studio.assembly.Root"));
+  doc.entities.push(root);
+  declareExtension(doc, "studio.assembly.Root");
+  const behavior = createBehavior("invalid step");
+  behavior.event = "ready";
+  behavior.sourceKind = "scene";
+  const action = createAction("studio.assembly.SelectStep");
+  action.targetId = root.id;
+  action.data.stepId = "missing";
+  behavior.actions.push(action);
+  doc.behaviors.push(behavior);
+});
+add("invalid surface barycentric sum", (doc) => {
+  const e = createEntity("label"),
+    c = createComponent("studio.annotation.Label");
+  c.data.anchorKind = "surface";
+  c.data.entityId = e.id;
+  c.data.barycentric = [1, 1, 1];
+  e.components.push(c);
+  doc.entities.push(e);
+  declareExtension(doc, c.type);
+});
+add(
+  "unfinished changed model placeholder",
+  (doc) => {
+    const root = createEntity("model"),
+      model = createComponent("Model");
+    root.components.push(model);
+    const node = createEntity("old node", root.id),
+      binding = createComponent("ModelNode");
+    binding.data.modelEntityId = root.id;
+    binding.data.sourceElementId = "external:old";
+    binding.data.sourceStatus = "unresolved";
+    node.components.push(binding);
+    doc.entities.push(root, node);
+  },
+  true,
+);
 for (const fixture of fixtures)
   assert.equal(
     validateDocument(fixture.document).length === 0,

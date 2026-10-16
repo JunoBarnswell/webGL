@@ -356,6 +356,19 @@ export interface PublishedManifest {
   document: SceneDocument;
 }
 export interface FieldSchema {
+  "x-runtime-binding"?: string;
+  "x-resets"?: string[];
+  "x-options"?: import("./field-options").FieldOptionsRule;
+  "x-public"?: boolean;
+  "x-reference-when"?: { field: string; values: string[] };
+  "x-visible-when"?: { field: string; values: string[] };
+  "x-source-element-id"?: boolean;
+  "x-publish-enum"?: string[];
+  "x-sum"?: number;
+  "x-coordinate"?: "world" | "local" | "parent-offset";
+  "x-coordinate-target"?: string;
+  "x-unique-by"?: string;
+  "x-target-components"?: string[];
   type?: string | string[];
   title?: string;
   default?: JsonValue;
@@ -376,6 +389,7 @@ export interface FieldSchema {
   "x-required-when"?: { field: string; value: string };
 }
 export interface ComponentDefinition {
+  anchor?: boolean;
   type: ComponentType;
   title: string;
   fields: Record<string, FieldSchema>;

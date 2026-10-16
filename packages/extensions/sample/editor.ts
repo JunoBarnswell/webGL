@@ -9,3 +9,5 @@ export const tools: ExtensionTool[] = [
       attachComponent("studio.sample.Pulse", selected),
   },
 ];
+
+export const panels = [];

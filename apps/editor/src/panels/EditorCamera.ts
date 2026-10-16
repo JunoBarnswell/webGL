@@ -1,10 +1,15 @@
 import * as THREE from "three";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ShowroomEngine } from "@o2vr/engine";
-import type { CameraPose, SceneRuntime } from "@studio/scene-runtime";
+import {
+  frameObjects,
+  type CameraPose,
+  type SceneRuntime,
+} from "@studio/scene-runtime";
 
 export class EditorCamera {
   private history: CameraPose[] = [];
+  private contextStart: { x: number; y: number } | undefined;
   private controller = new AbortController();
   private keys = new Set<string>();
   private flying = false;
@@ -25,12 +30,11 @@ export class EditorCamera {
     canvas.addEventListener("contextmenu", (event) => event.preventDefault(), {
       signal,
     });
-    let rightStart: { x: number; y: number } | undefined;
     canvas.addEventListener(
       "pointerdown",
       (event) => {
         if (event.button === 2 && this.enabled)
-          rightStart = { x: event.clientX, y: event.clientY };
+          this.contextStart = { x: event.clientX, y: event.clientY };
         if (!this.enabled) return;
         orbit.mouseButtons.LEFT =
           event.altKey || this.navigation === "orbit"
@@ -85,15 +89,15 @@ export class EditorCamera {
       (event) => {
         if (
           event.button === 2 &&
-          rightStart &&
+          this.contextStart &&
           Math.hypot(
-            event.clientX - rightStart.x,
-            event.clientY - rightStart.y,
+            event.clientX - this.contextStart.x,
+            event.clientY - this.contextStart.y,
           ) < 4 &&
           !this.keys.size
         )
           onContext?.(event.clientX, event.clientY);
-        rightStart = undefined;
+        this.contextStart = undefined;
       },
       { signal },
     );
@@ -107,7 +111,24 @@ export class EditorCamera {
     canvas.addEventListener(
       "keydown",
       (event) => {
-        if (this.enabled && this.flying) {
+        if (
+          this.enabled &&
+          this.flying &&
+          !event.isComposing &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          [
+            "KeyW",
+            "KeyS",
+            "KeyA",
+            "KeyD",
+            "KeyQ",
+            "KeyE",
+            "ShiftLeft",
+            "ShiftRight",
+          ].includes(event.code)
+        ) {
           this.keys.add(event.code);
           event.preventDefault();
           engine.requestRender();
@@ -211,73 +232,26 @@ export class EditorCamera {
     });
   }
   focus(ids: string[]): void {
-    const box = new THREE.Box3();
     const objects = ids.length
       ? ids
           .map((id) => this.runtime.getObject(id))
-          .filter((o): o is THREE.Object3D => Boolean(o))
-      : [...this.runtime.objects.values()].map((i) => i.root);
-    for (const object of objects) {
-      object.updateWorldMatrix(true, true);
-      object.traverseVisible((node) => {
-        if (node instanceof THREE.Mesh && !node.userData.collider) {
-          let cursor: THREE.Object3D | null = node;
-          while (cursor) {
-            if (!cursor.visible || cursor.userData.collider) return;
-            cursor = cursor.parent;
-          }
-          let bounds: THREE.Box3 | null;
-          if (node instanceof THREE.SkinnedMesh) {
-            node.skeleton.update();
-            node.computeBoundingBox();
-            bounds = node.boundingBox;
-          } else {
-            if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
-            bounds = node.geometry.boundingBox;
-          }
-          if (bounds) box.union(bounds.clone().applyMatrix4(node.matrixWorld));
-        }
-      });
+          .filter((object): object is THREE.Object3D => Boolean(object))
+      : [...this.runtime.objects.values()].map((instance) => instance.root);
+    try {
+      const pose = frameObjects(this.engine.camera, objects);
+      this.engine.camera.far = pose.far;
+      this.setPose(pose);
+    } catch {
+      /* An empty selection has no geometry to frame. */
     }
-    if (box.isEmpty()) return;
-    const center = box.getCenter(new THREE.Vector3()),
-      vertical = THREE.MathUtils.degToRad(this.engine.camera.fov),
-      horizontal =
-        2 * Math.atan(Math.tan(vertical / 2) * this.engine.camera.aspect);
-    const direction = this.engine.camera.position
-      .clone()
-      .sub(this.orbit.target)
-      .normalize();
-    if (!direction.lengthSq()) direction.set(1, 0.7, 1).normalize();
-    const right = new THREE.Vector3()
-      .crossVectors(this.engine.camera.up, direction)
-      .normalize();
-    if (!right.lengthSq()) right.set(1, 0, 0);
-    const up = new THREE.Vector3().crossVectors(direction, right).normalize();
-    let distance = 200;
-    for (const x of [box.min.x, box.max.x])
-      for (const y of [box.min.y, box.max.y])
-        for (const z of [box.min.z, box.max.z]) {
-          const offset = new THREE.Vector3(x, y, z).sub(center);
-          distance = Math.max(
-            distance,
-            offset.dot(direction) +
-              1.2 *
-                Math.max(
-                  Math.abs(offset.dot(up)) / Math.tan(vertical / 2),
-                  Math.abs(offset.dot(right)) / Math.tan(horizontal / 2),
-                ),
-          );
-        }
-    this.engine.camera.far = Math.max(this.engine.camera.far, distance * 10);
-    this.setPose({
-      position: center
-        .clone()
-        .add(direction.multiplyScalar(distance))
-        .toArray(),
-      target: center.toArray(),
-      fov: this.engine.camera.fov,
-    });
+  }
+  cancelInteraction(): boolean {
+    if (!this.flying) return false;
+    this.flying = false;
+    this.contextStart = undefined;
+    this.keys.clear();
+    this.orbit.enabled = this.enabled;
+    return true;
   }
   dispose(): void {
     this.controller.abort();

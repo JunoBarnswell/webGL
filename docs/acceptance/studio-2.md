@@ -1,42 +1,66 @@
 # Studio 2 acceptance — 2026-10-16
 
-Baseline: `0c3ae97da282e843efb490589215c2a8fca51d07`, fetched again before PR creation. Source was implemented as one coordinated change, then compiled and exercised. This report records measured outcomes, not assumed specification completion.
+Baseline: `0c3ae97da282e843efb490589215c2a8fca51d07`, fetched again before PR creation. The user authorized a coordinated destructive refactor and requested consolidated verification after implementation. Existing public document bytes are retained; version-1 migration occurs only at authoring boundaries.
 
-## Verified
+## Delivered architecture and product flows
+
+One SceneDocument, EditorSession transaction path, Runtime and generated trusted extension catalog serve Editor, preview, publication and independent Player. The old monolithic graph/material/media responsibilities and built-in action switch have been replaced by owned systems/services and registered executors. Hotspot and industry annotations have one renderer. No separate industry runtime or compatibility forwarding layer is shipped.
+
+- Shell: persistent standard/compact/focus layouts, resizable docks, command search, centralized shortcuts, remapping/conflicts, context operations, native fullscreen with focus fallback, input/IME/navigation priorities and layered cancellation.
+- Extension platform: four independent trusted packages (SamplePulse, Annotation, Assembly, Piping); static schema, action, system, tool and typed panel composition; generated TS and embedded Native AOT contracts; missing-extension JSON preservation and publication rejection; immutable version/catalog provenance.
+- Annotation: world/local/surface/path-station anchors, stable source/revision/primitive/triangle/barycentric provenance, repair and viewport reselection, real leaders and drag/undo/cancel, style/bulk/alignment tools, reverse-indexed property binding, deterministic clustering and selection, occlusion, Canvas batching above 500 labels and searchable accessible controls.
+- Assembly: BOM/groups, shared steps and timeline ordering, straight/multi-point curved paths, local rotation/scale/easing/visibility/trails, deterministic seek/play/pause/restore, part/group highlight/isolate/focus and schema-generated Player step selection. Overlaps compose in chronological order; sequential intervals express ordering/dependencies. This is an explicit animation recipe, without a CAD constraint solver.
+- Model revision: stable IDs, explicit mapping/animation reconciliation, added hierarchy, preserved edited world poses with shear rejection, retained unmatched business placeholders that block publication, and one undoable update. Surface anchors require reselection after provenance changes.
+- Piping: distinct system, logical line and physical segment identities; fittings/valves use the segment kind; batch assignment, query/focus/highlight/isolate, property-bound shared annotations and configurable CSV columns/types/units with preview errors and atomic apply. GLTF import/mount/revision use the trusted Importer interface; no IFC parser is claimed.
+
+Architecture/ownership and finite semantic metadata are documented in [design](../studio-2-design.md) and [extension development](../extensions.md). Synthetic portable examples are in [examples](../../examples/README.md).
+
+## Executed verification
 
 | Check | Result |
 | --- | --- |
-| Frozen npm install / generated catalog | Passed; current lockfile, Node 24 |
-| TypeScript / ESLint / both Vite builds | Passed; existing bundle-size warnings remain |
-| Native .NET 10 AOT build / actual API startup | Passed; third-party SqlSugar/SqlClient trimming and AOT warnings remain |
-| `verify:extensions` | 12 checks: migration, registry conflicts/dependencies/cycles, unknown JSON, clone/history, commands, source identities, seek/reset, CSV, anchors, dirty sets, BVH and sample action lifecycle |
-| `verify:experience` | Passed; existing content/history/tour/rule cancellation and loop detection |
-| `verify:contracts` | 34 TS/C# fixtures, including extension ranges, unknown contributions, line identity and target capabilities |
-| `verify:integration` | 12 real MySQL/MinIO checks: authentication, bytes/hash, CAS, validation rollback, immutable versions, publication, dependency protection, export/import (including SamplePulse), unpublish and reference release |
-| `verify:browser` | Actual keyboard/IME/flying priority, command search, preview, generic industry actions and public Player; no page errors |
-| Layout retention | 100 focus-layout toggles, one retained Canvas |
-| 1920px viewport width | Standard 66.77%; compact 97.5%; focus 100% |
-| Responsive header | No horizontal overflow at 1366, 1024, 767 and 390px |
-| O2VR showroom | 80 source nodes, 70 meshes, 57 bindings; 144 assets, **0 missing**; original 4 documented source-setting conflicts remain explicit |
-| Public sample delivery | Showroom, 50-part synthetic vehicle and 100-line/1000-segment/500-label pipe scene opened and operated in independent Player |
-| Resource lifecycle | 10 preview cycles and 10 actual editor close/reopen cycles: 345 registered resources before/after, 0 after close, no pending tasks, one retained context |
+| Frozen npm install and deterministic catalog generation | Passed; Node 24, catalog `e97c74bf1ef31dd04f81007a98d39dff90aab643217c8ae668d0b2d52b200765` |
+| TypeScript / ESLint / Editor and Player production builds | Passed; bundle-size advisories remain |
+| .NET 10 Native AOT build and actual API startup | Passed; third-party SqlSugar/SqlClient trimming/AOT warnings remain |
+| `verify:extensions` | 19 checks, including migration, registry gates, unknown JSON/history, commands, stable identity, exact restore, curves/rotation/scale/visibility, generic point paths, revision reconciliation, surface anchors, typed CSV, deterministic clustering, BVH, shared material release and SamplePulse lifecycle |
+| `verify:experience` | Passed; content/history/tour/rule cancellation and loop detection |
+| `verify:contracts` | 39 TS/C# fixtures, including nested stage rules, step options, barycentric sums and unresolved publication states |
+| `verify:integration` | 12 actual MySQL/MinIO checks: auth, bytes/hash, CAS, rollback, immutable versions, publication, references, export/import, unpublish and release |
+| `verify:browser` | Keyboard/IME/navigation priorities, input Esc and Ctrl+S, label drag/undo/cancel, native fullscreen, step selection, preview and independent Player; no browser/console errors |
+| `verify:model-revision` | Actual GLTF revision mapping dialog, accepted new hierarchy, preserved IDs, unmatched placeholder and viewport surface repair; no browser/console errors |
+| Layout retention | 100 focus-layout toggles; same primary 3D Canvas |
+| 1920px Canvas width | Standard 66.77%; compact 97.5%; focus 100% |
+| Responsive shell | No header overflow at 1366, 1024, 767 and 390px |
+| O2VR showroom delivery | 80 source nodes, 70 meshes, 57 artwork bindings; 144 assets, 0 missing; four documented source-setting conflicts remain explicit |
+| Public industry delivery | Published 50-part, two-step curved/rotational vehicle and 100-line/1000-segment/500-label pipe samples opened and operated in independent Player |
+| Resource lifecycle | 10 preview and 10 actual close/reopen cycles: 345 registered resources before/after, 0 after close, no pending tasks, one retained WebGL context |
 
-JSON evidence and synthetic screenshots are in [studio-2/](studio-2/). Actual showroom screenshots remain local under `.local/acceptance/studio-2/` rather than committing artwork/project data.
+Machine-readable evidence and safe synthetic screenshots are in [studio-2/](studio-2/). Actual gallery screenshots remain under ignored `.local/acceptance/studio-2/` to avoid committing artwork/project content. The additional 2D annotation canvas does not represent another WebGL context.
 
-## Reproduce
+| Before | Standard | Compact | Focus | Preview |
+| --- | --- | --- | --- | --- |
+| [baseline](studio-2/baseline.png) | [standard](studio-2/standard.png) | [compact](studio-2/compact.png) | [focus](studio-2/focus.png) | [preview](studio-2/preview.png) |
 
-Use the standard Linux setup, then run `npm run verify:extensions`, `verify:experience`, `verify:contracts`, `verify:integration` and `verify:browser`. Chromium defaults to `/usr/bin/chromium`; set `STUDIO_CHROMIUM` for another installed executable. `npm run examples:industry` generates and publishes the two synthetic projects. `NODE_USE_ENV_PROXY=1 npm run import:showroom` reconstructs the supplied showroom; `npm run verify:delivery` requires those local fixture records.
+## Performance method and limits
 
-`npm run benchmark:studio` creates and removes its own synthetic fixtures. `STUDIO_BASELINE` optionally points to a separately served immutable source archive. The baseline archive uses the original schema at its import boundary; no second runtime or compatibility package is shipped.
+[benchmark.json](studio-2/benchmark.json) records exact Chromium/OS/CPU, 1920×1080 DPR 1, SwiftShader software GPU, request/load/heap data, draw/triangle/resource counts, bounded CPU update/render distributions, system CPU totals, React commit samples and RAF cadence. Runs use fresh page/context, warm HTTP/server/module caches, no network simulation, and shared 12-triangle synthetic cube geometry. Browser tests run separately from the final benchmark. The legacy comparison is the same empty-core workflow; the legacy product has no industry counterpart.
 
-## Performance interpretation
+CPU render duration includes submission and shared annotation rendering; update duration covers the existing scheduler's simulation callbacks. Sampling includes initial render costs and on-demand heartbeat draws, so sample counts must be read with the distributions. GPU timer queries are unavailable on this software GPU and are recorded as null. RAF spacing measures scheduling, never rendered FPS. React profiling is opt-in on the development editor with `?profile=1`; production does not ship an active profiler.
 
-The checked-in benchmark records Chromium version, OS/CPU, DPR, dimensions, software GPU identity, requests, load time, draw/triangle/resource counts and per-system CPU totals. Fixtures share real 12-triangle cube geometry; they are not representative engineering car or plant models. HTTP/server/module caches are warm, while each page/context starts fresh. No network simulation is applied.
+| Fixture | Page to ready (ms) | RAF P95 (ms) | CPU render P95 (ms) | Draw calls | Label DOM | React commits through sampling |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| current · empty core | 941.3 | 16.7 | 16.8 | 0 | 0 | 16 |
+| baseline · empty core | 924.8 | 16.8 | unavailable | unavailable | 0 | unavailable |
+| current · 500 labels / 500 parts / 1000 segments | 3459.0 | 16.8 | 43.6 | 1000 | 500 | 43 |
+| current · 50 labels / 50 parts | 1668.1 | 16.8 | 13.6 | 50 | 50 | 20 |
+| current · 2000 labels / 2000 parts | 6625.6 | 16.8 | 73.6 | 2000 | 0 | 79 |
 
-RAF spacing measures scheduling cadence, **not CPU or GPU frame execution**. Static scenes use on-demand draws. Thus a 16.7ms RAF interval is not a claim of continuous rendered 60 FPS. The legacy comparison is an empty-core workflow; industry scenarios have no legacy counterpart. GPU timer queries, real hardware, React commit profiling and real CAD model performance have not been validated.
+The 60 FPS / ≤16.7ms desktop reference target is not established for the industry fixtures in this cloud software renderer. This evidence does not substitute for hardware GPU and real engineering-model stress tests. Loading progress publishes at most once per 80ms within a phase, with immediate phase/completion notifications; no additional RAF was introduced.
 
-## Scope that remains beyond this implementation
+## Reproduction and remaining external UAT
 
-The unified foundation and first-release industry flows above are implemented. The attachment's complete advanced scope is **not** claimed as finished: multi-curve/rotational assembly trajectories and a full BOM/step timeline editor; interactive surface-anchor reconciliation for changed/added model elements; draggable 3D leader endpoints and GPU-batched annotation LOD; exhaustive fullscreen/assistive-technology/international-keyboard UAT; and real industrial model stress/UAT remain outstanding. Model revision updates deliberately stop on unmatched/added elements and preserve the original model. Surface anchors with a revision mismatch remain unresolved rather than being silently moved.
+Use the configured Linux services and native API, then run `npm run verify:extensions`, `verify:experience`, `verify:contracts`, `verify:integration` and `verify:browser`. Start the Vite editor for `verify:model-revision`; Chromium defaults to `/usr/bin/chromium`, overridable through `STUDIO_CHROMIUM`. The CI workflow exercises both production Player and the model repair workflow.
 
-The examples demonstrate publishable linear explode, deterministic seek/restore, logical pipeline relationships, CSV transactions, shared labels and registered Player actions. They do not claim CAD constraint solving, native Plant 3D or IFC round-trip editing.
+`npm run examples:industry` creates and publishes synthetic examples; `NODE_USE_ENV_PROXY=1 npm run import:showroom` reconstructs the supplied gallery; `npm run verify:delivery` uses those ignored fixture records. `npm run benchmark:studio` creates/removes its own synthetic fixtures. `STUDIO_BASELINE` may point to an immutable baseline source archive served independently; no baseline implementation is included in the delivered application.
+
+Remaining external validation: real hardware GPU/real car and plant geometry, screen-reader and international-keyboard coverage, multi-monitor/browser fullscreen policy differences, and long-duration production operation. Native Plant 3D/IFC round-trip editing and CAD constraints are outside the stated first-release product boundary. No unexecuted scenario is counted as passed.

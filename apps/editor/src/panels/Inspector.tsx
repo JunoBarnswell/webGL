@@ -2,6 +2,7 @@ import { current as draftValue } from "immer";
 import * as THREE from "three";
 import {
   componentDefinitions,
+  editField,
   declareExtension,
   createComponent,
   createMaterial,
@@ -291,11 +292,47 @@ export function Inspector() {
                     fields={definition.fields}
                     value={component.data}
                     path={component.type}
+                    onSpatialEdit={(path, _value, space, targetField) =>
+                      useStudio
+                        .getState()
+                        .set({
+                          editingPoint: {
+                            path: [
+                              "entities",
+                              { id: entity.id },
+                              "components",
+                              { type: component.type },
+                              "data",
+                              ...path,
+                            ],
+                            label: definition.title + " · 路径点",
+                            ...(space === "world"
+                              ? {}
+                              : {
+                                  basis: {
+                                    entityId: String(
+                                      targetField
+                                        ? component.data[targetField] ||
+                                            entity.id
+                                        : entity.id,
+                                    ),
+                                    space,
+                                  },
+                                }),
+                          },
+                          tool: "translate",
+                        })
+                    }
                     onChange={(key, value) =>
                       mutate("修改" + definition.title, (current) => {
-                        current.components.find(
-                          (c) => c.type === component.type,
-                        )!.data[key] = value;
+                        editField(
+                          current.components.find(
+                            (c) => c.type === component.type,
+                          )!.data,
+                          definition.fields,
+                          key,
+                          value,
+                        );
                       })
                     }
                   />

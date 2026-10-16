@@ -41,6 +41,12 @@ jobs:
           npm run verify:integration
           npm exec -- playwright-core install --with-deps chromium
           STUDIO_CHROMIUM="$(node --input-type=module -e 'import {chromium} from "playwright-core"; process.stdout.write(chromium.executablePath());')" npm run verify:browser
+          npm run dev -- --host 127.0.0.1 --port 5173 > .local/logs/editor-ci.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5173/editor/ > /dev/null; then break; fi
+            sleep 1
+          done
+          STUDIO_CHROMIUM="$(node --input-type=module -e 'import {chromium} from "playwright-core"; process.stdout.write(chromium.executablePath());')" npm run verify:model-revision
       - uses: actions/upload-artifact@v4
         if: always()
         with:

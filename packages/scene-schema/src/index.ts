@@ -1,3 +1,6 @@
+import { fieldActive } from "./field-rules";
+export { fieldActive, editField } from "./field-rules";
+import { validateSemanticComponents } from "./semantic-validation";
 import Ajv from "ajv";
 import schema from "../scene-document.schema.json";
 import { createUiDocument } from "./ui";
@@ -36,6 +39,9 @@ export const componentDefinitions: ComponentDefinition[] =
     .map((item) => ({
       type: item.properties.type.const as ComponentType,
       title: item.title,
+      anchor: Boolean(
+        (item as unknown as { "x-anchor"?: boolean })["x-anchor"],
+      ),
       fields: item.properties.data.properties as unknown as Record<
         string,
         FieldSchema
@@ -65,8 +71,10 @@ export function fieldDefaults(
     Object.entries(fields).map(([key, field]) => [
       key,
       structuredClone(
-        field.default ??
-          (field.properties ? fieldDefaults(field.properties) : null),
+        field["x-editor"] === "uuid"
+          ? crypto.randomUUID()
+          : (field.default ??
+              (field.properties ? fieldDefaults(field.properties) : null)),
       ),
     ]),
   );
@@ -183,9 +191,10 @@ export function entityReferences(
       (d) => d.type === component.type,
     );
     for (const [key, field] of Object.entries(definition?.fields ?? {}))
-      fieldReferences(component.data[key], field, (kind, id) =>
-        references.push({ kind, id }),
-      );
+      if (fieldActive(field, component.data))
+        fieldReferences(component.data[key], field, (kind, id) =>
+          references.push({ kind, id }),
+        );
   }
   return references;
 }
@@ -289,51 +298,6 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     if (entity.transform.scale.some((n) => Math.abs(n) < 0.000001))
       errors.push(`${entity.name} 缩放不可为零`);
     for (const component of entity.components) {
-      const definition = componentDefinitions.find(
-        (d) => d.type === component.type,
-      );
-      for (const [key, field] of Object.entries(definition?.fields ?? {})) {
-        const value = component.data[key];
-        const when = field["x-required-when"];
-        if (
-          forPublish &&
-          component.enabled &&
-          (field["x-required-publish"] ||
-            (when && component.data[when.field] === when.value)) &&
-          !value
-        )
-          errors.push(entity.name + "/" + key + " 尚未配置");
-        if (
-          field["x-less-than"] &&
-          Number(value) >= Number(component.data[field["x-less-than"]!])
-        )
-          errors.push(
-            entity.name + "/" + key + " 必须小于 " + field["x-less-than"],
-          );
-        if (
-          field["x-target-component"] &&
-          typeof value === "string" &&
-          value &&
-          !entities
-            .get(value)
-            ?.components.some(
-              (c) => c.enabled && c.type === field["x-target-component"],
-            )
-        )
-          errors.push(entity.name + "/" + key + " 目标能力不匹配");
-        if (
-          field["x-unique"] &&
-          value &&
-          document.entities.some(
-            (other) =>
-              other.id !== entity.id &&
-              other.components.some(
-                (c) => c.type === component.type && c.data[key] === value,
-              ),
-          )
-        )
-          errors.push(component.type + "/" + key + " 重复");
-      }
       if (
         forPublish &&
         component.enabled &&
@@ -429,7 +393,9 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
   }
   const bindings = document.entities.flatMap((e) =>
     e.components
-      .filter((c) => c.type === "ModelNode")
+      .filter(
+        (c) => c.type === "ModelNode" && c.data.sourceStatus !== "unresolved",
+      )
       .map(
         (c) => String(c.data.modelEntityId) + ":" + String(c.data.nodeIndex),
       ),
@@ -443,6 +409,9 @@ export function validateDocument(value: unknown, forPublish = false): string[] {
     errors.push("环境立方体必须提供完整六面资源");
   if (document.settings.near >= document.settings.far)
     errors.push("相机远裁剪面必须大于近裁剪面");
+  errors.push(
+    ...validateSemanticComponents(document, componentDefinitions, forPublish),
+  );
   errors.push(...validateExperience(document, actionDefinitions, forPublish));
   return [...new Set(errors)];
 }
@@ -471,3 +440,5 @@ export function createBehavior(name = "新交互"): Behavior {
 }
 
 export * from "./model-identity";
+
+export { fieldOptions } from "./field-options";

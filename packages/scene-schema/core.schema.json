@@ -37,13 +37,7 @@
             "type": "string",
             "title": "类型",
             "default": "model",
-            "enum": [
-              "mesh",
-              "model",
-              "image",
-              "audio",
-              "texture"
-            ]
+            "enum": ["mesh", "model", "image", "audio", "texture"]
           },
           "entry": {
             "type": "string",
@@ -86,11 +80,7 @@
                 "maximum": 1000000
               }
             },
-            "required": [
-              "file",
-              "width",
-              "height"
-            ]
+            "required": ["file", "width", "height"]
           },
           "importTaskId": {
             "type": "string",
@@ -98,14 +88,7 @@
             "default": ""
           }
         },
-        "required": [
-          "id",
-          "name",
-          "kind",
-          "entry",
-          "files",
-          "sha256"
-        ]
+        "required": ["id", "name", "kind", "entry", "files", "sha256"]
       }
     },
     "materials": {
@@ -131,10 +114,7 @@
             "default": "节点"
           },
           "parentId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "visible": {
             "type": "boolean",
@@ -158,11 +138,7 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "default": [
-                  0,
-                  0,
-                  0
-                ],
+                "default": [0, 0, 0],
                 "x-editor": "vector"
               },
               "rotation": {
@@ -173,12 +149,7 @@
                 },
                 "minItems": 4,
                 "maxItems": 4,
-                "default": [
-                  0,
-                  0,
-                  0,
-                  1
-                ],
+                "default": [0, 0, 0, 1],
                 "x-editor": "quaternion"
               },
               "scale": {
@@ -189,19 +160,11 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "default": [
-                  1,
-                  1,
-                  1
-                ],
+                "default": [1, 1, 1],
                 "x-editor": "vector"
               }
             },
-            "required": [
-              "position",
-              "rotation",
-              "scale"
-            ]
+            "required": ["position", "rotation", "scale"]
           },
           "components": {
             "type": "array",
@@ -316,17 +279,10 @@
                   "x-reference": "material"
                 }
               },
-              "required": [
-                "assetId",
-                "materialId"
-              ]
+              "required": ["assetId", "materialId"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "网格"
         },
         {
@@ -362,21 +318,13 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 1e-06
+                  "minimum": 1e-6
                 }
               },
-              "required": [
-                "assetId",
-                "materialId",
-                "unitScale"
-              ]
+              "required": ["assetId", "materialId", "unitScale"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "GLB / glTF 模型"
         },
         {
@@ -422,20 +370,19 @@
                   "type": "string",
                   "title": "模型修订",
                   "default": ""
+                },
+                "sourceStatus": {
+                  "type": "string",
+                  "title": "来源状态",
+                  "enum": ["resolved", "unresolved"],
+                  "default": "resolved",
+                  "x-publish-enum": ["resolved"]
                 }
               },
-              "required": [
-                "modelEntityId",
-                "nodeIndex",
-                "materialId"
-              ]
+              "required": ["modelEntityId", "nodeIndex", "materialId"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "模型子节点"
         },
         {
@@ -484,11 +431,7 @@
                   },
                   "minItems": 3,
                   "maxItems": 3,
-                  "default": [
-                    0,
-                    0,
-                    0
-                  ]
+                  "default": [0, 0, 0]
                 },
                 "size": {
                   "type": "number",
@@ -508,11 +451,7 @@
               ]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "交互热点"
         },
         {
@@ -538,16 +477,10 @@
                   "x-reference": "content"
                 }
               },
-              "required": [
-                "contentId"
-              ]
+              "required": ["contentId"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "作品内容"
         },
         {
@@ -570,10 +503,7 @@
                   "type": "string",
                   "title": "形状",
                   "default": "mesh",
-                  "enum": [
-                    "mesh",
-                    "box"
-                  ]
+                  "enum": ["mesh", "box"]
                 },
                 "size": {
                   "type": "array",
@@ -583,11 +513,7 @@
                   },
                   "minItems": 3,
                   "maxItems": 3,
-                  "default": [
-                    1000,
-                    2000,
-                    1000
-                  ],
+                  "default": [1000, 2000, 1000],
                   "x-editor": "vector"
                 },
                 "offset": {
@@ -598,26 +524,14 @@
                   },
                   "minItems": 3,
                   "maxItems": 3,
-                  "default": [
-                    0,
-                    0,
-                    0
-                  ],
+                  "default": [0, 0, 0],
                   "x-editor": "vector"
                 }
               },
-              "required": [
-                "shape",
-                "size",
-                "offset"
-              ]
+              "required": ["shape", "size", "offset"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "碰撞体"
         },
         {
@@ -639,11 +553,7 @@
               "required": []
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "地面"
         },
         {
@@ -670,11 +580,7 @@
                   },
                   "minItems": 3,
                   "maxItems": 3,
-                  "default": [
-                    2000,
-                    2500,
-                    2000
-                  ],
+                  "default": [2000, 2500, 2000],
                   "x-editor": "vector"
                 },
                 "offset": {
@@ -685,25 +591,14 @@
                   },
                   "minItems": 3,
                   "maxItems": 3,
-                  "default": [
-                    0,
-                    0,
-                    0
-                  ],
+                  "default": [0, 0, 0],
                   "x-editor": "vector"
                 }
               },
-              "required": [
-                "size",
-                "offset"
-              ]
+              "required": ["size", "offset"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "触发区域"
         },
         {
@@ -726,11 +621,7 @@
                   "type": "string",
                   "title": "层级",
                   "default": "components",
-                  "enum": [
-                    "shell",
-                    "chassis",
-                    "components"
-                  ]
+                  "enum": ["shell", "chassis", "components"]
                 },
                 "xrayOpacity": {
                   "type": "number",
@@ -740,17 +631,10 @@
                   "maximum": 1
                 }
               },
-              "required": [
-                "layer",
-                "xrayOpacity"
-              ]
+              "required": ["layer", "xrayOpacity"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "展示分层"
         },
         {
@@ -773,12 +657,7 @@
                   "type": "string",
                   "title": "类型",
                   "default": "directional",
-                  "enum": [
-                    "ambient",
-                    "directional",
-                    "point",
-                    "spot"
-                  ]
+                  "enum": ["ambient", "directional", "point", "spot"]
                 },
                 "color": {
                   "type": "string",
@@ -808,20 +687,10 @@
                   "maximum": 89
                 }
               },
-              "required": [
-                "kind",
-                "color",
-                "intensity",
-                "distance",
-                "angle"
-              ]
+              "required": ["kind", "color", "intensity", "distance", "angle"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "灯光"
         },
         {
@@ -886,11 +755,7 @@
               ]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "音频"
         },
         {
@@ -920,7 +785,7 @@
                   "type": "number",
                   "title": "源单位转毫米",
                   "default": 1000,
-                  "minimum": 1e-06
+                  "minimum": 1e-6
                 },
                 "idleClip": {
                   "type": "string",
@@ -954,11 +819,7 @@
               ]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "角色"
         },
         {
@@ -989,17 +850,10 @@
                   "default": false
                 }
               },
-              "required": [
-                "tourId",
-                "autoplay"
-              ]
+              "required": ["tourId", "autoplay"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "漫游巡航"
         },
         {
@@ -1036,17 +890,10 @@
                   "maximum": 600
                 }
               },
-              "required": [
-                "viewpointIds",
-                "duration"
-              ]
+              "required": ["viewpointIds", "duration"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "展区视点"
         },
         {
@@ -1086,18 +933,10 @@
                   "maximum": 4096
                 }
               },
-              "required": [
-                "viewpointId",
-                "width",
-                "height"
-              ]
+              "required": ["viewpointId", "width", "height"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "全景"
         },
         {
@@ -1145,20 +984,10 @@
                   "maximum": 10
                 }
               },
-              "required": [
-                "modelEntityId",
-                "clip",
-                "loop",
-                "autoplay",
-                "speed"
-              ]
+              "required": ["modelEntityId", "clip", "loop", "autoplay", "speed"]
             }
           },
-          "required": [
-            "type",
-            "enabled",
-            "data"
-          ],
+          "required": ["type", "enabled", "data"],
           "title": "模型动画"
         }
       ]
@@ -1194,13 +1023,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "显示对象",
           "x-target": "entity",
           "x-components": []
@@ -1234,13 +1057,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "隐藏对象",
           "x-target": "entity",
           "x-components": []
@@ -1274,13 +1091,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "切换显隐",
           "x-target": "entity",
           "x-components": []
@@ -1312,26 +1123,15 @@
               "properties": {
                 "mode": {
                   "type": "string",
-                  "enum": [
-                    "solid",
-                    "xray"
-                  ],
+                  "enum": ["solid", "xray"],
                   "title": "模式",
                   "default": "solid"
                 }
               },
-              "required": [
-                "mode"
-              ]
+              "required": ["mode"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "展示分层",
           "x-target": "",
           "x-components": []
@@ -1363,26 +1163,15 @@
               "properties": {
                 "mode": {
                   "type": "string",
-                  "enum": [
-                    "first",
-                    "third"
-                  ],
+                  "enum": ["first", "third"],
                   "title": "模式",
                   "default": "first"
                 }
               },
-              "required": [
-                "mode"
-              ]
+              "required": ["mode"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "观察模式",
           "x-target": "",
           "x-components": []
@@ -1424,25 +1213,13 @@
                   "default": false
                 }
               },
-              "required": [
-                "clip",
-                "loop"
-              ]
+              "required": ["clip", "loop"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "播放动画",
           "x-target": "entity",
-          "x-components": [
-            "Animation",
-            "Avatar"
-          ]
+          "x-components": ["Animation", "Avatar"]
         },
         {
           "type": "object",
@@ -1473,19 +1250,10 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "暂停动画",
           "x-target": "entity",
-          "x-components": [
-            "Animation",
-            "Avatar"
-          ]
+          "x-components": ["Animation", "Avatar"]
         },
         {
           "type": "object",
@@ -1516,18 +1284,10 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "播放音频",
           "x-target": "entity",
-          "x-components": [
-            "Audio"
-          ]
+          "x-components": ["Audio"]
         },
         {
           "type": "object",
@@ -1558,18 +1318,10 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "停止音频",
           "x-target": "entity",
-          "x-components": [
-            "Audio"
-          ]
+          "x-components": ["Audio"]
         },
         {
           "type": "object",
@@ -1605,23 +1357,13 @@
                   "maximum": 1
                 }
               },
-              "required": [
-                "volume"
-              ]
+              "required": ["volume"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "设置音量",
           "x-target": "entity",
-          "x-components": [
-            "Audio"
-          ]
+          "x-components": ["Audio"]
         },
         {
           "type": "object",
@@ -1657,18 +1399,10 @@
                   "maximum": 600
                 }
               },
-              "required": [
-                "duration"
-              ]
+              "required": ["duration"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "移动到视点",
           "x-target": "viewpoint",
           "x-components": []
@@ -1702,13 +1436,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "打开内容",
           "x-target": "content",
           "x-components": []
@@ -1741,13 +1469,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "关闭内容",
           "x-target": "",
           "x-components": []
@@ -1781,13 +1503,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "播放巡航",
           "x-target": "tour",
           "x-components": []
@@ -1821,13 +1537,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "暂停巡航",
           "x-target": "tour",
           "x-components": []
@@ -1861,13 +1571,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "继续巡航",
           "x-target": "tour",
           "x-components": []
@@ -1901,13 +1605,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "停止巡航",
           "x-target": "tour",
           "x-components": []
@@ -1941,13 +1639,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "重播巡航",
           "x-target": "tour",
           "x-components": []
@@ -1986,18 +1678,10 @@
                   "maximum": 1
                 }
               },
-              "required": [
-                "progress"
-              ]
+              "required": ["progress"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "定位巡航",
           "x-target": "tour",
           "x-components": []
@@ -2031,18 +1715,10 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "进入全景",
           "x-target": "entity",
-          "x-components": [
-            "Panorama"
-          ]
+          "x-components": ["Panorama"]
         },
         {
           "type": "object",
@@ -2073,18 +1749,10 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "导出全景",
           "x-target": "entity",
-          "x-components": [
-            "Panorama"
-          ]
+          "x-components": ["Panorama"]
         },
         {
           "type": "object",
@@ -2113,27 +1781,15 @@
               "additionalProperties": false,
               "properties": {
                 "value": {
-                  "type": [
-                    "string",
-                    "number",
-                    "boolean"
-                  ],
+                  "type": ["string", "number", "boolean"],
                   "title": "值",
                   "default": false
                 }
               },
-              "required": [
-                "value"
-              ]
+              "required": ["value"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "设置变量",
           "x-target": "variable",
           "x-components": []
@@ -2167,13 +1823,7 @@
               "required": []
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "切换界面元素",
           "x-target": "ui",
           "x-components": []
@@ -2211,18 +1861,10 @@
                   "maximum": 3600
                 }
               },
-              "required": [
-                "seconds"
-              ]
+              "required": ["seconds"]
             }
           },
-          "required": [
-            "id",
-            "type",
-            "targetId",
-            "wait",
-            "data"
-          ],
+          "required": ["id", "type", "targetId", "wait", "data"],
           "title": "等待",
           "x-target": "",
           "x-components": []
@@ -2306,11 +1948,7 @@
           "type": "string",
           "title": "着色类型",
           "default": "phong",
-          "enum": [
-            "phong",
-            "standard",
-            "physical"
-          ]
+          "enum": ["phong", "standard", "physical"]
         },
         "color": {
           "type": "string",
@@ -2428,10 +2066,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2442,10 +2077,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2469,10 +2101,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2503,10 +2132,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2517,10 +2143,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2544,10 +2167,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2578,10 +2198,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2592,10 +2209,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2619,10 +2233,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2653,10 +2264,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2667,10 +2275,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2694,10 +2299,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2728,10 +2330,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2742,10 +2341,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2769,10 +2365,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2803,10 +2396,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2817,10 +2407,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2844,10 +2431,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2878,10 +2462,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2892,10 +2473,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2919,10 +2497,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -2953,10 +2528,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -2967,10 +2539,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -2994,10 +2563,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -3028,10 +2594,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -3042,10 +2605,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -3069,10 +2629,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -3103,10 +2660,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    0,
-                    0
-                  ],
+                  "default": [0, 0],
                   "x-editor": "vector"
                 },
                 "repeat": {
@@ -3117,10 +2671,7 @@
                   },
                   "minItems": 2,
                   "maxItems": 2,
-                  "default": [
-                    1,
-                    1
-                  ],
+                  "default": [1, 1],
                   "x-editor": "vector"
                 },
                 "rotation": {
@@ -3144,10 +2695,7 @@
                   "type": "string",
                   "title": "色彩空间",
                   "default": "srgb",
-                  "enum": [
-                    "srgb",
-                    "linear"
-                  ]
+                  "enum": ["srgb", "linear"]
                 }
               },
               "required": [
@@ -3243,11 +2791,7 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            -1846,
-            2000,
-            726
-          ],
+          "default": [-1846, 2000, 726],
           "x-editor": "vector"
         },
         "target": {
@@ -3258,11 +2802,7 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            -1778,
-            2162,
-            -1409
-          ],
+          "default": [-1778, 2162, -1409],
           "x-editor": "vector"
         },
         "moveSpeed": {
@@ -3293,10 +2833,7 @@
           "type": "string",
           "title": "初始视角",
           "default": "first",
-          "enum": [
-            "first",
-            "third"
-          ]
+          "enum": ["first", "third"]
         },
         "ambientColor": {
           "type": "string",
@@ -3334,11 +2871,7 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            5000,
-            10000,
-            5000
-          ],
+          "default": [5000, 10000, 5000],
           "x-editor": "vector"
         },
         "onDemand": {
@@ -3594,12 +3127,7 @@
           "maximum": 3600
         }
       },
-      "required": [
-        "id",
-        "viewpointId",
-        "hold",
-        "travel"
-      ]
+      "required": ["id", "viewpointId", "hold", "travel"]
     },
     "tour": {
       "type": "object",
@@ -3634,13 +3162,7 @@
           "maximum": 1000000
         }
       },
-      "required": [
-        "id",
-        "name",
-        "stops",
-        "loop",
-        "speed"
-      ]
+      "required": ["id", "name", "stops", "loop", "speed"]
     },
     "variable": {
       "type": "object",
@@ -3657,28 +3179,15 @@
         },
         "type": {
           "type": "string",
-          "enum": [
-            "boolean",
-            "number",
-            "string"
-          ],
+          "enum": ["boolean", "number", "string"],
           "title": "",
           "default": "boolean"
         },
         "initial": {
-          "type": [
-            "string",
-            "number",
-            "boolean"
-          ]
+          "type": ["string", "number", "boolean"]
         }
       },
-      "required": [
-        "id",
-        "name",
-        "type",
-        "initial"
-      ]
+      "required": ["id", "name", "type", "initial"]
     },
     "condition": {
       "oneOf": [
@@ -3697,10 +3206,7 @@
               "default": []
             }
           },
-          "required": [
-            "type",
-            "conditions"
-          ]
+          "required": ["type", "conditions"]
         },
         {
           "type": "object",
@@ -3717,10 +3223,7 @@
               "default": []
             }
           },
-          "required": [
-            "type",
-            "conditions"
-          ]
+          "required": ["type", "conditions"]
         },
         {
           "type": "object",
@@ -3731,10 +3234,7 @@
             },
             "source": {
               "type": "string",
-              "enum": [
-                "variable",
-                "runtime"
-              ],
+              "enum": ["variable", "runtime"],
               "title": "",
               "default": "variable"
             },
@@ -3745,33 +3245,15 @@
             },
             "operator": {
               "type": "string",
-              "enum": [
-                "eq",
-                "neq",
-                "gt",
-                "gte",
-                "lt",
-                "lte",
-                "contains"
-              ],
+              "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains"],
               "title": "",
               "default": "eq"
             },
             "value": {
-              "type": [
-                "string",
-                "number",
-                "boolean"
-              ]
+              "type": ["string", "number", "boolean"]
             }
           },
-          "required": [
-            "type",
-            "source",
-            "key",
-            "operator",
-            "value"
-          ]
+          "required": ["type", "source", "key", "operator", "value"]
         }
       ]
     },
@@ -3839,11 +3321,7 @@
         },
         "concurrency": {
           "type": "string",
-          "enum": [
-            "ignore",
-            "restart",
-            "queue"
-          ],
+          "enum": ["ignore", "restart", "queue"],
           "title": "",
           "default": "ignore"
         },
@@ -3882,16 +3360,10 @@
           "type": "number"
         },
         "width": {
-          "type": [
-            "number",
-            "string"
-          ]
+          "type": ["number", "string"]
         },
         "height": {
-          "type": [
-            "number",
-            "string"
-          ]
+          "type": ["number", "string"]
         },
         "rotation": {
           "type": "number"
@@ -3930,11 +3402,7 @@
         },
         "textAlign": {
           "type": "string",
-          "enum": [
-            "left",
-            "center",
-            "right"
-          ],
+          "enum": ["left", "center", "right"],
           "title": "",
           "default": "left"
         },
@@ -3985,52 +3453,31 @@
         },
         "layout": {
           "type": "string",
-          "enum": [
-            "free",
-            "row",
-            "column"
-          ],
+          "enum": ["free", "row", "column"],
           "title": "",
           "default": "free"
         },
         "align": {
           "type": "string",
-          "enum": [
-            "start",
-            "center",
-            "end",
-            "stretch"
-          ],
+          "enum": ["start", "center", "end", "stretch"],
           "title": "",
           "default": "start"
         },
         "justify": {
           "type": "string",
-          "enum": [
-            "start",
-            "center",
-            "end",
-            "space-between"
-          ],
+          "enum": ["start", "center", "end", "space-between"],
           "title": "",
           "default": "start"
         },
         "objectFit": {
           "type": "string",
-          "enum": [
-            "cover",
-            "contain"
-          ],
+          "enum": ["cover", "contain"],
           "title": "",
           "default": "cover"
         },
         "overflow": {
           "type": "string",
-          "enum": [
-            "visible",
-            "hidden",
-            "auto"
-          ],
+          "enum": ["visible", "hidden", "auto"],
           "title": "",
           "default": "visible"
         },
@@ -4049,12 +3496,7 @@
         },
         "animation": {
           "type": "string",
-          "enum": [
-            "none",
-            "fade",
-            "slide",
-            "pulse"
-          ],
+          "enum": ["none", "fade", "slide", "pulse"],
           "title": "",
           "default": "none"
         },
@@ -4065,10 +3507,7 @@
         },
         "position": {
           "type": "string",
-          "enum": [
-            "flow",
-            "absolute"
-          ],
+          "enum": ["flow", "absolute"],
           "default": "absolute"
         }
       },
@@ -4114,16 +3553,10 @@
           "type": "number"
         },
         "width": {
-          "type": [
-            "number",
-            "string"
-          ]
+          "type": ["number", "string"]
         },
         "height": {
-          "type": [
-            "number",
-            "string"
-          ]
+          "type": ["number", "string"]
         },
         "rotation": {
           "type": "number"
@@ -4162,11 +3595,7 @@
         },
         "textAlign": {
           "type": "string",
-          "enum": [
-            "left",
-            "center",
-            "right"
-          ],
+          "enum": ["left", "center", "right"],
           "title": "",
           "default": "left"
         },
@@ -4217,52 +3646,31 @@
         },
         "layout": {
           "type": "string",
-          "enum": [
-            "free",
-            "row",
-            "column"
-          ],
+          "enum": ["free", "row", "column"],
           "title": "",
           "default": "free"
         },
         "align": {
           "type": "string",
-          "enum": [
-            "start",
-            "center",
-            "end",
-            "stretch"
-          ],
+          "enum": ["start", "center", "end", "stretch"],
           "title": "",
           "default": "start"
         },
         "justify": {
           "type": "string",
-          "enum": [
-            "start",
-            "center",
-            "end",
-            "space-between"
-          ],
+          "enum": ["start", "center", "end", "space-between"],
           "title": "",
           "default": "start"
         },
         "objectFit": {
           "type": "string",
-          "enum": [
-            "cover",
-            "contain"
-          ],
+          "enum": ["cover", "contain"],
           "title": "",
           "default": "cover"
         },
         "overflow": {
           "type": "string",
-          "enum": [
-            "visible",
-            "hidden",
-            "auto"
-          ],
+          "enum": ["visible", "hidden", "auto"],
           "title": "",
           "default": "visible"
         },
@@ -4281,12 +3689,7 @@
         },
         "animation": {
           "type": "string",
-          "enum": [
-            "none",
-            "fade",
-            "slide",
-            "pulse"
-          ],
+          "enum": ["none", "fade", "slide", "pulse"],
           "title": "",
           "default": "none"
         },
@@ -4297,10 +3700,7 @@
         },
         "position": {
           "type": "string",
-          "enum": [
-            "flow",
-            "absolute"
-          ],
+          "enum": ["flow", "absolute"],
           "default": "absolute"
         }
       },
@@ -4321,12 +3721,7 @@
         },
         "scope": {
           "type": "string",
-          "enum": [
-            "hud",
-            "content",
-            "entry",
-            "loading"
-          ],
+          "enum": ["hud", "content", "entry", "loading"],
           "title": "",
           "default": "hud"
         },
@@ -4346,23 +3741,12 @@
         },
         "presentation": {
           "type": "string",
-          "enum": [
-            "modal",
-            "sidebar",
-            "card"
-          ],
+          "enum": ["modal", "sidebar", "card"],
           "title": "",
           "default": "modal"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "scope",
-        "width",
-        "height",
-        "presentation"
-      ]
+      "required": ["id", "name", "scope", "width", "height", "presentation"]
     },
     "uiNode": {
       "type": "object",
@@ -4410,10 +3794,7 @@
           "x-reference": "layout"
         },
         "parentId": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "x-reference": "ui"
         },
         "text": {
@@ -4528,19 +3909,10 @@
               "default": "Inter, Microsoft YaHei, sans-serif"
             }
           },
-          "required": [
-            "accent",
-            "background",
-            "text",
-            "fontFamily"
-          ]
+          "required": ["accent", "background", "text", "fontFamily"]
         }
       },
-      "required": [
-        "layouts",
-        "nodes",
-        "theme"
-      ]
+      "required": ["layouts", "nodes", "theme"]
     }
   },
   "title": "WebGL Studio SceneDocument"

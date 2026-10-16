@@ -63,6 +63,7 @@ const documents = [
     parts: 500,
     segments: 1000,
   },
+  { name: "50 labels / 50 parts", labels: 50, parts: 50, segments: 0 },
   { name: "2000 labels / 2000 parts", labels: 2000, parts: 2000, segments: 0 },
 ];
 try {
@@ -165,7 +166,11 @@ try {
         let requests = 0;
         page.on("request", () => requests++);
         const start = performance.now();
-        await page.goto(target.url + "/editor/");
+        await page.goto(
+          target.url +
+            "/editor/" +
+            (target.name === "current" ? "?profile=1" : ""),
+        );
         await page
           .locator('.viewport-panel[data-load-phase="ready"]')
           .waitFor({ timeout: 120000 });
@@ -204,11 +209,26 @@ try {
               p99: samples[Math.floor(samples.length * 0.99)],
             },
             frames,
+            react: window.studioProfile ?? null,
             renderer,
-            visibleLabels: document.querySelectorAll(
-              ".runtime-hotspot:not([hidden])",
-            ).length,
-            totalLabels: document.querySelectorAll(".runtime-hotspot").length,
+            visibleLabels: Number(
+              (document.querySelector(".annotation-canvas") as HTMLElement)
+                ?.dataset.visibleLabels ??
+                document.querySelectorAll(".runtime-hotspot:not([hidden])")
+                  .length,
+            ),
+            totalLabels: Number(
+              (document.querySelector(".annotation-canvas") as HTMLElement)
+                ?.dataset.totalLabels ??
+                document.querySelectorAll(".runtime-hotspot").length,
+            ),
+            annotationDOM: document.querySelectorAll(".runtime-hotspot").length,
+            heap:
+              (
+                performance as Performance & {
+                  memory?: { usedJSHeapSize: number };
+                }
+              ).memory?.usedJSHeapSize ?? null,
             resources: JSON.parse(
               document
                 .querySelector(".viewport-panel")!

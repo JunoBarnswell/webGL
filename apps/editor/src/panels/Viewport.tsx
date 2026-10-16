@@ -1,3 +1,6 @@
+import { pointWorld, pointValue, pointFrame } from "../shell/DocumentPoint";
+import { writeDocumentValue } from "@studio/editor-core";
+import { surfaceAnchor } from "../../../../packages/extensions/annotation/anchors";
 import { usePreferences } from "../shell/preferences";
 import { execute } from "../shell/commands";
 import { useEffect, useRef, useState } from "react";
@@ -125,6 +128,21 @@ export function Viewport() {
           )
             useStudio.getState().select([id]);
         },
+        onAnnotationOffset: (id, offset) =>
+          useStudio.getState().command({
+            label: "调整标注引线",
+            mutate: (doc) => {
+              const component = doc.entities
+                .find((e) => e.id === id)
+                ?.components.find((c) => c.type === "studio.annotation.Label");
+              if (component) component.data.offset = offset;
+            },
+          }),
+        isToolActive: () =>
+          Boolean(
+            useStudio.getState().placingAnnotation ||
+              useStudio.getState().placingHotspot,
+          ),
         onIssue: (id, error) =>
           useStudio
             .getState()
@@ -192,7 +210,7 @@ export function Viewport() {
       orbit.enabled = false;
     });
     gizmo.addEventListener("objectChange", () => {
-      if (drag && gizmo.object === pivot) {
+      if (drag && !drag.point && gizmo.object === pivot) {
         pivot.updateMatrixWorld(true);
         const delta = pivot.matrixWorld
           .clone()
@@ -212,16 +230,14 @@ export function Viewport() {
           .getState()
           .set({ pointPreview: gizmo.object.position.toArray() });
       if (drag && !drag.point)
-        useStudio
-          .getState()
-          .set({
-            transforms: Object.fromEntries(
-              [...drag.worlds.keys()].map((id) => [
-                id,
-                readTransform(runtime, id),
-              ]),
-            ),
-          });
+        useStudio.getState().set({
+          transforms: Object.fromEntries(
+            [...drag.worlds.keys()].map((id) => [
+              id,
+              readTransform(runtime, id),
+            ]),
+          ),
+        });
       engine.requestRender();
     });
     const finish = (cancel: boolean) => {
@@ -229,7 +245,11 @@ export function Viewport() {
       useStudio.getState().set({ dragging: false });
       if (drag.point && gizmo.object) {
         const point = drag.point,
-          position = gizmo.object.position.toArray();
+          position = pointValue(
+            runtime,
+            point,
+            gizmo.object.getWorldPosition(new THREE.Vector3()),
+          );
         drag = null;
         useStudio.getState().set({ pointPreview: null });
         if (cancel) {
@@ -237,12 +257,9 @@ export function Viewport() {
           gizmo.dragging = false;
         } else
           useStudio.getState().command({
-            label: "编辑路径视点",
+            label: "编辑空间点",
             mutate: (doc) => {
-              const view = doc.viewpoints.find(
-                (v) => v.id === point.viewpointId,
-              );
-              if (view) view[point.property] = position;
+              writeDocumentValue(doc, point.path, position);
             },
           });
         orbit.enabled = useStudio.getState().mode === "edit";
@@ -300,6 +317,38 @@ export function Viewport() {
           useStudio.getState().mode !== "edit"
         )
           return;
+        const annotationId = useStudio.getState().placingAnnotation;
+        if (annotationId) {
+          const rect = canvas.getBoundingClientRect(),
+            hit = runtime.pickIntersection(
+              ((event.clientX - rect.left) / rect.width) * 2 - 1,
+              (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+            );
+          const anchor = hit && surfaceAnchor(runtime, hit);
+          if (anchor) {
+            useStudio.getState().command({
+              label: "重新附着标注",
+              mutate: (doc) => {
+                const component = doc.entities
+                  .find((e) => e.id === annotationId)
+                  ?.components.find(
+                    (c) => c.type === "studio.annotation.Label",
+                  );
+                if (component)
+                  Object.assign(component.data, {
+                    anchorKind: "surface",
+                    ...anchor,
+                  });
+              },
+            });
+            useStudio.getState().set({ placingAnnotation: "" });
+          } else
+            useStudio
+              .getState()
+              .set({ message: "请选择具有稳定来源和网格版本的表面" });
+          event.stopImmediatePropagation();
+          return;
+        }
         if (useStudio.getState().placingHotspot) {
           const rect = canvas.getBoundingClientRect(),
             hit = runtime.pickSurface(
@@ -309,12 +358,10 @@ export function Viewport() {
           if (hit) {
             const created = addHotspot(hit.point);
             useStudio.getState().command(created.command);
-            useStudio
-              .getState()
-              .set({
-                placingHotspot: false,
-                activeContentId: created.content.id,
-              });
+            useStudio.getState().set({
+              placingHotspot: false,
+              activeContentId: created.content.id,
+            });
             useStudio.getState().select([created.entity.id]);
           }
           event.stopImmediatePropagation();
@@ -335,13 +382,11 @@ export function Viewport() {
           false,
         )[0];
         if (hit) {
-          useStudio
-            .getState()
-            .set({
-              editingPoint: hit.object.userData.editorHandle as EditingPoint,
-              pointPreview: null,
-              tool: "translate",
-            });
+          useStudio.getState().set({
+            editingPoint: hit.object.userData.editorHandle as EditingPoint,
+            pointPreview: null,
+            tool: "translate",
+          });
           event.stopImmediatePropagation();
         }
       },
@@ -423,7 +468,12 @@ export function Viewport() {
 
     const overlayUpdate = engine.onUpdate(() => {
       controls.current?.overlays?.update(
-        gizmo.dragging ? gizmo.object : undefined,
+        drag?.point && gizmo.object
+          ? {
+              point: drag.point,
+              world: gizmo.object.getWorldPosition(new THREE.Vector3()),
+            }
+          : undefined,
       );
       return false;
     });
@@ -565,9 +615,25 @@ export function Viewport() {
       else pivot.rotation.set(0, 0, 0);
       pivot.scale.set(1, 1, 1);
     }
-    if (object && mode === "edit" && tool !== "select") gizmo.attach(object);
+    if (editingPoint && mode === "edit") {
+      const world = pointWorld(current.runtime, editingPoint);
+      if (world) {
+        pivot.position.copy(world);
+        pivot.quaternion.setFromRotationMatrix(
+          new THREE.Matrix4().extractRotation(
+            pointFrame(current.runtime, editingPoint),
+          ),
+        );
+        pivot.scale.set(1, 1, 1);
+        pivot.userData.editorHandle = editingPoint;
+        gizmo.attach(pivot);
+      }
+    } else {
+      delete pivot.userData.editorHandle;
+      if (object && mode === "edit" && tool !== "select") gizmo.attach(object);
+    }
     gizmo.setMode(
-      handle ? "translate" : tool === "select" ? "translate" : tool,
+      editingPoint ? "translate" : tool === "select" ? "translate" : tool,
     );
     gizmo.setSpace(space);
     gizmo.setTranslationSnap(snap ? 100 : null);
@@ -593,6 +659,9 @@ export function Viewport() {
       controls.current?.engine.requestRender();
     }
   }, [grid]);
+  useEffect(() => {
+    controls.current?.runtime.selectionChanged(mode === "edit" ? selected : []);
+  }, [selected, mode]);
   return (
     <section
       className="viewport-panel"
@@ -604,6 +673,7 @@ export function Viewport() {
       }}
       data-runtime-stats={JSON.stringify(statistics.resources)}
       data-render-info={JSON.stringify({
+        timings: controls.current?.engine.perfMonitor.getMetrics(),
         fps: statistics.fps,
         draws: statistics.draws,
         triangles: statistics.triangles,
@@ -778,15 +848,7 @@ export function Viewport() {
       )}
       {editingPoint && mode === "edit" && (
         <div className="point-edit-tools">
-          <span>
-            {"视点"} ·{" "}
-            {
-              document?.viewpoints.find(
-                (v) => v.id === editingPoint.viewpointId,
-              )?.name
-            }{" "}
-            · {editingPoint.property === "position" ? "位置" : "朝向"}
-          </span>
+          <span>{editingPoint.label}</span>
           <button
             onClick={() =>
               useStudio
@@ -810,6 +872,24 @@ export function Viewport() {
             {statistics.triangles.toLocaleString()} △
           </span>
         </div>
+      )}
+      {preferences.statistics && (
+        <details className="performance-panel">
+          <summary>资源与系统 CPU</summary>
+          <pre>
+            {JSON.stringify(
+              {
+                timings: controls.current?.engine.perfMonitor.getMetrics(),
+                resources: statistics.resources,
+                systems: Object.fromEntries(
+                  runtimeReference?.systemMetrics ?? [],
+                ),
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </details>
       )}
       {rectangle && (
         <div
@@ -864,6 +944,11 @@ export function Viewport() {
             </button>
           </div>
         )}
+      {useStudio.getState().placingAnnotation && mode === "edit" && (
+        <div className="viewport-instruction">
+          点击模型表面重新附着标注 · Esc 取消
+        </div>
+      )}
       {useStudio.getState().placingHotspot && mode === "edit" && (
         <div className="viewport-instruction">
           点击模型表面放置热点 · Esc 取消

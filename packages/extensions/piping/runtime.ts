@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import {
   getComponent,
   type SceneDocument,
@@ -10,9 +9,6 @@ import type { RuntimeSystem } from "../../scene-runtime/src/systems/RuntimeSyste
 export class PipingSystem implements RuntimeSystem {
   readonly id = "studio.piping";
   readonly segmentsByLine = new Map<string, Set<string>>();
-  private original = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
-  private temporary = new Set<THREE.Material>();
-  private visibility = new Map<string, boolean>();
   constructor(private runtime: SceneRuntime) {}
   attach(document: SceneDocument): void {
     for (const entity of document.entities) {
@@ -25,76 +21,70 @@ export class PipingSystem implements RuntimeSystem {
       }
     }
   }
-  beforeChange(): void {
-    this.mode();
-  }
+
   change(change: ChangeSet): void {
-    this.segmentsByLine.clear();
-    this.attach(change.after);
-  }
-  actions: Record<string, (action: BehaviorAction) => Promise<void>> = {
-    "studio.piping.Highlight": async (action) => {
-      this.restore();
-      const ids = this.segmentsByLine.get(action.targetId);
-      if (!ids) throw Error("管线没有关联管段");
-      for (const id of ids)
-        this.runtime.getObject(id)?.traverse((object) => {
-          if (!(object instanceof THREE.Mesh) || object.userData.collider)
-            return;
-          this.original.set(object, object.material);
-          const materials = (
-            Array.isArray(object.material) ? object.material : [object.material]
-          ).map((material) => {
-            const clone = material.clone();
-            if ("emissive" in clone)
-              (clone as THREE.MeshStandardMaterial).emissive.set("#16ba9b");
-            this.temporary.add(clone);
-            return clone;
-          });
-          object.material = Array.isArray(object.material)
-            ? materials
-            : materials[0];
-        });
-      this.runtime.engine.requestRender();
-    },
-    "studio.piping.Isolate": async (action) => {
-      this.restore();
-      const selected = this.segmentsByLine.get(action.targetId);
-      if (!selected) throw Error("管线没有关联管段");
-      for (const ids of this.segmentsByLine.values())
-        for (const id of ids) {
-          const object = this.runtime.getObject(id);
-          if (object) {
-            this.visibility.set(id, object.visible);
-            object.visible = selected.has(id);
-          }
-        }
-      this.runtime.engine.requestRender();
-    },
-    "studio.piping.Restore": async () => this.restore(),
-  };
-  restore(): void {
-    for (const [mesh, material] of this.original) mesh.material = material;
-    this.original.clear();
-    for (const material of this.temporary) material.dispose();
-    this.temporary.clear();
-    for (const [id, visible] of this.visibility) {
-      const object = this.runtime.getObject(id);
-      if (object) object.visible = visible;
+    for (const id of change.entityIds) {
+      const before = change.before.entities.find((e) => e.id === id),
+        after = change.after.entities.find((e) => e.id === id);
+      const old = before && getComponent(before, "studio.piping.Segment"),
+        next = after && getComponent(after, "studio.piping.Segment");
+      if (old === next) continue;
+      if (old) {
+        const key = String(old.data.lineId),
+          members = this.segmentsByLine.get(key);
+        members?.delete(id);
+        if (!members?.size) this.segmentsByLine.delete(key);
+      }
+      if (next) {
+        const key = String(next.data.lineId);
+        let members = this.segmentsByLine.get(key);
+        if (!members) this.segmentsByLine.set(key, (members = new Set()));
+        members.add(id);
+      }
     }
-    this.visibility.clear();
-    this.runtime.engine.requestRender();
   }
+  private members(id: string): Set<string> {
+    const ids = this.segmentsByLine.get(id);
+    if (!ids) throw Error("管线没有关联管段");
+    return ids;
+  }
+  actions: Record<
+    string,
+    (action: BehaviorAction, signal: AbortSignal) => Promise<void>
+  > = {
+    "studio.piping.Highlight": async (a) => {
+      this.runtime.visual.highlight("piping", this.members(a.targetId));
+    },
+    "studio.piping.Isolate": async (a) => {
+      this.runtime.visual.isolate(
+        "piping",
+        this.members(a.targetId),
+        [...this.segmentsByLine.values()].flatMap((set) => [...set]),
+      );
+    },
+    "studio.piping.Restore": async () => {
+      this.runtime.visual.reset("piping");
+    },
+    "studio.piping.Focus": async (a, signal) => {
+      const task = this.runtime.focusObjects(
+        [...this.members(a.targetId)],
+        1,
+        signal,
+      );
+      if (a.wait) await task;
+      else
+        void task.catch((error) => {
+          if (!(error instanceof DOMException && error.name === "AbortError"))
+            this.runtime.issue(a.targetId, error);
+        });
+    },
+  };
   mode(): void {
-    this.restore();
-  }
-  update(): boolean {
-    return false;
+    this.runtime.visual.reset("piping");
   }
   detach(): void {
-    this.restore();
+    this.mode();
     this.segmentsByLine.clear();
   }
 }
-
 export default PipingSystem;

@@ -38,9 +38,11 @@ for (const extension of extensions) {
         fields: Record<string, unknown>;
         target?: string;
         components?: string[];
+        anchor?: boolean;
       };
       const template = structuredClone(schema.$defs[key].oneOf[0]);
       template.title = definition.title;
+      if (definition.anchor) template["x-anchor"] = true;
       template.properties.type.const = type;
       template.properties.data = {
         type: "object",
@@ -116,10 +118,15 @@ await writeFile(
 await writeFile(
   new URL("packages/extensions/editor-catalog.ts", base),
   names
-    .map((name, i) => `import {tools as tools${i}} from './${name}/editor';`)
+    .map(
+      (name, i) =>
+        `import {tools as tools${i},panels as panels${i}} from './${name}/editor';`,
+    )
     .join("\n") +
     "\nexport const extensionTools=[" +
     names.map((_name, i) => `...tools${i}`).join(",") +
+    "];\nexport const extensionPanels=[" +
+    names.map((_name, i) => `...panels${i}`).join(",") +
     "];\n",
 );
 

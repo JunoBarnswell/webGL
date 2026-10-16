@@ -123,12 +123,35 @@ parts.forEach((part, index) => {
   c.data.partNo = "PART-" + index;
   c.data.sourceElementId = "synthetic-car:" + index;
   c.data.groupId = root.id;
-  c.data.direction = [
-    part.p[0] === 0 ? 0 : Math.sign(part.p[0]),
-    index < 4 ? 1 : 0.2,
-    part.p[2] === 0 ? 0 : Math.sign(part.p[2]),
+  c.data.stages = [
+    {
+      id: "lift",
+      name: "脱离安装点",
+      start: 0,
+      end: 0.4,
+      path: [[0, 400, 0]],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      easing: "smooth",
+      trail: index < 4,
+      visibility: "inherit",
+    },
+    {
+      id: "spread",
+      name: "展开零件",
+      start: 0.4,
+      end: 1,
+      path: [
+        [0, 100, 0],
+        [Math.sign(part.p[0]) * 700, 600, Math.sign(part.p[2]) * 700],
+      ],
+      rotation: [0, index < 4 ? 25 : 0, 0],
+      scale: [1, 1, 1],
+      easing: "smooth",
+      trail: false,
+      visibility: "inherit",
+    },
   ];
-  c.data.distance = index < 4 ? 1000 : 600;
   entity.components.push(c);
   if (index < 8) label(car, entity.id, part.name);
 });

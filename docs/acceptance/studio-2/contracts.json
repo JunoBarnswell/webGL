@@ -34,8 +34,13 @@
     "duplicate pipeline identity",
     "wrong extension target capability",
     "invalid assembly interval",
-    "future document version"
+    "future document version",
+    "duplicate nested assembly stage IDs",
+    "unfinished assembly step selection",
+    "unknown assembly step selection",
+    "invalid surface barycentric sum",
+    "unfinished changed model placeholder"
   ],
   "commands": 7,
-  "at": "2026-10-16T04:09:25.304Z"
+  "at": "2026-10-16T05:12:18.811Z"
 }

@@ -2,6 +2,11 @@
   "status": "Pass",
   "canvasRetained": true,
   "layoutCycles": 100,
+  "annotationDragUndoCancel": true,
+  "escapeCancelsFlight": true,
+  "nativeFullscreen": true,
+  "inputEscapeAndSave": true,
+  "stepSelection": true,
   "layouts": [
     {
       "layout": "standard",

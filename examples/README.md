@@ -2,7 +2,7 @@
 
 Import `assembly.studio.zip` or `piping.studio.zip` through the project menu. These contain generated geometry, no credentials and no private project data.
 
-The assembly example contains 50 synthetic vehicle parts (body, chassis, battery, drive unit, wheel groups and connectors) plus attached labels. It demonstrates seek, play, pause and exact restore. It is an instructional model, not an engineering CAD asset.
+The assembly example contains 50 synthetic vehicle parts (body, chassis, battery, drive unit, wheel groups and connectors) plus attached labels. It demonstrates a two-step lift/spread sequence, curved trajectories, local rotation, trails, BOM editing, seek, play, pause and exact restore. It is an instructional model, not an engineering CAD asset.
 
 The piping example contains 100 logical lines, 1000 physical segments and 500 attached labels, with system/service attributes and published highlight/isolation controls.
 

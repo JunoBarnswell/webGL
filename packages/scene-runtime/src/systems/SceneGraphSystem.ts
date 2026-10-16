@@ -285,7 +285,9 @@ export class SceneGraphSystem {
         const present = new Set(
           this.runtime.document.entities.flatMap((e) => {
             const b = getComponent(e, "ModelNode");
-            return b && string(b.data.modelEntityId) === ownerId
+            return b &&
+              b.data.sourceStatus !== "unresolved" &&
+              string(b.data.modelEntityId) === ownerId
               ? [number(b.data.nodeIndex)]
               : [];
           }),
@@ -296,6 +298,20 @@ export class SceneGraphSystem {
     for (const entity of this.runtime.document.entities) {
       const binding = getComponent(entity, "ModelNode");
       if (!binding) continue;
+      if (binding.data.sourceStatus === "unresolved") {
+        const instance = this.runtime.objects.get(entity.id)!;
+        if (instance.root.userData.nativeBound) {
+          this.release(instance);
+          instance.root.removeFromParent();
+          instance.root = new THREE.Group();
+          instance.root.userData.entityId = entity.id;
+          instance.visual = new THREE.Group();
+          instance.visual.scale.setScalar(1 / this.runtime.sourceUnits(entity));
+          instance.root.add(instance.visual);
+          this.runtime.track(this.runtime.presentation.business(entity));
+        }
+        continue;
+      }
       const owner = this.runtime.objects.get(
         string(binding.data.modelEntityId),
       );
@@ -305,6 +321,7 @@ export class SceneGraphSystem {
         instance.root.removeFromParent();
         instance.root = native;
         native.userData.entityId = entity.id;
+        native.userData.nativeBound = true;
         instance.visual = new THREE.Group();
         instance.visual.scale.setScalar(1 / this.runtime.sourceUnits(entity));
         native.add(instance.visual);

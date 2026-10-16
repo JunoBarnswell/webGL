@@ -1,0 +1,25 @@
+{
+  "status": "Pass",
+  "checks": 19,
+  "evidence": [
+    "v1 boundary migration preserves data and is idempotent",
+    "deterministic extension registration rejects duplicates, missing dependencies and cycles",
+    "extension shape, unknown JSON preservation, clone, undo/redo and publication rejection",
+    "one command execution gate and browser-reserved bindings",
+    "model identity uses stable metadata, rejects ambiguous source identities",
+    "100 assembly seek/reverse/reset cycles do not accumulate pose drift",
+    "CSV mapped import is transactional, reports invalid matches, supports quoted cells and undo",
+    "referenced annotation anchors prevent silent parent deletion",
+    "dirty changes identify one entity",
+    "logical line to segment index lifecycle",
+    "spatial BVH follows invalidated transforms and rejects broad-phase misses",
+    "sample action and system detach restore exact scale without GPU resources",
+    "curved paths, local rotation/scale and visibility evaluate from immutable assembly poses",
+    "generic spatial paths use stable entity and stage IDs and generated step options",
+    "model revision preserves entity identity and edited pose, accepts new hierarchy, blocks unresolved publication and undoes",
+    "surface barycentrics, stable primitive identity, revision repair and target-change resets share one anchor contract",
+    "CSV mappings retain typed custom properties and units and reject invalid numbers",
+    "cluster layout is deterministic and selected labels have stable priority",
+    "shared visual overlays release materials and restore current assembly visibility"
+  ]
+}

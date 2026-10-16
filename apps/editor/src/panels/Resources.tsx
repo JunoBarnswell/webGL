@@ -1,3 +1,7 @@
+import {
+  ModelRevisionDialog,
+  type RevisionInput,
+} from "../components/ModelRevisionDialog";
 import { useEffect, useRef, useState } from "react";
 import { Upload, Trash2, X } from "lucide-react";
 import {
@@ -6,13 +10,13 @@ import {
   documentReferences,
   type SceneAsset,
 } from "@studio/scene-schema";
-import { bindContent, replaceModelRevision } from "@studio/editor-core";
+import { bindContent } from "@studio/editor-core";
 import {
   modelEntities,
+  modelImporter,
   runAssetTask,
   type FileBundle,
   type ImportReport,
-  type readGltf,
 } from "@studio/asset-pipeline";
 import { assetBytes } from "@studio/scene-runtime";
 import { useStudio } from "../state/studio";
@@ -32,11 +36,20 @@ export async function mountModel(
   parentId: string | null = null,
 ): Promise<void> {
   const sceneId = useStudio.getState().document?.sceneId;
-  const entry = new Uint8Array(await assetBytes(source, asset));
-  const metadata = await runAssetTask<ReturnType<typeof readGltf>>("gltf", {
-    files: [[asset.entry, entry]],
-    entry: asset.entry,
-  });
+  const files = new Map(
+    await Promise.all(
+      asset.files.map(
+        async (entry) =>
+          [
+            entry,
+            new Uint8Array(await assetBytes(source, { ...asset, entry })),
+          ] as const,
+      ),
+    ),
+  );
+  const importer = modelImporter(asset.entry);
+  if (!importer) throw Error("没有可用的模型导入器");
+  const { metadata } = await importer.prepare(files, asset.entry, {});
   if (useStudio.getState().document?.sceneId !== sceneId)
     throw new Error("场景已切换，未挂载模型");
   const entities = modelEntities(asset, metadata, parentId);
@@ -61,6 +74,10 @@ export function Resources() {
     [page, setPage] = useState(48),
     [progress, setProgress] = useState(""),
     [error, setError] = useState("");
+  const [revisionInput, setRevisionInput] = useState<RevisionInput | null>(
+    null,
+  );
+  useEffect(() => setRevisionInput(null), [document?.sceneId]);
   const input = useRef<HTMLInputElement>(null),
     controller = useRef<AbortController | null>(null);
   useEffect(() => {
@@ -78,27 +95,29 @@ export function Resources() {
   const replaceModel = async (asset: SceneAsset) => {
     const doc = useStudio.getState().document;
     if (!doc || !selected[0]) throw Error("先选择待更新的模型根节点");
-    const entry = new Uint8Array(await assetBytes(source, asset));
-    const metadata = await runAssetTask<ReturnType<typeof readGltf>>("gltf", {
-      files: [[asset.entry, entry]],
-      entry: asset.entry,
-    });
-    const result = replaceModelRevision(
-      doc,
-      selected[0],
+    const files = new Map(
+      await Promise.all(
+        asset.files.map(
+          async (entry) =>
+            [
+              entry,
+              new Uint8Array(await assetBytes(source, { ...asset, entry })),
+            ] as const,
+        ),
+      ),
+    );
+    const importer = modelImporter(asset.entry);
+    if (!importer) throw Error("没有可用的模型导入器");
+    const { metadata } = await importer.prepare(files, asset.entry, {});
+    if (useStudio.getState().document?.sceneId !== doc.sceneId)
+      throw Error("场景已切换");
+    setRevisionInput({
+      modelId: selected[0],
       asset,
-      modelEntities(asset, metadata, null),
-    );
-    setError(
-      "来源匹配 " +
-        result.report.matched.length +
-        "；未匹配 " +
-        result.report.unmatched.length +
-        "；新增 " +
-        result.report.newElements.length,
-    );
-    if (!result.report.unmatched.length && !result.report.newElements.length)
-      useStudio.getState().command(result.command);
+      nodes: modelEntities(asset, metadata, null),
+      clips: metadata.animations,
+      sceneId: doc.sceneId,
+    });
   };
   const importFiles = async (files: FileList | null) => {
     if (!files?.length || controller.current) return;
@@ -151,20 +170,19 @@ export function Resources() {
         setReport(imported.report);
       } else {
         const assets: SceneAsset[] = [];
-        const entry = paths.find((path) => /\.(gltf|glb)$/i.test(path));
+        const entry = paths.find((path) => modelImporter(path));
         let entities: ReturnType<typeof modelEntities> = [];
         if (entry) {
-          const metadata = await runAssetTask<ReturnType<typeof readGltf>>(
-            "gltf",
-            { files: pairs, entry },
-            { signal: abort.signal },
-          );
+          const prepared = await modelImporter(entry)!.prepare(bundle, entry, {
+            signal: abort.signal,
+          });
+          const { metadata } = prepared;
           setProgress("上传模型与依赖");
           const asset = await upload(
             entry.split("/").pop()!,
             "model",
-            entry,
-            bundle,
+            prepared.entry,
+            prepared.files,
             { signal: abort.signal, taskId },
           );
           assets.push(asset);
@@ -249,6 +267,12 @@ export function Resources() {
   };
   return (
     <section className="panel resource-panel">
+      {revisionInput && (
+        <ModelRevisionDialog
+          input={revisionInput}
+          close={() => setRevisionInput(null)}
+        />
+      )}
       <div className="panel-toolbar">
         <strong>资源库</strong>
         <button

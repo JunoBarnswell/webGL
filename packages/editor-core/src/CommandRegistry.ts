@@ -19,6 +19,11 @@ export interface StudioCommand {
   category: string;
   keywords?: string;
   shortcuts?: string[];
+  allowInTextInput?: boolean;
+  allowInDialog?: boolean;
+  allowDuringNavigation?: boolean;
+  commitText?: boolean;
+  preventNativeWhenBlocked?: boolean;
   scope: "global" | "editor" | "viewport" | "preview";
   enabled?: (ctx: CommandContext) => boolean;
   execute: (ctx: CommandContext) => void | Promise<void>;
@@ -64,10 +69,11 @@ export class CommandRegistry {
 }
 export function focusScope(target: EventTarget | null): FocusScope {
   if (!(target instanceof HTMLElement)) return "editor";
+  if (target.closest('[role="dialog"],.modal-backdrop')) return "dialog";
   if (target.closest('input,textarea,select,[contenteditable="true"]'))
     return "text-input";
-  if (target.closest('[role="dialog"],.modal-backdrop')) return "dialog";
   if (target.closest('[data-focus-scope="timeline"]')) return "timeline";
+  if (target.closest('button,a,summary,[role="button"]')) return "editor";
   if (target.closest(".viewport-panel")) return "viewport";
   return "editor";
 }
@@ -128,14 +134,6 @@ export class ShortcutManager {
       const key = chord(event);
       if (reserved.has(key)) return;
       const context = this.context();
-      if (
-        context.surface === "text-input" ||
-        context.surface === "dialog" ||
-        context.flying ||
-        context.dragging ||
-        document.pointerLockElement
-      )
-        return;
       for (const command of this.registry.commands.values()) {
         if (
           !(this.bindings()[command.id] ?? command.shortcuts ?? []).includes(
@@ -143,6 +141,21 @@ export class ShortcutManager {
           )
         )
           continue;
+        const blocked =
+          (context.surface === "text-input" && !command.allowInTextInput) ||
+          (context.surface === "dialog" && !command.allowInDialog) ||
+          ((context.flying ||
+            context.dragging ||
+            Boolean(document.pointerLockElement)) &&
+            key !== "Escape" &&
+            !command.allowDuringNavigation);
+        if (blocked) {
+          if (command.preventNativeWhenBlocked) {
+            event.preventDefault();
+            this.feedback("请先完成当前对话框或操作");
+          }
+          return;
+        }
         if (command.scope === "viewport" && context.surface !== "viewport")
           continue;
         if (command.scope === "preview" && context.editingAllowed) continue;
@@ -155,6 +168,8 @@ export class ShortcutManager {
         )
           continue;
         event.preventDefault();
+        if (command.commitText && document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
         void this.registry
           .execute(command.id, context)
           .then((ok) => {

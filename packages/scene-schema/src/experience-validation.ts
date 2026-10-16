@@ -1,3 +1,4 @@
+import { optionErrors } from "./field-options";
 import type {
   ActionDefinition,
   BehaviorAction,
@@ -191,6 +192,9 @@ export function validateExperience(
         if (publish) errors.push("未知动作 " + a.type);
         continue;
       }
+      errors.push(
+        ...optionErrors(doc, def.fields, a.data, a.targetId, publish),
+      );
       if (publish && def.target && !a.targetId)
         errors.push(def.title + " 未指定目标");
       if (

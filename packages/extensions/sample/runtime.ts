@@ -26,12 +26,49 @@ export class SamplePulseSystem implements RuntimeSystem {
           });
       }
   }
-  beforeChange(): void {
-    this.mode();
+  private dirty = new Set<string>();
+  beforeChange(change: ChangeSet): void {
+    this.dirty.clear();
+    const modelChanged = change.entityIds.some(
+      (id) =>
+        change.before.entities
+          .find((e) => e.id === id)
+          ?.components.find((c) => c.type === "Model") !==
+        change.after.entities
+          .find((e) => e.id === id)
+          ?.components.find((c) => c.type === "Model"),
+    );
+    for (const id of new Set([
+      ...change.entityIds,
+      ...(modelChanged ? [...this.active.keys()] : []),
+    ])) {
+      const before = change.before.entities.find((e) => e.id === id),
+        after = change.after.entities.find((e) => e.id === id);
+      if (
+        !modelChanged &&
+        before?.transform === after?.transform &&
+        before?.components.find((c) => c.type === "studio.sample.Pulse") ===
+          after?.components.find((c) => c.type === "studio.sample.Pulse")
+      )
+        continue;
+      const entry = this.active.get(id);
+      if (entry) this.runtime.getObject(id)?.scale.fromArray(entry.base);
+      this.active.delete(id);
+      this.dirty.add(id);
+    }
   }
   change(change: ChangeSet): void {
-    this.active.clear();
-    this.attach(change.after);
+    for (const id of this.dirty) {
+      const entity = change.after.entities.find((e) => e.id === id),
+        component = entity && getComponent(entity, "studio.sample.Pulse"),
+        object = this.runtime.getObject(id);
+      if (component && object)
+        this.active.set(id, {
+          enabled: Boolean(component.data.active),
+          base: object.scale.toArray(),
+        });
+    }
+    this.dirty.clear();
   }
   mode(): void {
     this.time = 0;

@@ -12,6 +12,9 @@ export interface RuntimeSystem {
   mode(mode: "edit" | "play"): void;
   update?(dt: number): boolean;
   render?(): void;
+  selectionChanged?(ids: readonly string[]): void;
+  cancelInteraction?(): boolean;
+  interacting?(): boolean;
   detach(): void;
   actions?: Record<
     string,

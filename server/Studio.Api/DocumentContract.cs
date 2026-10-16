@@ -67,16 +67,6 @@ public sealed class DocumentContract
             if (components.Select(x => Text(x, "type")).Distinct().Count() != components.Length) errors.Add(id + " 重复组件");
             foreach (var component in components) {
                 var type = Text(component, "type"); var data = component.GetProperty("data");
-                var definition=schema.GetProperty("$defs").GetProperty("component").GetProperty("oneOf").EnumerateArray().FirstOrDefault(d=>d.GetProperty("properties").GetProperty("type").TryGetProperty("const",out var t)&&t.GetString()==type);
-                if(definition.ValueKind==JsonValueKind.Object)foreach(var field in definition.GetProperty("properties").GetProperty("data").GetProperty("properties").EnumerateObject()) {
-                    if(!data.TryGetProperty(field.Name,out var value))continue;var spec=field.Value;
-                    var required=spec.TryGetProperty("x-required-publish",out var r)&&r.GetBoolean();
-                    if(spec.TryGetProperty("x-required-when",out var when)&&data.TryGetProperty(Text(when,"field"),out var discriminator))required|=discriminator.ValueKind==JsonValueKind.String&&discriminator.GetString()==Text(when,"value");
-                    if(publish&&component.GetProperty("enabled").GetBoolean()&&required&&(value.ValueKind==JsonValueKind.Null||value.ValueKind==JsonValueKind.String&&value.GetString()==""))errors.Add(id+"/"+field.Name+" 尚未配置");
-                    if(spec.TryGetProperty("x-less-than",out var bound)&&value.ValueKind==JsonValueKind.Number&&data.TryGetProperty(bound.GetString()!,out var other)&&value.GetDouble()>=other.GetDouble())errors.Add(id+"/"+field.Name+" 范围无效");
-                    if(spec.TryGetProperty("x-target-component",out var capability)&&value.ValueKind==JsonValueKind.String&&value.GetString()!=""&&(!entities.TryGetValue(value.GetString()!,out var target)||!target.GetProperty("components").EnumerateArray().Any(c=>Text(c,"type")==capability.GetString()&&c.GetProperty("enabled").GetBoolean())))errors.Add(id+"/"+field.Name+" 目标能力不匹配");
-                    if(spec.TryGetProperty("x-unique",out var unique)&&unique.GetBoolean()&&value.ValueKind==JsonValueKind.String&&value.GetString()!=""&&entities.Values.Any(other=>Text(other,"id")!=id&&other.GetProperty("components").EnumerateArray().Any(c=>Text(c,"type")==type&&c.GetProperty("data").TryGetProperty(field.Name,out var existing)&&Equal(existing,value))))errors.Add(type+"/"+field.Name+" 重复");
-                }
                 if (publish && component.GetProperty("enabled").GetBoolean() && new[] { "Mesh", "Model", "Avatar", "Audio" }.Contains(type) && Text(data, "assetId") == "") errors.Add(id + "/" + type + " 未指定资源");
                 if (type == "ModelNode" || type == "Animation" && publish && component.GetProperty("enabled").GetBoolean()) {
                     if (!entities.TryGetValue(Text(data, "modelEntityId"), out var model) || !model.GetProperty("components").EnumerateArray().Any(c => Text(c, "type") == "Model")) errors.Add(id + " 模型实例引用无效");
@@ -98,7 +88,7 @@ public sealed class DocumentContract
                     var sameParent=parentId==modelId;
                     if(entities.TryGetValue(parentId,out var parent))sameParent|=parent.GetProperty("components").EnumerateArray().Any(c=>Text(c,"type")=="ModelNode"&&Text(c.GetProperty("data"),"modelEntityId")==modelId);
                     if(!sameParent)errors.Add(Text(entity,"name")+" 必须属于同一模型实例的层级");
-                    if(!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
+                    if(Text(data,"sourceStatus")!="unresolved"&&!nodeBindings.Add(modelId+":"+data.GetProperty("nodeIndex").GetInt32()))errors.Add("模型子节点索引重复绑定");
                 }
                 var expected=type switch {"Mesh"=>"mesh","Model" or "Avatar"=>"model","Audio"=>"audio",_=>""};
                 if(expected!="") {
@@ -116,6 +106,7 @@ public sealed class DocumentContract
         }
         var settings = document.GetProperty("settings");
         if (settings.GetProperty("near").GetDouble() >= settings.GetProperty("far").GetDouble()) errors.Add("近裁剪面必须小于远裁剪面");
+        SemanticContract.Validate(document,schema,errors,publish);
         ExperienceContract.Validate(document, schema, groups, errors, publish);
         return errors.Distinct().Take(30).ToArray();
     }
@@ -170,7 +161,10 @@ public sealed class DocumentContract
                 if (check.Count == 0) foreach (var reference in References(value, alternative)) yield return reference;
             }
         } else if (value.ValueKind == JsonValueKind.Object && spec.TryGetProperty("properties", out var properties)) {
-            foreach (var property in properties.EnumerateObject()) if (value.TryGetProperty(property.Name, out var child)) foreach (var reference in References(child, property.Value)) yield return reference;
+            foreach (var property in properties.EnumerateObject()) {
+                if(property.Value.TryGetProperty("x-reference-when",out var predicate)&&(!value.TryGetProperty(Text(predicate,"field"),out var discriminator)||!predicate.GetProperty("values").EnumerateArray().Any(item=>JsonElement.DeepEquals(item,discriminator))))continue;
+                if(value.TryGetProperty(property.Name,out var child))foreach(var reference in References(child,property.Value))yield return reference;
+            }
         } else if (value.ValueKind == JsonValueKind.Array && spec.TryGetProperty("items", out var items)) foreach (var child in value.EnumerateArray()) foreach (var reference in References(child, items)) yield return reference;
     }
 }

@@ -105,6 +105,9 @@ const page = await browser.newPage({
 });
 const errors: string[] = [];
 page.on("pageerror", (error) => errors.push(error.message));
+page.on("console", (message) => {
+  if (message.type() === "error") errors.push("console: " + message.text());
+});
 await page.addInitScript(
   ({ token, scene }) => {
     sessionStorage.setItem("studio-token", token);
@@ -155,7 +158,10 @@ try {
     ),
     true,
   );
-  assert.equal(await page.locator("canvas").count(), 1);
+  assert.equal(
+    await page.locator('canvas[aria-label="三维场景视口"]').count(),
+    1,
+  );
   await canvas.focus();
   await page.keyboard.press("w");
   const selectedTool = await page
@@ -185,6 +191,77 @@ try {
       .getAttribute("class"),
     "active",
   );
+
+  await page.mouse.move(1700, 900);
+  await page.mouse.down({ button: "right" });
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("r");
+  await page.mouse.up({ button: "right" });
+  assert.equal(
+    await page
+      .getByRole("button", { name: "缩放 R", exact: true })
+      .getAttribute("class"),
+    "active",
+  );
+  const labelButton = page
+    .locator(".runtime-hotspot")
+    .filter({ hasText: "Fixture label" });
+  await labelButton.waitFor();
+  const beforeLabel = await labelButton.boundingBox();
+  assert.ok(beforeLabel);
+  await page.mouse.move(
+    beforeLabel.x + beforeLabel.width / 2,
+    beforeLabel.y + beforeLabel.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    beforeLabel.x + beforeLabel.width / 2 + 65,
+    beforeLabel.y + beforeLabel.height / 2 + 30,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  const movedLabel = await labelButton.boundingBox();
+  assert.ok(movedLabel && Math.abs(movedLabel.x - beforeLabel.x - 65) < 3);
+  await canvas.focus();
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(150);
+  const restoredLabel = await labelButton.boundingBox();
+  assert.ok(restoredLabel && Math.abs(restoredLabel.x - beforeLabel.x) < 3);
+  await page.mouse.move(
+    restoredLabel.x + restoredLabel.width / 2,
+    restoredLabel.y + restoredLabel.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    restoredLabel.x + restoredLabel.width / 2 + 40,
+    restoredLabel.y + restoredLabel.height / 2 + 20,
+    { steps: 4 },
+  );
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  assert.ok(Math.abs((await labelButton.boundingBox())!.x - beforeLabel.x) < 3);
+
+  await page.getByLabel("工作台布局").selectOption("standard");
+  await page.locator(".tree-label").filter({ hasText: "Source part" }).click();
+  const nameInput = page.getByLabel("节点名称");
+  await nameInput.fill("Canceled name");
+  await nameInput.press("Escape");
+  assert.equal(await nameInput.inputValue(), "Source part");
+  await nameInput.fill("Saved from input");
+  const [saved] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/draft") &&
+        response.request().method() === "PUT",
+    ),
+    nameInput.press("Control+s"),
+  ]);
+  assert.equal(saved.status(), 200);
+  await canvas.focus();
+  await page.keyboard.press("Control+z");
+  await page.getByLabel("工作台布局").selectOption("compact");
   await page.getByRole("button", { name: "搜索命令", exact: true }).click();
   await page.getByLabel("查找命令").fill("聚焦");
   await page.keyboard.press("Escape");
@@ -196,8 +273,19 @@ try {
   await page.getByRole("button", { name: "播放拆解", exact: true }).click();
   await page.getByRole("button", { name: "暂停拆解", exact: true }).click();
   await page.getByRole("button", { name: "恢复装配", exact: true }).click();
+  await page
+    .getByRole("group", { name: "选择装配步骤", exact: true })
+    .getByRole("combobox")
+    .nth(1)
+    .selectOption("initial");
+  await page.getByRole("button", { name: "选择装配步骤", exact: true }).click();
   await page.getByRole("button", { name: "高亮管线", exact: true }).click();
   await page.getByRole("button", { name: "恢复管网", exact: true }).click();
+  await page.getByRole("button", { name: "全屏预览", exact: true }).click();
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  assert.equal(await canvas.count(), 1);
+  await page.getByRole("button", { name: "全屏预览", exact: true }).click();
+  await page.waitForFunction(() => !document.fullscreenElement);
   await page.screenshot({ path: ".local/acceptance/studio-2/preview.png" });
   await page.getByRole("button", { name: "停止预览 Esc" }).click();
   const responsive = [];
@@ -212,6 +300,12 @@ try {
     });
     assert.equal(responsive.at(-1)!.overflow, false);
   }
+  await page.waitForTimeout(1000);
+  const currentDraft = await (
+    await fetch(base + "/api/scenes/" + draft.sceneId + "/draft", {
+      headers: { Authorization: "Bearer " + token },
+    })
+  ).json();
   const publication = await fetch(
     base + "/api/scenes/" + draft.sceneId + "/publish",
     {
@@ -220,7 +314,7 @@ try {
         Authorization: "Bearer " + token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ expectedRevision: draft.revision }),
+      body: JSON.stringify({ expectedRevision: currentDraft.revision }),
     },
   );
   assert.equal(publication.status, 200, await publication.clone().text());
@@ -232,6 +326,12 @@ try {
   await page.getByRole("button", { name: "设置脉冲", exact: true }).click();
   await page.getByRole("button", { name: "播放拆解", exact: true }).click();
   await page.getByRole("button", { name: "恢复装配", exact: true }).click();
+  await page
+    .getByRole("group", { name: "选择装配步骤", exact: true })
+    .getByRole("combobox")
+    .nth(1)
+    .selectOption("initial");
+  await page.getByRole("button", { name: "选择装配步骤", exact: true }).click();
   await page.getByRole("button", { name: "高亮管线", exact: true }).click();
   await page.screenshot({ path: ".local/acceptance/studio-2/player.png" });
   if (process.env.STUDIO_BASELINE) {
@@ -273,6 +373,11 @@ try {
         status: "Pass",
         canvasRetained: true,
         layoutCycles: 100,
+        annotationDragUndoCancel: true,
+        escapeCancelsFlight: true,
+        nativeFullscreen: true,
+        inputEscapeAndSave: true,
+        stepSelection: true,
         layouts: results,
         responsive,
         browser: await browser.version(),

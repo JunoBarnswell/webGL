@@ -52,7 +52,7 @@ npm run build
 
 ## Studio 2
 
-统一扩展、沉浸布局与命令中心说明见 [架构设计](docs/studio-2-design.md) 和 [扩展开发](docs/extensions.md)。新增受信任扩展只需在 `packages/extensions` 提供 Schema、RuntimeSystem 和 EditorCommand 工具，构建生成两端目录；未知扩展数据保留，未解析依赖阻止发布。
+统一扩展、沉浸布局与命令中心说明见 [架构设计](docs/studio-2-design.md) 和 [扩展开发](docs/extensions.md)。新增受信任扩展只需在 `packages/extensions` 提供 Schema、RuntimeSystem、EditorCommand 工具及可选任务面板，构建生成两端目录；未知扩展数据保留，未解析依赖阻止发布。
 
 紧凑布局默认收起停靠面板，Space 在视口焦点时切换专注模式，Ctrl+. 搜索命令，? 打开快捷键帮助与重映射。输入法、输入框和右键飞行具有输入优先级。预览复用已有 Canvas 与 Runtime，会话停止后恢复编辑状态。
 
@@ -67,6 +67,8 @@ npm run build
 # 完整 API / MySQL / MinIO 环境启动后
 npm run verify:contracts
 npm run verify:integration
+# Vite 编辑器运行时验证模型映射与选面修复
+npm run verify:model-revision
 npm run verify:browser
 ```
 

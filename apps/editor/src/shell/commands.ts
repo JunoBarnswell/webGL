@@ -17,7 +17,7 @@ export function context(): CommandContext {
     editingAllowed: s.mode === "edit" && !s.busy && Boolean(s.document),
     selectedIds: s.selected,
     flying: Boolean(s.view?.isFlying),
-    dragging: s.dragging,
+    dragging: s.dragging || Boolean(s.runtime?.isInteracting),
     signal: abort.signal,
   };
 }
@@ -134,6 +134,10 @@ commands.register({
   category: "工程",
   scope: "global",
   shortcuts: ["Mod+S"],
+  allowInTextInput: true,
+  allowDuringNavigation: true,
+  commitText: true,
+  preventNativeWhenBlocked: true,
   enabled: () => Boolean(useStudio.getState().document),
   execute: () => useStudio.getState().save(),
 });
@@ -177,7 +181,14 @@ for (const [id, title, keys, run] of [
       const state = useStudio.getState();
       if (id === "undo") return Boolean(state.session?.canUndo);
       if (id === "redo") return Boolean(state.session?.canRedo);
-      return context.selectedIds.length > 0 && context.selectedIds.every(selectedId => state.document?.entities.some(entity => entity.id === selectedId && !entity.locked));
+      return (
+        context.selectedIds.length > 0 &&
+        context.selectedIds.every((selectedId) =>
+          state.document?.entities.some(
+            (entity) => entity.id === selectedId && !entity.locked,
+          ),
+        )
+      );
     },
     execute: run,
   });
@@ -188,13 +199,11 @@ commands.register({
   scope: "global",
   execute: () => {
     usePreferences.getState().restore();
-    useStudio
-      .getState()
-      .set({
-        inspectorOpen: false,
-        assetsOpen: false,
-        layoutEpoch: useStudio.getState().layoutEpoch + 1,
-      });
+    useStudio.getState().set({
+      inspectorOpen: false,
+      assetsOpen: false,
+      layoutEpoch: useStudio.getState().layoutEpoch + 1,
+    });
   },
 });
 commands.register({
@@ -204,6 +213,7 @@ commands.register({
   keywords: "mingling sousuo command search",
   scope: "global",
   shortcuts: ["Mod+."],
+  allowInTextInput: true,
   execute: () => useStudio.getState().set({ commandPanel: "search" }),
 });
 commands.register({
@@ -220,6 +230,9 @@ commands.register({
   category: "工作台",
   scope: "global",
   shortcuts: ["Escape"],
+  allowInTextInput: true,
+  allowInDialog: false,
+  allowDuringNavigation: true,
   execute: () => {
     const state = useStudio.getState();
     const menu = document.querySelector("details[open].file-menu");
@@ -235,11 +248,23 @@ commands.register({
       state.set({ commandPanel: null });
       return;
     }
+    if (document.pointerLockElement) {
+      void document.exitPointerLock();
+      return;
+    }
+    if (state.view?.cancelInteraction()) return;
+    if (state.runtime?.cancelInteraction()) return;
     if (state.cancelTool?.()) return;
-    if (state.pickEntity || state.placingHotspot || state.editingPoint) {
+    if (
+      state.pickEntity ||
+      state.placingHotspot ||
+      state.placingAnnotation ||
+      state.editingPoint
+    ) {
       state.set({
         pickEntity: null,
         placingHotspot: false,
+        placingAnnotation: "",
         editingPoint: null,
       });
       return;
@@ -277,14 +302,12 @@ for (const tool of extensionTools)
 viewport("context.open", "对象操作", ["Shift+F10"], () => {
   const rect = document.querySelector("canvas")?.getBoundingClientRect();
   if (rect)
-    useStudio
-      .getState()
-      .set({
-        contextMenu: {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
-        },
-      });
+    useStudio.getState().set({
+      contextMenu: {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      },
+    });
 });
 
 viewport(

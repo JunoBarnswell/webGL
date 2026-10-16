@@ -619,4 +619,50 @@ export function modelEntities(
   return entities;
 }
 
-export { runAssetTask } from "./AssetWorker";
+import { runAssetTask } from "./AssetWorker";
+export { runAssetTask };
+
+/** Trusted importers produce the same model document contract and packaged render assets. */
+export interface PreparedModel {
+  entry: string;
+  files: FileBundle;
+  metadata: ReturnType<typeof readGltf>;
+}
+export interface ModelImporter {
+  id: string;
+  extensions: readonly string[];
+  prepare(
+    files: FileBundle,
+    entry: string,
+    options: import("./AssetWorker").AssetTaskOptions,
+  ): Promise<PreparedModel>;
+}
+const modelImporters: ModelImporter[] = [];
+export function registerModelImporter(importer: ModelImporter): void {
+  if (
+    modelImporters.some(
+      (item) =>
+        item.id === importer.id ||
+        item.extensions.some((ext) => importer.extensions.includes(ext)),
+    )
+  )
+    throw Error("模型导入器重复注册 " + importer.id);
+  modelImporters.push(importer);
+}
+export function modelImporter(entry: string): ModelImporter | undefined {
+  return modelImporters.find((importer) =>
+    importer.extensions.includes(entry.split(".").pop()!.toLowerCase()),
+  );
+}
+registerModelImporter({
+  id: "gltf",
+  extensions: ["gltf", "glb"],
+  async prepare(files, entry, options) {
+    const metadata = await runAssetTask<ReturnType<typeof readGltf>>(
+      "gltf",
+      { files: [...files], entry },
+      options,
+    );
+    return { entry, files, metadata };
+  },
+});

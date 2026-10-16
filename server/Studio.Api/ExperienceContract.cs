@@ -30,6 +30,7 @@ public static class ExperienceContract
             foreach(var a in actions.EnumerateArray()) {
                 if(!ids.Add(Text(a,"id"))) errors.Add("动作 ID 重复");
                 var type=Text(a,"type"); if(!definitions.TryGetValue(type,out var definition)){if(publish)errors.Add("未知动作 "+type);continue;} var target=Text(a,"targetId");
+                SemanticContract.ActionOptions(doc,definition,a,errors,publish);
                 var kind=Text(definition,"x-target"); if(kind!="") { Ref(kind,target); if(publish && target=="") errors.Add(type+" 未指定目标"); }
                 var capabilities=definition.GetProperty("x-components").EnumerateArray().Select(c=>c.GetString()!).ToArray();
                 if(target!="" && capabilities.Length>0 && !capabilities.Any(c=>Has(target,c))) errors.Add(type+" 目标能力不匹配");

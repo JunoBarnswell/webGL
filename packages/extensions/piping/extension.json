@@ -61,6 +61,19 @@
           "type": "string",
           "title": "所属系统",
           "default": ""
+        },
+        "systemId": {
+          "type": "string",
+          "title": "所属系统",
+          "default": "",
+          "x-reference": "entity",
+          "x-target-component": "studio.piping.System"
+        },
+        "properties": {
+          "type": "object",
+          "title": "自定义属性",
+          "default": {},
+          "x-editor": "json"
         }
       }
     },
@@ -78,17 +91,14 @@
         "sourceElementId": {
           "type": "string",
           "title": "来源元素",
-          "default": ""
+          "default": "",
+          "x-source-element-id": true
         },
         "kind": {
           "type": "string",
           "title": "种类",
           "default": "segment",
-          "enum": [
-            "segment",
-            "fitting",
-            "valve"
-          ]
+          "enum": ["segment", "fitting", "valve"]
         },
         "start": {
           "type": "array",
@@ -97,11 +107,7 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            0,
-            0,
-            0
-          ],
+          "default": [0, 0, 0],
           "x-editor": "vector",
           "title": "起点"
         },
@@ -112,13 +118,40 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            1000,
-            0,
-            0
-          ],
+          "default": [1000, 0, 0],
           "x-editor": "vector",
           "title": "终点"
+        }
+      }
+    },
+    "studio.piping.System": {
+      "title": "管网系统",
+      "fields": {
+        "systemNo": {
+          "type": "string",
+          "title": "系统编号",
+          "default": ""
+        },
+        "service": {
+          "type": "string",
+          "title": "介质",
+          "default": ""
+        },
+        "color": {
+          "type": "string",
+          "title": "颜色",
+          "default": "#60bca3"
+        },
+        "units": {
+          "type": "object",
+          "title": "字段单位与类型",
+          "default": {
+            "nominalDiameter": {
+              "type": "number",
+              "unit": "mm"
+            }
+          },
+          "x-editor": "json"
         }
       }
     }
@@ -127,25 +160,25 @@
     "studio.piping.Highlight": {
       "title": "高亮管线",
       "target": "entity",
-      "components": [
-        "studio.piping.Line"
-      ],
+      "components": ["studio.piping.Line"],
       "fields": {}
     },
     "studio.piping.Isolate": {
       "title": "隔离管线",
       "target": "entity",
-      "components": [
-        "studio.piping.Line"
-      ],
+      "components": ["studio.piping.Line"],
       "fields": {}
     },
     "studio.piping.Restore": {
       "title": "恢复管网",
       "target": "entity",
-      "components": [
-        "studio.piping.Line"
-      ],
+      "components": ["studio.piping.Line"],
+      "fields": {}
+    },
+    "studio.piping.Focus": {
+      "title": "聚焦管线",
+      "target": "entity",
+      "components": ["studio.piping.Line"],
       "fields": {}
     }
   }

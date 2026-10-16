@@ -11,10 +11,7 @@ import type { EditorCamera } from "../panels/EditorCamera";
 import { ApiError, request, type CloudDraft, type Project } from "./api";
 import { journal, localDraft, type JournalEntry } from "./journal";
 
-export interface EditingPoint {
-  viewpointId: string;
-  property: "position" | "target";
-}
+export type EditingPoint = import("../shell/DocumentPoint").DocumentPoint;
 export type Workspace =
   | "scene"
   | "content"
@@ -51,6 +48,7 @@ interface StudioState {
   uiSelected: string[];
   placingHotspot: boolean;
   pickEntity: ((id: string) => void) | null;
+  placingAnnotation: string;
   contextMenu: { x: number; y: number } | null;
   dragging: boolean;
   cancelTool: (() => boolean) | null;
@@ -59,7 +57,7 @@ interface StudioState {
   recovery: JournalEntry | null;
   layoutEpoch: number;
   set: (patch: Partial<StudioState>) => void;
-  command: (command: EditorCommand) => void;
+  command: (command: EditorCommand) => boolean;
   select: (ids: string[], add?: boolean) => void;
   open: (draft: CloudDraft, restore?: boolean) => Promise<void>;
   close: () => void;
@@ -86,6 +84,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   space: "world",
   snap: false,
   mode: "edit",
+  placingAnnotation: "",
   contextMenu: null,
   dragging: false,
   cancelTool: null,
@@ -111,11 +110,14 @@ export const useStudio = create<StudioState>((set, get) => ({
   set,
   command(command) {
     const state = get();
-    if (state.mode === "play") return;
+    if (state.mode === "play" || !state.session) return false;
     try {
-      state.session?.execute(command);
+      state.session.execute(command);
+      set({ message: "" });
+      return true;
     } catch (error) {
       set({ message: error instanceof Error ? error.message : String(error) });
+      return false;
     }
   },
   select(ids, add = false) {
@@ -132,12 +134,14 @@ export const useStudio = create<StudioState>((set, get) => ({
       pointPreview: null,
       selected: add ? [...new Set([...get().selected, ...ids])] : ids,
     });
+    get().runtime?.selectionChanged(get().selected);
   },
   close() {
     clearTimeout(saveTimer);
     unsubscribe?.();
     unsubscribe = undefined;
     sessionGeneration++;
+    get().cancelTool?.();
     get().runtime?.unloadScene();
     set({
       session: null,
@@ -149,6 +153,9 @@ export const useStudio = create<StudioState>((set, get) => ({
       pointPreview: null,
       transforms: {},
       mode: "edit",
+      placingAnnotation: "",
+      placingHotspot: false,
+      pickEntity: null,
       saveState: "saved",
       issues: {},
       recovery: null,
@@ -310,6 +317,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         editingPoint: null,
         pointPreview: null,
         placingHotspot: false,
+        placingAnnotation: "",
         pickEntity: null,
       });
     } catch (error) {

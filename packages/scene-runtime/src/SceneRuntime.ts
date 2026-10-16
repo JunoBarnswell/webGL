@@ -1,3 +1,4 @@
+import { VisualStateSystem } from "./systems/VisualStateSystem";
 import * as THREE from "three";
 import { ShowroomEngine } from "@o2vr/engine";
 import {
@@ -13,7 +14,7 @@ import {
   type Vec3,
 } from "@studio/scene-schema";
 import { AssetStore, type AssetSource, type GpuResource } from "./AssetStore";
-import { Navigation } from "./Navigation";
+import { Navigation, frameObjects } from "./Navigation";
 import { capturePanorama } from "./PanoramaCapture";
 import {
   RuntimeState,
@@ -65,6 +66,8 @@ type Flight = {
   cleanup: () => void;
 };
 export interface RuntimeCallbacks {
+  isToolActive?: () => boolean;
+  onAnnotationOffset?: (id: string, offset: Vec3) => void;
   disabledExtensions?: readonly string[];
   onIssue?: (id: string, error: string) => void;
   onSelect?: (id: string) => void;
@@ -82,6 +85,7 @@ const number = (value: JsonValue | undefined): number => Number(value ?? 0);
 export class SceneRuntime {
   readonly index = new EntityIndex();
   readonly spatial: SpatialSystem;
+  readonly visual: VisualStateSystem;
   readonly graph: SceneGraphSystem;
   readonly presentation: PresentationSystem;
   readonly systems: RuntimeSystem[];
@@ -138,9 +142,11 @@ export class SceneRuntime {
   ) {
     this.graph = new SceneGraphSystem(this);
     this.presentation = new PresentationSystem(this);
+    this.visual = new VisualStateSystem(this);
     this.spatial = new SpatialSystem(this);
     this.systems = [
       this.spatial,
+      this.visual,
       ...createRuntimeSystems(this).filter(
         (system) => !callbacks.disabledExtensions?.includes(system.id),
       ),
@@ -303,10 +309,13 @@ export class SceneRuntime {
   getObject(id: string): THREE.Object3D | undefined {
     return this.objects.get(id)?.root;
   }
-  pickSurface(x: number, y: number): { entityId: string; point: Vec3 } | null {
+  pickIntersection(x: number, y: number): THREE.Intersection | undefined {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(x, y), this.engine.camera);
-    const hit = this.spatial.pick(ray)[0];
+    return this.spatial.pick(ray)[0];
+  }
+  pickSurface(x: number, y: number): { entityId: string; point: Vec3 } | null {
+    const hit = this.pickIntersection(x, y);
     if (!hit) return null;
     let object: THREE.Object3D | null = hit.object;
     while (object && !object.userData.entityId) object = object.parent;
@@ -314,6 +323,23 @@ export class SceneRuntime {
       entityId: String(object?.userData.entityId ?? ""),
       point: hit.point.toArray(),
     };
+  }
+  get isInteracting(): boolean {
+    return this.systems.some((system) => system.interacting?.());
+  }
+  get isToolActive(): boolean {
+    return Boolean(this.callbacks.isToolActive?.());
+  }
+  selectionChanged(ids: readonly string[]): void {
+    for (const system of this.systems) system.selectionChanged?.(ids);
+  }
+  cancelInteraction(): boolean {
+    for (const system of this.systems)
+      if (system.cancelInteraction?.()) return true;
+    return false;
+  }
+  annotationOffset(id: string, offset: Vec3): void {
+    if (this.mode === "edit") this.callbacks.onAnnotationOffset?.(id, offset);
   }
   getAssetSource(): AssetSource {
     return this.source;
@@ -354,6 +380,8 @@ export class SceneRuntime {
     if (options.signal?.aborted) controller.abort();
     const started = performance.now(),
       stages: Record<string, number> = {};
+    let lastProgressAt = 0,
+      lastProgressPhase: LoadProgress["phase"] | undefined;
     const progress = (
       phase: LoadProgress["phase"],
       completed: number,
@@ -361,6 +389,15 @@ export class SceneRuntime {
       message: string,
     ) => {
       if (generation !== this.generation || controller.signal.aborted) return;
+      const now = performance.now();
+      if (
+        phase === lastProgressPhase &&
+        completed < total &&
+        now - lastProgressAt < 80
+      )
+        return;
+      lastProgressAt = now;
+      lastProgressPhase = phase;
       const load = { phase, completed, total, message, stages: { ...stages } };
       this.state.patch({ load });
       options.onProgress?.(load);
@@ -998,7 +1035,31 @@ export class SceneRuntime {
     duration: number,
     signal: AbortSignal,
   ): Promise<void> {
-    const pose = this.resolveViewpoint(id);
+    return this.flyToPose(this.resolveViewpoint(id), duration, signal, () => {
+      void this.emit("viewpointArrive", id, "viewpoint");
+    });
+  }
+  async focusObjects(
+    ids: readonly string[],
+    duration = 1,
+    signal = this.playAbort.signal,
+  ): Promise<void> {
+    const pose = frameObjects(
+      this.engine.camera,
+      ids
+        .map((id) => this.getObject(id))
+        .filter((object): object is THREE.Object3D => Boolean(object)),
+    );
+    this.engine.camera.far = pose.far;
+    this.engine.camera.updateProjectionMatrix();
+    await this.flyToPose(pose, duration, signal);
+  }
+  flyToPose(
+    pose: CameraPose,
+    duration: number,
+    signal: AbortSignal,
+    arrived?: () => void,
+  ): Promise<void> {
     this.tour.pause();
     this.cancelFlight();
     const camera = this.engine.camera.clone();
@@ -1018,7 +1079,7 @@ export class SceneRuntime {
         toFov: pose.fov,
         resolve: () => {
           resolve();
-          void this.emit("viewpointArrive", id, "viewpoint");
+          arrived?.();
         },
         reject,
         cleanup: () => signal.removeEventListener("abort", cancel),
@@ -1281,6 +1342,7 @@ export class SceneRuntime {
     const pose = this.resolveViewpoint(string(panorama.data.viewpointId));
     const extras = this.engine.scene.children.filter(
       (child) =>
+        !child.userData.runtimeOwned &&
         !new Set<THREE.Object3D>([this.root, this.ambient, this.sun]).has(
           child,
         ),
@@ -1307,6 +1369,7 @@ export class SceneRuntime {
   async captureViewThumbnail(): Promise<Blob> {
     const extras = this.engine.scene.children.filter(
       (child) =>
+        !child.userData.runtimeOwned &&
         ![this.root, this.ambient, this.sun].includes(child as THREE.Group),
     );
     const visibility = extras.map((child) => child.visible);

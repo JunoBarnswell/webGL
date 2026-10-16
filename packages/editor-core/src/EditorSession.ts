@@ -157,3 +157,5 @@ export * from "./authoring";
 export * from "./CommandRegistry";
 
 export * from "./modelRevision";
+
+export * from "./DocumentPath";

@@ -26,14 +26,37 @@ export const tools: ExtensionTool[] = [
             createComponent("studio.assembly.Part");
           c.data.groupId = root.id;
           c.data.partNo = part.name;
-          c.data.direction = [
-            Math.cos((index / selected.length) * Math.PI * 2),
-            0.2,
-            Math.sin((index / selected.length) * Math.PI * 2),
+          c.data.sourceElementId = String(
+            getComponent(part, "ModelNode")?.data.sourceElementId || part.id,
+          );
+          c.data.stages = [
+            {
+              id: "initial",
+              name: "初始拆解",
+              start: 0,
+              end: 1,
+              path: [
+                [
+                  Math.cos((index / selected.length) * Math.PI * 2) * 500,
+                  100,
+                  Math.sin((index / selected.length) * Math.PI * 2) * 500,
+                ],
+              ],
+              rotation: [0, 0, 0],
+              scale: [1, 1, 1],
+              easing: "smooth",
+              trail: false,
+              visibility: "inherit",
+            },
           ];
           if (!part.components.includes(c)) part.components.push(c);
         });
       },
     }),
   },
+];
+
+import { AssemblyPanel } from "./panel";
+export const panels = [
+  { id: "assembly", title: "装配 BOM 与步骤", Component: AssemblyPanel },
 ];

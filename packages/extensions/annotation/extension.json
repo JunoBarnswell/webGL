@@ -14,18 +14,39 @@
           "type": "string",
           "title": "锚点",
           "default": "entity-local",
-          "enum": [
-            "world",
-            "entity-local",
-            "surface",
-            "path-station"
+          "enum": ["world", "entity-local", "surface", "path-station"],
+          "x-resets": [
+            "entityId",
+            "position",
+            "sourceElementId",
+            "meshRevision",
+            "triangleIndex",
+            "barycentric",
+            "primitiveIndex",
+            "routeId",
+            "station"
           ]
         },
         "entityId": {
           "type": "string",
           "title": "附着对象",
           "default": "",
-          "x-reference": "entity"
+          "x-reference": "entity",
+          "x-reference-when": {
+            "field": "anchorKind",
+            "values": ["entity-local", "surface"]
+          },
+          "x-required-when": {
+            "field": "anchorKind",
+            "value": "surface"
+          },
+          "x-resets": [
+            "sourceElementId",
+            "meshRevision",
+            "triangleIndex",
+            "barycentric",
+            "primitiveIndex"
+          ]
         },
         "position": {
           "type": "array",
@@ -34,13 +55,13 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            0,
-            0,
-            0
-          ],
+          "default": [0, 0, 0],
           "x-editor": "vector",
-          "title": "锚点位置"
+          "title": "锚点位置",
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["world", "entity-local"]
+          }
         },
         "sourceElementId": {
           "type": "string",
@@ -49,6 +70,10 @@
           "x-required-when": {
             "field": "anchorKind",
             "value": "surface"
+          },
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["surface"]
           }
         },
         "meshRevision": {
@@ -58,28 +83,39 @@
           "x-required-when": {
             "field": "anchorKind",
             "value": "surface"
+          },
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["surface"]
           }
         },
         "triangleIndex": {
-          "type": "number",
+          "type": "integer",
           "title": "三角形",
           "default": 0,
-          "minimum": 0
+          "minimum": 0,
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["surface"]
+          }
         },
         "barycentric": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            1,
-            0,
-            0
-          ],
+          "default": [1, 0, 0],
           "x-editor": "vector",
-          "title": "重心坐标"
+          "title": "重心坐标",
+          "x-sum": 1,
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["surface"]
+          }
         },
         "routeId": {
           "type": "string",
@@ -90,6 +126,10 @@
           "x-required-when": {
             "field": "anchorKind",
             "value": "path-station"
+          },
+          "x-reference-when": {
+            "field": "anchorKind",
+            "values": ["path-station"]
           }
         },
         "station": {
@@ -97,7 +137,11 @@
           "title": "里程",
           "default": 0,
           "minimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["path-station"]
+          }
         },
         "label": {
           "type": "string",
@@ -129,11 +173,7 @@
           },
           "minItems": 3,
           "maxItems": 3,
-          "default": [
-            40,
-            -40,
-            0
-          ],
+          "default": [40, -40, 0],
           "x-editor": "vector",
           "title": "引线偏移"
         },
@@ -147,9 +187,51 @@
           "type": "boolean",
           "title": "遮挡检测",
           "default": false
+        },
+        "primitiveIndex": {
+          "type": "integer",
+          "title": "网格图元",
+          "default": 0,
+          "minimum": 0,
+          "x-visible-when": {
+            "field": "anchorKind",
+            "values": ["surface"]
+          }
+        },
+        "style": {
+          "type": "string",
+          "title": "标注样式",
+          "default": "callout",
+          "enum": ["callout", "badge", "measurement"]
+        },
+        "bindProperty": {
+          "type": "string",
+          "title": "属性绑定字段",
+          "default": ""
+        },
+        "cluster": {
+          "type": "boolean",
+          "title": "允许聚合",
+          "default": true
+        }
+      },
+      "anchor": true
+    }
+  },
+  "actions": {
+    "studio.annotation.Focus": {
+      "title": "聚焦标注",
+      "target": "entity",
+      "components": ["studio.annotation.Label"],
+      "fields": {
+        "duration": {
+          "type": "number",
+          "title": "秒",
+          "default": 1,
+          "minimum": 0.1,
+          "maximum": 30
         }
       }
     }
-  },
-  "actions": {}
+  }
 }
