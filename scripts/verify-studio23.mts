@@ -969,6 +969,59 @@ if (!process.argv.includes("--pure")) {
     { expectedRevision: dormantDraft.revision, document: active },
   );
   assert.equal(activeReady.ready, false);
+  const boundary = structuredClone(dormantDraft.document),
+    numberGroup = boundary.entities[0].components[0].data.groups[0];
+  Object.assign(numberGroup, {
+    numericMinimum: 0,
+    numericMaximum: 2,
+    numericStep: 1,
+    numericDefault: 0.49999999999999994,
+    numericUnit: "1",
+  });
+  numberGroup.visuals = [
+    {
+      ...numberGroup.options[0].visuals[0],
+      id: "boundary-opacity",
+      operation: "opacity",
+      targetId: boundary.entities[0].id,
+      value: "0",
+      numericBinding: {
+        property: "opacity",
+        axis: "all",
+        mode: "set",
+        factor: 2,
+        offset: 0,
+        reference: 0,
+      },
+    },
+  ];
+  assert.equal(
+    resolveConfiguration(boundary.entities[0].components[0].data, {})
+      .numericValues.number,
+    0,
+  );
+  const predecessor = await api(
+    "/scenes/" + dormantDraft.sceneId + "/readiness",
+    "POST",
+    { expectedRevision: dormantDraft.revision, document: boundary },
+  );
+  assert.equal(predecessor.ready, true, JSON.stringify(predecessor));
+  numberGroup.numericDefault = 0.5;
+  const midpoint = await api(
+    "/scenes/" + dormantDraft.sceneId + "/readiness",
+    "POST",
+    { expectedRevision: dormantDraft.revision, document: boundary },
+  );
+  assert.equal(midpoint.ready, false);
+  assert.ok(
+    midpoint.checks.some(
+      (check: { code: string; status: string }) =>
+        check.code === "visual" && check.status === "fail",
+    ),
+  );
+  pass(
+    "Native/JS step rounding agrees at the half-step predecessor and exact midpoint; downstream opacity admission follows the same number",
+  );
   pass(
     "Dormant choice bindings/defaults stay inactive for numeric groups; reactivation restores reference and cardinality admission in TS and Native",
   );

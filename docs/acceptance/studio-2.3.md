@@ -26,7 +26,7 @@ S0–S5 分别完成审计、共享契约、作者工作台、工业语义、配
 
 有限规则覆盖报告保留未覆盖数量、预算截断及目录快照。两两/三元覆盖不是全局可满足性证明。默认 primitive 准入和配置组合采样也不等于穷举全部模型/部件组合。
 
-S6 验收还修正了两个统一语义问题：模式切换等待既有文档同步队列，避免新轨道尚未挂载就开始预览；数值组的旧选项绑定/defaults 在 Schema、TS 与 Native 一致休眠，重新激活后再验证引用；样例目录复用同一所有权检查，避免自动让两个目录控制同一模型。
+S6 验收还修正了统一语义问题：模式切换等待既有文档同步队列，避免新轨道尚未挂载就开始预览；数值组的旧选项绑定/defaults 在 Schema、TS 与 Native 一致休眠，重新激活后再验证引用；样例目录复用同一所有权检查，避免自动让两个目录控制同一模型。
 
 ## Blocked / Waived
 
@@ -40,3 +40,5 @@ S6 验收还修正了两个统一语义问题：模式切换等待既有文档�
 复测入口：先按 `README.md` 启动包，`STUDIO_CHROMIUM=/path/to/physical/browser npm run verify:browser` 验证通用交互；`npm run benchmark:studio` 只提供现有合成统计入口，不能自动满足生产长会话门禁。一次性浏览器操作脚本保留于 `acceptance/studio-2.3/reproduce/`，需同一源码、Vite 和本地隔离配置，先将记录脚本拷贝回源码 `.local/`，再运行 `node --import tsx .local/<脚本名>`；浏览器记录中的 Vite `/@fs/workspace/webGL` 地址对应本轮源码位置，换目录时需要调整。图和性能原始记录位于同目录；缺少设备或资料时继续保持 Blocked。
 
 G2 实例化 / LOD 与 G3 流式加载本轮交付准入研究，未声称实现自动转换或运行时切换，见 `ASSET-PIPELINE.md`。Native AOT 保留 SqlSugar / Newtonsoft.Json 等依赖分析警告；实际查询、事务和处理路径通过原生运行核验。Vite 的大块提示保留。没有隐藏这些局限或重置用户数据。
+
+浮点边界复现：输入 `0.49999999999999994`、步长 1 时，JS 结果为 0；发布端原先先加 0.5 会因 IEEE 舍入得到 1，进而错误拒绝后续透明度绑定。原生离散索引改为比较 floor 的余数，避免中点前驱被抬高；跨语言套件同时覆盖该前驱和精确中点 0.5。复现及修正后报告为 `numeric-rounding-before.json` / `numeric-rounding-after.json`，不通过容差或兼容分支掩盖差异。

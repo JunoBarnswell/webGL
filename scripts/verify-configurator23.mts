@@ -147,6 +147,21 @@ assert.equal(
   formatNumericValue(numeric.groups[0], result.numericValues.n),
   "1000000000000007",
 );
+const half = {
+  ...numeric,
+  groups: [
+    {
+      ...numeric.groups[0],
+      numericMinimum: 0,
+      numericMaximum: 2,
+      numericStep: 1,
+      numericDefault: 0.49999999999999994,
+    },
+  ],
+};
+assert.equal(solve(half).numericValues.n, 0);
+half.groups[0].numericDefault = 0.5;
+assert.equal(solve(half).numericValues.n, 1);
 const dormant = structuredClone(numeric);
 dormant.groups[0].min = 3;
 dormant.groups[0].max = 2;

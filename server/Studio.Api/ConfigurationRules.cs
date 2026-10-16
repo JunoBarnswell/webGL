@@ -107,7 +107,7 @@ public static class ConfigurationRules
                     var minIndex=Math.Ceiling((domain.Low-group.Low)/group.Step-1e-9);var maxIndex=Math.Floor((domain.High-group.Low)/group.Step+1e-9);
                     if(minIndex>maxIndex){issues.Add("范围内没有符合步长的数值："+group.Name);continue;}
                     if(!double.IsFinite(minIndex)||!double.IsFinite(maxIndex)||Math.Abs(minIndex)>9007199254740991||Math.Abs(maxIndex)>9007199254740991){issues.Add("离散域超出安全整数索引："+group.Name);continue;}
-                    var index=Math.Floor((baseNumbers[group.Id]-group.Low)/group.Step+.5);var value=group.Low+Math.Max(minIndex,Math.Min(maxIndex,index))*group.Step;nextNumbers[group.Id]=value==0?0:value;
+                    var rawIndex=(baseNumbers[group.Id]-group.Low)/group.Step;var lowerIndex=Math.Floor(rawIndex);var index=rawIndex-lowerIndex<.5?lowerIndex:lowerIndex+1;var value=group.Low+Math.Max(minIndex,Math.Min(maxIndex,index))*group.Step;nextNumbers[group.Id]=value==0?0:value;
                 } else {
                     var counts=active.Where(r=>r.ToGroup==group.Id&&r.Type=="count").Where(rule=>{
                         var hard=group.Options.Count(o=>{var vote=votes[K(group.Id,T(o,"id"))];return vote.Selected&&vote.Priority>rule.Priority;});if(hard>rule.Maximum)return false;
