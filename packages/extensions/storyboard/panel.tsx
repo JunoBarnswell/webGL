@@ -4,6 +4,9 @@ import type { ExtensionPanelProps } from "../editor-contract";
 import { useDomainEntity, captureThumbnail, AssetThumbnail } from "../designer";
 import {
   newClip,
+  evaluateStoryboard,
+  rippleStory,
+  subtitles,
   type Storyboard,
   type StoryClip,
   type TrackChannel,
@@ -22,6 +25,91 @@ export function StoryboardPanel(props: ExtensionPanelProps) {
     [snap, setSnap] = useState(true),
     [collapsed, setCollapsed] = useState<string[]>([]),
     [preset, setPreset] = useState("产品发布");
+  const [ripple, setRipple] = useState(1),
+    [timelineView, setTimelineView] = useState({ left: 0, width: 1200 });
+  const activeTrack = data?.tracks.find((t) =>
+      t.clips.some((c) => selection.includes(c.id)),
+    ),
+    activeClip = activeTrack?.clips.find((c) => selection.includes(c.id));
+  const addKeyframe = () =>
+    mutate("记录播放头关键帧", (story) => {
+      const sample = evaluateStoryboard(story, time).find(
+        (s) => s.clip.id === activeClip?.id,
+      );
+      if (!sample || !sample.active || sample.track.locked)
+        throw Error("播放头必须位于一个未锁定的选中片段中");
+      const clip = sample.clip,
+        parameter =
+          clip.curveStart +
+          ((clip.curveEnd - clip.curveStart) * (time - clip.start)) /
+            clip.duration;
+      const frames = (clip.keyframes ??= []);
+      const existing = frames.find((f) => Math.abs(f.time - parameter) < 1e-8);
+      const object = props.runtime?.getObject(sample.track.targetId),
+        target = props.document.entities.find(
+          (e) => e.id === sample.track.targetId,
+        ),
+        units = props.runtime && target ? props.runtime.sourceUnits(target) : 1;
+      const pose: Transform = object
+        ? {
+            position: object.position
+              .toArray()
+              .map((v) => v * units) as Transform["position"],
+            rotation: object.quaternion.toArray() as Transform["rotation"],
+            scale: object.scale.toArray(),
+          }
+        : sample.transform;
+      const frame = {
+        id: existing?.id ?? crypto.randomUUID(),
+        time: parameter,
+        transform: pose,
+        camera: props.runtime?.getCameraPose() ?? sample.camera,
+        value: sample.value,
+        easing: "smooth",
+      };
+      if (existing) Object.assign(existing, frame);
+      else frames.push(frame);
+    });
+  const waveform = () =>
+    void props.services.run("分析原始音频波形", async () => {
+      if (!activeTrack || !activeClip || activeTrack.channel !== "audio")
+        throw Error("请选择音频轨道片段");
+      const entity = props.document.entities.find(
+          (e) => e.id === activeTrack.targetId,
+        ),
+        audio = entity?.components.find((c) => c.type === "Audio" && c.enabled),
+        asset = props.document.assets.find((a) => a.id === audio?.data.assetId);
+      if (!asset) throw Error("音频资源不存在");
+      const bytes = await props.services.assetBytes(asset.id, asset.entry),
+        context = new AudioContext();
+      try {
+        const buffer = await context.decodeAudioData(bytes.slice(0)),
+          peaks = Array.from({ length: 256 }, (_, index) => {
+            let peak = 0;
+            const start = Math.floor((index * buffer.length) / 256),
+              end = Math.floor(((index + 1) * buffer.length) / 256);
+            for (
+              let channel = 0;
+              channel < buffer.numberOfChannels;
+              channel++
+            ) {
+              const samples = buffer.getChannelData(channel);
+              for (let i = start; i < end; i++)
+                peak = Math.max(peak, Math.abs(samples[i]));
+            }
+            return Math.min(1, peak);
+          });
+        mutate("保存音频波形", (story) => {
+          const track = story.tracks.find((t) => t.id === activeTrack.id),
+            clip = track?.clips.find((c) => c.id === activeClip.id);
+          if (!clip || track?.targetId !== activeTrack.targetId)
+            throw Error("音频轨道已变化");
+          clip.waveform = peaks;
+        });
+      } finally {
+        await context.close();
+      }
+    });
   const drag = useRef<{
     x: number;
     start: number;
@@ -290,6 +378,49 @@ export function StoryboardPanel(props: ExtensionPanelProps) {
           {tab === "timeline" && (
             <>
               <div className="designer-toolbar">
+                <button
+                  disabled={!activeClip || activeTrack?.locked}
+                  onClick={addKeyframe}
+                >
+                  记录关键帧
+                </button>
+                <label>
+                  波纹秒数
+                  <input
+                    aria-label="波纹秒数"
+                    type="number"
+                    step={0.1}
+                    value={ripple}
+                    onChange={(event) =>
+                      setRipple(event.currentTarget.valueAsNumber)
+                    }
+                  />
+                </label>
+                <button
+                  onClick={() =>
+                    mutate("波纹编辑", (story) =>
+                      rippleStory(story, time, ripple),
+                    )
+                  }
+                >
+                  在播放头插入 / 移除时间
+                </button>
+                <button
+                  onClick={waveform}
+                  disabled={activeTrack?.channel !== "audio"}
+                >
+                  生成音频波形
+                </button>
+                <button
+                  onClick={() =>
+                    props.services.downloadFile(
+                      data.name + ".vtt",
+                      new Blob([subtitles(data)], { type: "text/vtt" }),
+                    )
+                  }
+                >
+                  导出字幕 VTT
+                </button>
                 <select
                   aria-label="新轨道通道"
                   value={channel}
@@ -393,12 +524,37 @@ export function StoryboardPanel(props: ExtensionPanelProps) {
                 data-focus-scope="timeline"
                 tabIndex={0}
                 aria-label="故事板时间线"
+                onScroll={(event) =>
+                  setTimelineView({
+                    left: event.currentTarget.scrollLeft,
+                    width: event.currentTarget.clientWidth,
+                  })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && drag.current) {
+                    drag.current.node.style.left = drag.current.left;
+                    drag.current.node.style.width = drag.current.width;
+                    drag.current = null;
+                    event.preventDefault();
+                  }
+                }}
               >
                 <div
                   className="timeline-content"
                   style={{ minWidth: 180 + data.duration * zoom }}
                 >
                   <div className="timeline-ruler">
+                    {data.markers.map((marker) => (
+                      <button
+                        key={marker.id}
+                        className="timeline-marker"
+                        title={marker.name}
+                        style={{ left: 180 + marker.time * zoom }}
+                        onClick={() => run("Seek", { time: marker.time })}
+                      >
+                        ◆ {marker.name}
+                      </button>
+                    ))}
                     {Array.from(
                       { length: Math.ceil(data.duration) + 1 },
                       (_, i) => (
@@ -461,63 +617,249 @@ export function StoryboardPanel(props: ExtensionPanelProps) {
                         </button>
                       </div>
                       {!collapsed.includes(track.id) &&
-                        track.clips.map((clip) => (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            aria-label={clip.name}
-                            key={clip.id}
-                            className={
-                              "timeline-clip " +
-                              track.channel +
-                              (selection.includes(clip.id) ? " selected" : "")
-                            }
-                            style={{
-                              left: 180 + clip.start * zoom,
-                              width: clip.duration * zoom,
-                            }}
-                            onClick={(e) => {
-                              const ids = clip.groupId
-                                ? data.tracks.flatMap((t) =>
-                                    t.clips
-                                      .filter((c) => c.groupId === clip.groupId)
-                                      .map((c) => c.id),
-                                  )
-                                : [clip.id];
-                              setSelection(
-                                e.shiftKey
-                                  ? [...new Set([...selection, ...ids])]
-                                  : ids,
-                              );
-                              if (track.targetId)
-                                props.select([track.targetId]);
-                            }}
-                            onPointerDown={(e) =>
-                              dragStart(e, track.id, clip, "move")
-                            }
-                            onPointerMove={dragMove}
-                            onPointerUp={(e) => dragEnd(e)}
-                            onPointerCancel={(e) => dragEnd(e, true)}
-                          >
-                            <span
-                              className="clip-handle start"
-                              onPointerDown={(e) =>
-                                dragStart(e, track.id, clip, "start")
+                        track.clips
+                          .filter(
+                            (clip) =>
+                              clip.start * zoom + clip.duration * zoom + 180 >=
+                                timelineView.left &&
+                              clip.start * zoom + 180 <=
+                                timelineView.left + timelineView.width,
+                          )
+                          .map((clip) => (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              aria-label={clip.name}
+                              key={clip.id}
+                              className={
+                                "timeline-clip " +
+                                track.channel +
+                                (selection.includes(clip.id) ? " selected" : "")
                               }
-                            />
-                            <span>{clip.name}</span>
-                            <span
-                              className="clip-handle end"
+                              style={{
+                                left: 180 + clip.start * zoom,
+                                width: clip.duration * zoom,
+                              }}
+                              onClick={(e) => {
+                                const ids = clip.groupId
+                                  ? data.tracks.flatMap((t) =>
+                                      t.clips
+                                        .filter(
+                                          (c) => c.groupId === clip.groupId,
+                                        )
+                                        .map((c) => c.id),
+                                    )
+                                  : [clip.id];
+                                setSelection(
+                                  e.shiftKey
+                                    ? [...new Set([...selection, ...ids])]
+                                    : ids,
+                                );
+                                if (track.targetId)
+                                  props.select([track.targetId]);
+                              }}
                               onPointerDown={(e) =>
-                                dragStart(e, track.id, clip, "end")
+                                dragStart(e, track.id, clip, "move")
                               }
-                            />
-                          </div>
-                        ))}
+                              onPointerMove={dragMove}
+                              onPointerUp={(e) => dragEnd(e)}
+                              onPointerCancel={(e) => dragEnd(e, true)}
+                            >
+                              <span
+                                className="clip-handle start"
+                                onPointerDown={(e) =>
+                                  dragStart(e, track.id, clip, "start")
+                                }
+                              />
+                              <span>{clip.name}</span>
+                              {clip.waveform && (
+                                <svg
+                                  className="clip-waveform"
+                                  viewBox={`0 0 ${clip.waveform.length} 24`}
+                                  preserveAspectRatio="none"
+                                >
+                                  <path
+                                    d={clip.waveform
+                                      .map(
+                                        (peak, i) =>
+                                          `M${i} ${12 - peak * 11}v${peak * 22}`,
+                                      )
+                                      .join(" ")}
+                                    stroke="#b3e5e0"
+                                    strokeWidth={0.6}
+                                  />
+                                </svg>
+                              )}
+                              {clip.keyframes
+                                ?.filter(
+                                  (frame) =>
+                                    frame.time >= clip.curveStart &&
+                                    frame.time <= clip.curveEnd,
+                                )
+                                .map((frame) => (
+                                  <button
+                                    key={frame.id}
+                                    className="timeline-keyframe"
+                                    title={`关键帧 ${frame.time.toFixed(3)}`}
+                                    style={{
+                                      left:
+                                        ((frame.time - clip.curveStart) /
+                                          (clip.curveEnd - clip.curveStart)) *
+                                          100 +
+                                        "%",
+                                    }}
+                                    onPointerDown={(event) =>
+                                      event.stopPropagation()
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setSelection([clip.id]);
+                                      run("Seek", {
+                                        time:
+                                          clip.start +
+                                          (clip.duration *
+                                            (frame.time - clip.curveStart)) /
+                                            (clip.curveEnd - clip.curveStart),
+                                      });
+                                    }}
+                                  >
+                                    ◆
+                                  </button>
+                                ))}
+                              <span
+                                className="clip-handle end"
+                                onPointerDown={(e) =>
+                                  dragStart(e, track.id, clip, "end")
+                                }
+                              />
+                            </div>
+                          ))}
                     </div>
                   ))}
                 </div>
               </div>
+              {activeClip && (
+                <fieldset>
+                  <legend>选中片段关键帧与缓动 · {activeClip.name}</legend>
+                  <label>
+                    Bezier 缓动
+                    <input
+                      type="checkbox"
+                      checked={Boolean(activeClip.bezier)}
+                      onChange={(event) =>
+                        mutate("切换 Bezier 缓动", (story) => {
+                          const clip = story.tracks
+                            .flatMap((t) => t.clips)
+                            .find((c) => c.id === activeClip.id)!;
+                          if (event.target.checked)
+                            clip.bezier = [0.25, 0.1, 0.25, 1];
+                          else delete clip.bezier;
+                        })
+                      }
+                    />
+                  </label>
+                  {activeClip.bezier?.map((value, index) => (
+                    <label key={index}>
+                      {["x₁", "y₁", "x₂", "y₂"][index]}
+                      <input
+                        type="number"
+                        step={0.05}
+                        min={index % 2 === 0 ? 0 : undefined}
+                        max={index % 2 === 0 ? 1 : undefined}
+                        value={value}
+                        onChange={(event) => {
+                          const next = event.currentTarget.valueAsNumber;
+                          if (Number.isFinite(next))
+                            mutate("调整 Bezier 控制点", (story) => {
+                              story.tracks
+                                .flatMap((t) => t.clips)
+                                .find((c) => c.id === activeClip.id)!.bezier![
+                                index
+                              ] = next;
+                            });
+                        }}
+                      />
+                    </label>
+                  ))}
+                  <svg
+                    className="timing-curve"
+                    viewBox="0 0 120 80"
+                    aria-label="Bezier 缓动曲线"
+                  >
+                    <path
+                      d={
+                        activeClip.bezier
+                          ? `M10 70 C${10 + activeClip.bezier[0] * 100} ${70 - activeClip.bezier[1] * 60} ${10 + activeClip.bezier[2] * 100} ${70 - activeClip.bezier[3] * 60} 110 10`
+                          : "M10 70 L110 10"
+                      }
+                      fill="none"
+                      stroke="#64d6b7"
+                      strokeWidth={2}
+                    />
+                  </svg>
+                  {activeClip.keyframes?.map((frame) => (
+                    <div className="button-group" key={frame.id}>
+                      <span>◆</span>
+                      <label>
+                        归一化时间
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.001}
+                          value={frame.time}
+                          onChange={(event) => {
+                            const next = event.currentTarget.valueAsNumber;
+                            if (Number.isFinite(next))
+                              mutate("调整关键帧时间", (story) => {
+                                story.tracks
+                                  .flatMap((t) => t.clips)
+                                  .find((c) => c.id === activeClip.id)!
+                                  .keyframes!.find(
+                                    (f) => f.id === frame.id,
+                                  )!.time = next;
+                              });
+                          }}
+                        />
+                      </label>
+                      <label>
+                        数值
+                        <input
+                          type="number"
+                          step={0.01}
+                          value={frame.value}
+                          onChange={(event) => {
+                            const next = event.currentTarget.valueAsNumber;
+                            if (Number.isFinite(next))
+                              mutate("调整关键帧数值", (story) => {
+                                story.tracks
+                                  .flatMap((t) => t.clips)
+                                  .find((c) => c.id === activeClip.id)!
+                                  .keyframes!.find(
+                                    (f) => f.id === frame.id,
+                                  )!.value = next;
+                              });
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={() =>
+                          mutate("删除关键帧", (story) => {
+                            const clip = story.tracks
+                              .flatMap((t) => t.clips)
+                              .find((c) => c.id === activeClip.id)!;
+                            clip.keyframes = clip.keyframes?.filter(
+                              (f) => f.id !== frame.id,
+                            );
+                          })
+                        }
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </fieldset>
+              )}
             </>
           )}
           {tab === "properties" &&

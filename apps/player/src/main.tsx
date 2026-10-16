@@ -28,8 +28,12 @@ function Player() {
       const scene = new URLSearchParams(location.search).get("scene");
       const project = new URLSearchParams(location.search).get("project");
       if (project) {
+        const version = new URLSearchParams(location.search).get("version");
         const response = await fetch(
-          "/api/player/projects/" + encodeURIComponent(project) + "/manifest",
+          "/api/player/projects/" +
+            encodeURIComponent(project) +
+            (version ? "/versions/" + encodeURIComponent(version) : "") +
+            "/manifest",
           { signal: abort.signal },
         );
         if (!response.ok) throw Error("项目无法读取 HTTP " + response.status);
@@ -63,7 +67,7 @@ function Player() {
           (node, signal) => publishedSceneLoader(projectManifest, node, signal),
         );
         setRuntime(current);
-        await navigation.navigate(projectManifest.document.entryNodeId);
+        await navigation.bindBrowserHistory(window);
         setManifest({
           versionId: projectManifest.versionId,
           publishedAt: projectManifest.publishedAt,

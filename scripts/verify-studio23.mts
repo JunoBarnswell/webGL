@@ -7,7 +7,6 @@ import {
   createComponent,
   documentReferences,
   releaseReadiness,
-  sourceDocument,
   type SceneDocument,
 } from "@studio/scene-schema";
 import {
@@ -16,7 +15,38 @@ import {
   instantiatePrefab,
   planPrefabUpdate,
   applyPrefabUpdatePlan,
+  prefabSourcePath,
+  revisionFromInstance,
 } from "@studio/editor-core";
+import { freeze } from "immer";
+import {
+  emptyProject,
+  newTourNode,
+  validateProject,
+  directionAngles,
+  type ProjectManifest,
+} from "../packages/extensions/virtual-tour/core";
+import {
+  calibrateFloor,
+  floorToWorld,
+  worldToFloor,
+  ensureDiagram,
+  removeProjectNodes,
+} from "../packages/extensions/virtual-tour/spatial";
+import {
+  readProjectLocation,
+  projectLocationUrl,
+  locationPose,
+} from "../packages/extensions/virtual-tour/location";
+import {
+  compileStoryboard,
+  evaluateStoryboard,
+  newClip,
+  rippleStory,
+  subtitles,
+  validateStory,
+  type Storyboard,
+} from "../packages/extensions/storyboard/core";
 import { CameraOwnership } from "../packages/scene-runtime/src/CameraOwnership";
 import { VisualStateSystem } from "../packages/scene-runtime/src/systems/VisualStateSystem";
 import {
@@ -122,15 +152,15 @@ pass(
 );
 const camera = new CameraOwnership();
 let cancelled = 0;
-const story = camera.acquire("story", "storyboard", () => cancelled++);
+const storyLease = camera.acquire("story", "storyboard", () => cancelled++);
 assert.equal(
   camera.acquire("config", "configuration", () => {}),
   0,
 );
-assert.equal(camera.isCurrent(story), true);
+assert.equal(camera.isCurrent(storyLease), true);
 const manual = camera.acquire("manual", "manual", () => cancelled++);
 assert.equal(cancelled, 1);
-camera.release(story);
+camera.release(storyLease);
 assert.equal(camera.isCurrent(manual), true);
 camera.release(manual);
 assert.equal(camera.owner, "navigation");
@@ -328,6 +358,260 @@ pass(
   "Rule IR positive cycles, shortest contradiction reasons, deterministic priority and conditional truth evaluation",
 );
 assert.equal(releaseReadiness(createDocument()).ready, true);
+const parentDoc = createDocument("Parent"),
+  parentRoot = createEntity("Parent root");
+parentDoc.entities.push(parentRoot);
+const inner = instantiatePrefab(revision);
+inner.instance.parentId = parentRoot.id;
+const parentSession = new EditorSession(parentDoc);
+parentSession.execute(inner.command);
+const parentRevision = createPrefabRevision(
+    parentSession.document,
+    parentRoot.id,
+    "Parent template",
+  ),
+  nestedSession = new EditorSession(createDocument()),
+  outer = instantiatePrefab(parentRevision);
+nestedSession.execute(outer.command);
+const innerGlobal =
+  outer.instance.bindings.entity[inner.instance.bindings.entity[child.id]];
+nestedSession.execute({
+  label: "Nested local edit",
+  mutate(doc) {
+    doc.entities.find((e) => e.id === innerGlobal)!.name = "Nested override";
+  },
+});
+const sourceLevels = prefabSourcePath(nestedSession.document, innerGlobal);
+assert.equal(sourceLevels.length, 2);
+const appliedChild = revisionFromInstance(
+  sourceLevels[1].document,
+  sourceLevels[1].instance,
+  "Child source",
+);
+assert.equal(appliedChild.id, revision.id);
+assert.equal(
+  appliedChild.document.entities.find((e) => e.id === child.id)!.name,
+  "Nested override",
+);
+assert.equal(
+  nestedSession.document.prefabs![0].source.prefabs![0].revisionId,
+  revision.revisionId,
+);
+pass(
+  "Nested Apply resolves explicit source ancestors and captures child edits without changing parent revision pins",
+);
+const graph = emptyProject();
+graph.nodes = Array.from({ length: 100 }, (_, i) => newTourNode("Node " + i));
+graph.entryNodeId = graph.nodes[0].id;
+graph.locales = ["zh-CN", "en"];
+graph.links = Array.from({ length: 300 }, (_, i) => ({
+  id: "edge" + i,
+  fromNodeId: graph.nodes[i % 100].id,
+  toNodeId: graph.nodes[(i + 1 + Math.floor(i / 100)) % 100].id,
+  transition: "fade",
+  reverseLinkId: "",
+}));
+ensureDiagram(graph).positions = graph.nodes.map((node, i) => ({
+  nodeId: node.id,
+  x: (i % 10) * 200,
+  y: Math.floor(i / 10) * 130,
+}));
+ensureDiagram(graph).groups = [
+  {
+    id: "cluster",
+    name: "Group",
+    nodeIds: graph.nodes.slice(0, 10).map((n) => n.id),
+  },
+];
+assert.deepEqual(validateProject(graph), []);
+assert.throws(
+  () => removeProjectNodes(graph, new Set([graph.entryNodeId])),
+  /仍被引用/,
+);
+const floor = calibrateFloor(
+  {
+    id: "f",
+    name: "Floor",
+    assetId: "image",
+    north: 15,
+    mmPerPixel: 1,
+    calibrated: false,
+    rotation: 30,
+    originX: 0.3,
+    originY: 0.7,
+  },
+  [0, 0],
+  [1, 0],
+  10000,
+  1000,
+  500,
+);
+assert.equal(floor.mmPerPixel, 10);
+for (let i = 0; i < 1000; i++) {
+  const x = ((i * 13) % 1000) / 1000,
+    y = ((i * 37) % 1000) / 1000,
+    world = floorToWorld(floor, x, y),
+    image = worldToFloor(floor, ...world);
+  assert.ok(Math.abs(image[0] - x) < 1e-10 && Math.abs(image[1] - y) < 1e-10);
+}
+assert.throws(() => calibrateFloor(floor, [0, 0], [0, 0], 1000, 1000, 500));
+const project: ProjectManifest = {
+  projectId: "project",
+  versionId: "version",
+  graphVersionId: "graph",
+  document: graph,
+  sceneVersions: {},
+  assets: [],
+  publishedAt: "",
+  runtimeBuild: "2.3.0",
+};
+const location = readProjectLocation(
+  new URL(
+    "https://studio.test/player/?project=project&version=version&node=" +
+      graph.nodes[1].id +
+      "&yaw=42&pitch=-12&fov=70&locale=en",
+  ),
+  project,
+);
+const shared = projectLocationUrl(
+  new URL("https://studio.test/player/"),
+  location,
+);
+assert.deepEqual(readProjectLocation(shared, project), location);
+const pose = locationPose(location, {
+    position: [1, 2, 3],
+    target: [1, 2, -10],
+    fov: 60,
+  }),
+  angles = directionAngles(
+    pose.target.map((v, i) => v - pose.position[i]) as [number, number, number],
+  );
+assert.ok(
+  Math.abs(angles.yaw - 42) < 1e-10 && Math.abs(angles.pitch + 12) < 1e-10,
+);
+for (const query of [
+  "yaw=NaN",
+  "pitch=91",
+  "fov=0",
+  "node=foreign",
+  "version=other",
+  "locale=unknown",
+  "hotspot=foreign",
+  "yaw=1&yaw=2",
+  "position=0,,0&target=0,0,-1",
+])
+  assert.throws(() =>
+    readProjectLocation(
+      new URL("https://studio.test/player/?project=project&" + query),
+      project,
+    ),
+  );
+pass(
+  "100-node/300-edge authored graph, reference-aware deletion, 1000 floor coordinate round trips and strictly pinned deep links",
+);
+const story: Storyboard = {
+  name: "Seek index",
+  duration: 200,
+  fps: "30",
+  loop: true,
+  tracks: Array.from({ length: 100 }, (_, track) => ({
+    id: "track" + track,
+    name: "Track " + track,
+    channel: "transform",
+    targetId: "target" + track,
+    contentId: "",
+    muted: false,
+    locked: false,
+    priority: 0,
+    clips: Array.from({ length: 100 }, (_, index) => {
+      const clip = newClip(index * 2);
+      clip.toTransform.position = [100, 200, 300];
+      clip.path = [[20, 100, 30]];
+      return clip;
+    }),
+  })),
+  snapshots: [],
+  markers: [{ id: "m", name: "Marker", time: 10 }],
+};
+assert.deepEqual(validateStory(story), []);
+freeze(story, true);
+const compiled = compileStoryboard(story);
+assert.equal(compileStoryboard(story), compiled);
+const samples: number[] = [];
+for (let i = 0; i < 520; i++) {
+  const time = ((i * 157) % 2000) / 10,
+    start = performance.now(),
+    actual = evaluateStoryboard(story, time, compiled);
+  if (i >= 20) samples.push(performance.now() - start);
+  assert.equal(actual.length, 100);
+  assert.deepEqual(evaluateStoryboard(story, time, compiled), actual);
+}
+for (let repeat = 0; repeat < 50; repeat++)
+  for (const time of [0, 199.99, 0, 100, 50, 199.99])
+    assert.deepEqual(
+      evaluateStoryboard(story, time, compiled),
+      evaluateStoryboard(story, time, compiled),
+    );
+const seekP95 = samples.sort((a, b) => a - b)[
+  Math.floor(samples.length * 0.95)
+];
+assert.ok(
+  seekP95 <= 8,
+  "Synthetic Node CPU seek P95 " + seekP95 + " ms exceeds 8 ms",
+);
+const edited = structuredClone(story),
+  firstClip = edited.tracks[0].clips[0];
+firstClip.keyframes = [
+  {
+    id: "key",
+    time: 0.5,
+    transform: {
+      position: [40, 50, 60],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    },
+    camera: firstClip.fromCamera,
+    value: 7,
+    easing: "linear",
+  },
+];
+firstClip.path = [];
+assert.deepEqual(
+  evaluateStoryboard(edited, 1)[0].transform.position,
+  [40, 50, 60],
+);
+const beforeSplit = evaluateStoryboard(edited, 1.5)[0].transform;
+const split = structuredClone(firstClip);
+split.id = "split";
+split.start = 1;
+split.duration = 1;
+split.curveStart = 0.5;
+firstClip.duration = 1;
+firstClip.curveEnd = 0.5;
+edited.tracks[0].clips.push(split);
+assert.deepEqual(evaluateStoryboard(edited, 1.5)[0].transform, beforeSplit);
+const ripple = structuredClone(edited);
+rippleStory(ripple, 10, 2);
+assert.equal(ripple.markers[0].time, 12);
+assert.equal(ripple.duration, 202);
+assert.equal(ripple.tracks[0].clips.find((c) => c.start === 12)?.start, 12);
+ripple.tracks.push({
+  id: "captions",
+  name: "Captions",
+  channel: "caption",
+  targetId: "",
+  contentId: "",
+  muted: false,
+  locked: false,
+  priority: 0,
+  clips: [{ ...newClip(1), text: "中文字幕" }],
+});
+assert.match(subtitles(ripple), /00:00:01.000 --> 00:00:03.000\n中文字幕/);
+pass(
+  "Compiled 100-track × 100-clip pure sampling: 500 random seeks, independent output, repeatable loops, keyframe split invariance, ripple and VTT; synthetic Node CPU P95 " +
+    seekP95.toFixed(3) +
+    " ms",
+);
 if (!process.argv.includes("--pure")) {
   const config = JSON.parse(await readFile(".local/config.json", "utf8")),
     base = process.env.STUDIO_API ?? "http://127.0.0.1:18080";
@@ -388,12 +672,19 @@ if (!process.argv.includes("--pure")) {
     { expectedRevision: draft.revision + 1, document: strict },
     409,
   );
+  const flattened = structuredClone(session.document);
+  delete flattened.prefabs;
   const persisted = await api("/projects", "POST", {
     name: "Reference parity",
-    document: sourceDocument(session.document),
+    document: flattened,
   });
   const native = await api("/scenes/" + persisted.sceneId + "/references");
-  assert.deepEqual(native, documentReferences(persisted.document));
+  assert.deepEqual(
+    native.sort((a: { path: string }, b: { path: string }) =>
+      a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+    ),
+    documentReferences(persisted.document),
+  );
   pass(
     "Native readiness advisory/required policy, unsaved read-only preflight, CAS rejection and reference-path parity",
   );

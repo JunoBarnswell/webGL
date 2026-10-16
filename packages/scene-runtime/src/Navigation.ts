@@ -18,7 +18,16 @@ export class Navigation {
   private ray = new THREE.Raycaster();
   private previousCamera = new THREE.Vector3();
   private controller = new AbortController();
-  onInterrupt?: (active: boolean) => void;
+  private inputListeners = new Set<(active: boolean) => void>();
+  onInputChanged(listener: (active: boolean) => void): () => void {
+    this.inputListeners.add(listener);
+    return () => {
+      this.inputListeners.delete(listener);
+    };
+  }
+  private notifyInput(active: boolean): void {
+    for (const listener of this.inputListeners) listener(active);
+  }
   get hasInput(): boolean {
     return (
       this.dragging ||
@@ -59,7 +68,7 @@ export class Navigation {
         ) {
           event.preventDefault();
           this.keys.add(event.code);
-          this.onInterrupt?.(true);
+          this.notifyInput(true);
           wake();
         }
       },
@@ -69,7 +78,7 @@ export class Navigation {
       "keyup",
       (event) => {
         this.keys.delete(event.code);
-        this.onInterrupt?.(this.hasInput);
+        this.notifyInput(this.hasInput);
       },
       { signal },
     );
@@ -79,7 +88,7 @@ export class Navigation {
         this.keys.clear();
         this.movement = { forward: 0, right: 0 };
         this.dragging = false;
-        this.onInterrupt?.(this.hasInput);
+        this.notifyInput(this.hasInput);
       },
       { signal },
     );
@@ -88,7 +97,7 @@ export class Navigation {
       (event) => {
         if (!this.enabled || event.button !== 0) return;
         this.dragging = true;
-        this.onInterrupt?.(true);
+        this.notifyInput(true);
         canvas.focus();
         canvas.setPointerCapture(event.pointerId);
       },
@@ -112,7 +121,7 @@ export class Navigation {
       "pointerup",
       () => {
         this.dragging = false;
-        this.onInterrupt?.(this.hasInput);
+        this.notifyInput(this.hasInput);
       },
       { signal },
     );
@@ -121,7 +130,7 @@ export class Navigation {
       () => {
         this.dragging = false;
         this.keys.clear();
-        this.onInterrupt?.(this.hasInput);
+        this.notifyInput(this.hasInput);
       },
       { signal },
     );
@@ -130,14 +139,14 @@ export class Navigation {
       (event) => {
         if (!this.enabled) return;
         event.preventDefault();
-        this.onInterrupt?.(true);
+        this.notifyInput(true);
         camera.fov = THREE.MathUtils.clamp(
           camera.fov + event.deltaY * 0.02,
           20,
           110,
         );
         camera.updateProjectionMatrix();
-        this.onInterrupt?.(this.hasInput);
+        this.notifyInput(this.hasInput);
         wake();
       },
       { passive: false, signal },
@@ -148,7 +157,7 @@ export class Navigation {
       forward: Math.max(-1, Math.min(1, forward)),
       right: Math.max(-1, Math.min(1, right)),
     };
-    this.onInterrupt?.(this.hasInput);
+    this.notifyInput(this.hasInput);
     this.wake();
   }
   reset(settings: SceneSettings): void {
@@ -286,7 +295,7 @@ export class Navigation {
     this.keys.clear();
     this.movement = { forward: 0, right: 0 };
     this.dragging = false;
-    this.onInterrupt?.(false);
+    this.notifyInput(false);
   }
   pause(): void {
     this.enabled = false;
@@ -295,6 +304,7 @@ export class Navigation {
   dispose(): void {
     this.pause();
     this.controller.abort();
+    this.inputListeners.clear();
   }
 }
 

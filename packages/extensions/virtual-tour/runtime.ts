@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import {
-  createAction,
   getComponent,
   type SceneDocument,
   type ChangeSet,
@@ -89,12 +88,7 @@ export default class VirtualTourSystem implements RuntimeSystem {
     );
   }
   private async activate(hotspot: TourHotspot): Promise<void> {
-    if (hotspot.toNodeId) await this.nav()?.navigate(hotspot.toNodeId);
-    else if (hotspot.contentId) {
-      const action = createAction("OpenContent");
-      action.targetId = hotspot.contentId;
-      await this.runtime.dispatch(action);
-    }
+    await this.nav()?.activateHotspot(hotspot.id);
   }
   private buildHotspots(): void {
     this.overlay.replaceChildren();

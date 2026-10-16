@@ -61,7 +61,7 @@ export function extensionErrors(document: SceneDocument): string[] {
     errors.push("扩展声明重复");
   for (const requirement of document.requiredExtensions) {
     const manifest = catalog.manifests.find((m) => m.id === requirement.id);
-    if (!manifest || manifest.version !== requirement.version)
+    if (!manifest || !supportsExtension(manifest.version, requirement.version))
       errors.push(
         "缺失或不兼容扩展 " + requirement.id + "@" + requirement.version,
       );
@@ -81,6 +81,13 @@ export function declareExtension(document: SceneDocument, type: string): void {
     !document.requiredExtensions.some((e) => e.id === requirement.id)
   )
     document.requiredExtensions.push(requirement);
+  else if (requirement) {
+    const current = document.requiredExtensions.find(
+      (e) => e.id === requirement.id,
+    )!;
+    if (supportsExtension(requirement.version, current.version))
+      current.version = requirement.version;
+  }
 }
 export interface MigrationReport {
   from: number;
@@ -120,4 +127,15 @@ function compareVersions(a: string, b: string): number {
   for (let i = 0; i < 3; i++)
     if (left[i] !== right[i]) return left[i] - right[i];
   return 0;
+}
+/** Additive minor versions share one contract; future and different-major requirements are rejected. */
+export function supportsExtension(
+  installed: string,
+  requested: string,
+): boolean {
+  return (
+    /^\d+\.\d+\.\d+$/.test(requested) &&
+    installed.split(".")[0] === requested.split(".")[0] &&
+    compareVersions(requested, installed) <= 0
+  );
 }

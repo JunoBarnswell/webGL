@@ -60,6 +60,7 @@ export interface SceneAsset {
     | "model"
     | "image"
     | "audio"
+    | "video"
     | "texture"
     | "source"
     | "semantic";

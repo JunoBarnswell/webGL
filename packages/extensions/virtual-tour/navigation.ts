@@ -1,6 +1,7 @@
 import {
   createDocument,
   createComponent,
+  createAction,
   declareExtension,
   type SceneDocument,
   type PublishedManifest,
@@ -8,12 +9,21 @@ import {
 import type { SceneRuntime } from "../../scene-runtime/src/SceneRuntime";
 import { assetBytes } from "../../scene-runtime/src/AssetCache";
 import {
+  readProjectLocation,
+  projectLocationUrl,
+  locationPose,
+  type ProjectLocation,
+} from "./location";
+import {
   sphericalDirection,
+  directionAngles,
   type ProjectManifest,
   type ProjectGraph,
   type TourNode,
 } from "./core";
 export interface ProjectNavigationState {
+  locale?: string;
+  hotspotId?: string;
   nodeId: string;
   status: "idle" | "loading" | "ready" | "error";
   error: string;
@@ -43,8 +53,117 @@ export class ProjectNavigation {
   private pendingStop: number | null = null;
   private cleanup: () => void;
   private audio: HTMLAudioElement | null = null;
-  private previousInterrupt: ((active: boolean) => void) | undefined;
-  private interrupt: (active: boolean) => void;
+  private inputCleanup: () => void;
+  private browser: Window | null = null;
+  private browserAbort: AbortController | null = null;
+  private routeLease = 0;
+  private currentLocation(): ProjectLocation {
+    const pose = this.runtime.getCameraPose(),
+      angles = directionAngles(
+        pose.target.map((v, i) => v - pose.position[i]) as [
+          number,
+          number,
+          number,
+        ],
+      );
+    return {
+      projectId: this.manifest.projectId,
+      versionId: this.manifest.versionId,
+      nodeId: this.state.nodeId,
+      locale: this.state.locale ?? this.graph.locales?.[0] ?? "zh-CN",
+      hotspotId: this.state.hotspotId ?? "",
+      ...angles,
+      fov: pose.fov,
+      position: pose.position,
+      target: pose.target,
+    };
+  }
+  shareUrl(): string {
+    if (!this.browser || this.state.status !== "ready")
+      throw Error("项目尚未进入公开节点");
+    return projectLocationUrl(
+      new URL(this.browser.location.href),
+      this.currentLocation(),
+    ).href;
+  }
+  private writeLocation(mode: "push" | "replace"): void {
+    if (!this.browser || this.state.status !== "ready") return;
+    this.browser.history[mode === "push" ? "pushState" : "replaceState"](
+      { project: this.manifest.projectId, version: this.manifest.versionId },
+      "",
+      this.shareUrl(),
+    );
+  }
+  async bindBrowserHistory(browser: Window): Promise<void> {
+    this.browserAbort?.abort();
+    this.browser = browser;
+    this.browserAbort = new AbortController();
+    const restore = async () => {
+      const location = readProjectLocation(
+        new URL(browser.location.href),
+        this.manifest,
+      );
+      if (
+        this.state.nodeId !== location.nodeId ||
+        this.state.status !== "ready"
+      )
+        await this.navigate(location.nodeId, { fromHistory: true });
+      if (this.state.nodeId !== location.nodeId) return;
+      this.patch({ locale: location.locale, hotspotId: location.hotspotId });
+      this.runtime.navigation.clearInput();
+      const lease = this.runtime.cameraOwnership.acquire(
+        "project:location",
+        "virtualTour",
+        () => {},
+      );
+      if (lease) {
+        this.runtime.applyCameraPose(
+          locationPose(location, this.runtime.getCameraPose()),
+        );
+        this.runtime.cameraOwnership.release(lease);
+      }
+      const hotspot = this.graph.nodes
+        .find((n) => n.id === location.nodeId)
+        ?.hotspots.find((h) => h.id === location.hotspotId);
+      if (hotspot?.contentId)
+        this.runtime.state.patch({ contentId: hotspot.contentId });
+      this.writeLocation("replace");
+    };
+    browser.addEventListener(
+      "popstate",
+      () => {
+        void restore().catch((error) => {
+          this.patch({ error: String(error) });
+        });
+      },
+      { signal: this.browserAbort.signal },
+    );
+    await restore();
+  }
+  async activateHotspot(id: string): Promise<void> {
+    const hotspot = this.graph.nodes
+      .find((n) => n.id === this.state.nodeId)
+      ?.hotspots.find((h) => h.id === id);
+    if (!hotspot) throw Error("热点不属于当前节点");
+    if (hotspot.toNodeId) {
+      await this.navigate(hotspot.toNodeId);
+      return;
+    }
+    this.patch({ hotspotId: id });
+    if (hotspot.contentId) {
+      const action = createAction("OpenContent");
+      action.targetId = hotspot.contentId;
+      await this.runtime.dispatch(action);
+    }
+    this.writeLocation("push");
+  }
+  async followLink(id: string): Promise<void> {
+    const link = this.graph.links.find(
+      (l) => l.id === id && l.fromNodeId === this.state.nodeId,
+    );
+    if (!link) throw Error("连接不属于当前节点");
+    await this.navigate(link.toNodeId, { entrance: link.entrance });
+  }
   readonly getSnapshot = () => this.state;
   readonly subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -62,12 +181,9 @@ export class ProjectNavigation {
   ) {
     runtime.capabilities.set("studio.virtualTour.navigation", this);
     this.cleanup = runtime.engine.onUpdate((dt: number) => this.update(dt));
-    this.previousInterrupt = runtime.navigation.onInterrupt;
-    this.interrupt = (active) => {
-      this.previousInterrupt?.(active);
+    this.inputCleanup = runtime.navigation.onInputChanged((active) => {
       if (active && this.state.routeStatus === "playing") this.pauseRoute();
-    };
-    runtime.navigation.onInterrupt = this.interrupt;
+    });
   }
   get graph(): ProjectGraph {
     return this.manifest.document;
@@ -163,10 +279,16 @@ export class ProjectNavigation {
   }
   async navigate(
     nodeId: string,
-    options: { route?: boolean; back?: boolean } = {},
+    options: {
+      route?: boolean;
+      back?: boolean;
+      fromHistory?: boolean;
+      entrance?: import("../../scene-runtime/src/RuntimeState").CameraPose;
+    } = {},
   ): Promise<void> {
     const node = this.graph.nodes.find((n) => n.id === nodeId);
     if (!node) throw Error("项目节点不存在");
+    if (!options.fromHistory) this.writeLocation("replace");
     if (!options.route && this.state.routeStatus === "playing")
       this.pauseRoute();
     const playing = this.runtime.mode === "play";
@@ -217,10 +339,23 @@ export class ProjectNavigation {
       await this.runtime.loadDocument(doc, { signal });
       if (serial !== this.generation) return;
       if (playing) await this.runtime.setMode("play");
-      if (node.kind === "scene3d") this.runtime.applyCameraPose(node.camera);
+      const entrance =
+        options.entrance ?? (node.kind === "scene3d" ? node.camera : null);
+      if (entrance) {
+        const lease = this.runtime.cameraOwnership.acquire(
+          "project:entrance",
+          "virtualTour",
+          () => {},
+        );
+        if (lease) {
+          this.runtime.applyCameraPose(entrance);
+          this.runtime.cameraOwnership.release(lease);
+        }
+      }
       this.elapsed = 0;
       this.patch({
         nodeId,
+        hotspotId: "",
         status: "ready",
         transitionImage: "",
         history: options.back
@@ -230,6 +365,16 @@ export class ProjectNavigation {
             : this.state.history,
       });
       this.runtime.engine.requestRender();
+      if (!options.fromHistory)
+        this.writeLocation(previousId ? "push" : "replace");
+      for (const link of this.graph.links.filter(
+        (l) => l.fromNodeId === nodeId && l.preload && l.preload !== "none",
+      ))
+        void this.prefetch(
+          link.toNodeId,
+          signal,
+          link.preload === "media",
+        ).catch(() => {});
     } catch (error) {
       if (serial !== this.generation || signal.aborted) return;
       if (previous) {
@@ -247,6 +392,10 @@ export class ProjectNavigation {
     }
   }
   async back(): Promise<void> {
+    if (this.browser && this.state.history.length) {
+      this.browser.history.back();
+      return;
+    }
     const id = this.state.history.at(-1);
     if (id) await this.navigate(id, { back: true });
   }
@@ -258,11 +407,19 @@ export class ProjectNavigation {
     await this.visitRouteStop(0);
   }
   pauseRoute(): void {
+    this.runtime.cameraOwnership.release(this.routeLease);
+    this.routeLease = 0;
     this.audio?.pause();
     this.patch({ routeStatus: "paused" });
   }
   resumeRoute(): void {
     if (!this.state.routeId) throw Error("尚未选择路线");
+    this.routeLease = this.runtime.cameraOwnership.acquire(
+      "virtualTour:route",
+      "virtualTour",
+      () => this.pauseRoute(),
+    );
+    if (!this.routeLease) throw Error("相机正由更高优先级操作使用");
     this.patch({ routeStatus: "playing" });
     if (this.pendingStop !== null) {
       const index = this.pendingStop;
@@ -281,6 +438,8 @@ export class ProjectNavigation {
     this.runtime.engine.requestRender();
   }
   stopRoute(): void {
+    this.runtime.cameraOwnership.release(this.routeLease);
+    this.routeLease = 0;
     this.routeCancellation.abort();
     this.routeCancellation = new AbortController();
     this.pendingStop = null;
@@ -305,13 +464,26 @@ export class ProjectNavigation {
         this.pendingStop = index;
         return;
       }
+      this.routeLease = this.runtime.cameraOwnership.acquire(
+        "virtualTour:route",
+        "virtualTour",
+        () => this.pauseRoute(),
+      );
+      if (!this.routeLease) {
+        this.patch({
+          routeStatus: "paused",
+          error: "相机正由更高优先级操作使用",
+        });
+        return;
+      }
       const node = this.graph.nodes.find((n) => n.id === stop.nodeId);
       if (node?.kind !== "scene3d") {
         const pose = this.runtime.getCameraPose();
         pose.target = sphericalDirection(stop.heading, stop.pitch).map(
           (v, i) => pose.position[i] + v * 1000,
         ) as [number, number, number];
-        this.runtime.applyCameraPose(pose);
+        if (this.runtime.cameraOwnership.isCurrent(this.routeLease))
+          this.runtime.applyCameraPose(pose);
       }
       for (const action of stop.actions ?? []) {
         if (controller.signal.aborted) return;
@@ -361,6 +533,8 @@ export class ProjectNavigation {
     if (this.elapsed >= stop.hold) {
       const next = this.state.routeIndex + 1;
       if (next >= route.stops.length && !route.loop) {
+        this.runtime.cameraOwnership.release(this.routeLease);
+        this.routeLease = 0;
         this.patch({ routeStatus: "completed" });
         return false;
       }
@@ -374,7 +548,11 @@ export class ProjectNavigation {
     }
     return true;
   }
-  async prefetch(nodeId: string, signal: AbortSignal): Promise<void> {
+  async prefetch(
+    nodeId: string,
+    signal: AbortSignal,
+    mediaOnly = false,
+  ): Promise<void> {
     const node = this.graph.nodes.find((n) => n.id === nodeId);
     if (!node) return;
     const document =
@@ -383,18 +561,23 @@ export class ProjectNavigation {
         : await this.panorama(node, signal);
     await Promise.all(
       document.assets
-        .slice(0, 8)
+        .filter(
+          (a) => !mediaOnly || ["image", "texture", "audio"].includes(a.kind),
+        )
         .map((a) =>
           assetBytes(this.runtime.getAssetSource(), a, a.entry, signal),
         ),
     );
   }
   dispose(): void {
+    this.runtime.cameraOwnership.release(this.routeLease);
+    this.routeLease = 0;
+    this.browserAbort?.abort();
+    this.browser = null;
     this.routeCancellation.abort();
     this.audio?.pause();
     this.audio = null;
-    if (this.runtime.navigation.onInterrupt === this.interrupt)
-      this.runtime.navigation.onInterrupt = this.previousInterrupt;
+    this.inputCleanup();
     this.generation++;
     this.cancellation.abort();
     this.cleanup();

@@ -28,6 +28,7 @@ export interface ExtensionPanelProps {
       asset: import("../scene-schema/src/types").SceneAsset,
     ) => Promise<import("../scene-schema/src/types").Entity[]>;
     downloadJson: (name: string, value: unknown) => void;
+    downloadFile: (name: string, value: Blob) => void;
     activeTool: string;
     activateTool: (id: string) => void;
     dragPrefab: (

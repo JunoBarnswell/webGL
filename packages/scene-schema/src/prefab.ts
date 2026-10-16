@@ -1,3 +1,4 @@
+import { supportsExtension } from "./extensions";
 import schema from "../scene-document.schema.json";
 import { remapSceneReferences, type ReferenceSchema } from "./references";
 import type { Entity, JsonValue, SceneDocument, Transform } from "./types";
@@ -195,9 +196,16 @@ export function compilePrefabs(
     for (const asset of source.assets)
       if (!document.assets.some((a) => a.id === asset.id))
         document.assets.push(asset);
-    for (const required of source.requiredExtensions)
-      if (!document.requiredExtensions.some((e) => e.id === required.id))
-        document.requiredExtensions.push(required);
+    for (const required of source.requiredExtensions) {
+      const declared = document.requiredExtensions.find(
+        (e) => e.id === required.id,
+      );
+      if (!declared) document.requiredExtensions.push(required);
+      else if (supportsExtension(required.version, declared.version))
+        declared.version = required.version;
+      else if (!supportsExtension(declared.version, required.version))
+        throw Error("嵌套模板扩展主版本不兼容：" + required.id);
+    }
     if (document.entities.length > 100000)
       throw Error("预制体展开超过实体限额");
   }

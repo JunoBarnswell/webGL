@@ -36,6 +36,13 @@ export interface TourNode {
   thumbnailAssetId: string;
 }
 export interface ProjectGraph {
+  diagram?: {
+    positions: { nodeId: string; x: number; y: number }[];
+    groups: { id: string; name: string; nodeIds: string[] }[];
+    viewport: { x: number; y: number; zoom: number };
+  };
+  locales?: string[];
+  releasePolicy?: import("../../scene-schema/src/readiness").ReleasePolicy;
   name: string;
   entryNodeId: string;
   nodes: TourNode[];
@@ -46,6 +53,11 @@ export interface ProjectGraph {
     calibrated: boolean;
     north: number;
     mmPerPixel: number;
+    originX?: number;
+    originY?: number;
+    rotation?: number;
+    imageWidth?: number;
+    imageHeight?: number;
   }[];
   links: {
     id: string;
@@ -53,6 +65,8 @@ export interface ProjectGraph {
     toNodeId: string;
     transition: string;
     reverseLinkId: string;
+    entrance?: CameraPose;
+    preload?: "none" | "media" | "scene";
   }[];
   routes: {
     id: string;
@@ -129,6 +143,8 @@ export function directionAngles(direction: Vec3): {
   pitch: number;
 } {
   const length = Math.hypot(...direction);
+  if (!Number.isFinite(length) || length === 0)
+    throw Error("观察方向必须为非零有限向量");
   return {
     yaw: (Math.atan2(direction[0], -direction[2]) * 180) / Math.PI,
     pitch:
@@ -162,6 +178,28 @@ export function validateProject(
     ids = new Set(graph.nodes.map((n) => n.id)),
     floors = new Set(graph.floors.map((f) => f.id));
   if (ids.size !== graph.nodes.length) errors.push("节点 ID 重复");
+  if (floors.size !== graph.floors.length) errors.push("楼层 ID 重复");
+  for (const floor of graph.floors)
+    if (
+      floor.calibrated &&
+      (!(floor.mmPerPixel > 0) ||
+        (complete && (!(floor.imageWidth! > 0) || !(floor.imageHeight! > 0))))
+    )
+      errors.push(floor.name + " 标定缺少有效图像尺寸或比例");
+  const positions = new Set<string>();
+  for (const position of graph.diagram?.positions ?? []) {
+    if (!ids.has(position.nodeId) || positions.has(position.nodeId))
+      errors.push("连接图位置指向缺失或重复节点");
+    positions.add(position.nodeId);
+  }
+  const groups = new Set<string>();
+  for (const group of graph.diagram?.groups ?? []) {
+    if (groups.has(group.id) || group.nodeIds.some((id) => !ids.has(id)))
+      errors.push("节点分组重复或指向缺失节点");
+    groups.add(group.id);
+  }
+  if (new Set(graph.locales ?? []).size !== (graph.locales ?? []).length)
+    errors.push("项目语言重复");
   if (complete && !ids.has(graph.entryNodeId)) errors.push("入口节点不存在");
   for (const node of graph.nodes) {
     if (node.floorId && !floors.has(node.floorId))
@@ -174,11 +212,32 @@ export function validateProject(
     )
       errors.push(node.name + " 缺少场景或媒体");
     for (const h of node.hotspots) {
+      if (
+        !Number.isFinite(h.yaw) ||
+        h.yaw < -180 ||
+        h.yaw > 180 ||
+        !Number.isFinite(h.pitch) ||
+        h.pitch < -90 ||
+        h.pitch > 90
+      )
+        errors.push(h.name + " 球面坐标越界");
       if (h.toNodeId && !ids.has(h.toNodeId)) errors.push(h.name + " 跳转断链");
       if (complete && h.kind === "polygon" && h.points.length < 3)
         errors.push(h.name + " 多边形顶点不足");
     }
   }
+  for (const link of graph.links)
+    if (
+      link.reverseLinkId &&
+      !graph.links.some(
+        (reverse) =>
+          reverse.id === link.reverseLinkId &&
+          reverse.reverseLinkId === link.id &&
+          reverse.fromNodeId === link.toNodeId &&
+          reverse.toNodeId === link.fromNodeId,
+      )
+    )
+      errors.push("双向连接修订不一致：" + link.id);
   for (const link of graph.links)
     if (
       (link.fromNodeId ? !ids.has(link.fromNodeId) : complete) ||

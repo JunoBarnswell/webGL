@@ -95,6 +95,7 @@ export function useExtensionProps(): ExtensionPanelProps | null {
       activeTool,
       activateTool: (id) => studio.set({ domainTool: id }),
       dragPrefab: (revision) => studio.set({ draggingPrefab: revision }),
+      downloadFile: (name, value) => saveBlob(value, name),
       downloadJson: (name, value) =>
         saveBlob(
           new Blob([JSON.stringify(value, null, 2)], {
@@ -249,26 +250,24 @@ function DomainFields({
           })
         }
         onSpatialEdit={(path, _value, space, targetField) =>
-          useStudio
-            .getState()
-            .set({
-              editingPoint: editablePoint(
-                document!,
-                [
-                  "entities",
-                  { id: entityId },
-                  "components",
-                  { type },
-                  "data",
-                  ...path,
-                ],
-                definition.title,
-                space,
-                entityId,
-                targetField,
-              ),
-              tool: "translate",
-            })
+          useStudio.getState().set({
+            editingPoint: editablePoint(
+              document!,
+              [
+                "entities",
+                { id: entityId },
+                "components",
+                { type },
+                "data",
+                ...path,
+              ],
+              definition.title,
+              space,
+              entityId,
+              targetField,
+            ),
+            tool: "translate",
+          })
         }
       />
     </fieldset>

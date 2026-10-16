@@ -64,6 +64,9 @@ function StoryboardWidget({
           结束
         </button>
       </div>
+      {Number(playback?.speed ?? 1) < 0 && (
+        <small role="status">倒放时原音频静音；字幕按绝对时间显示。</small>
+      )}
       <label>
         {time.toFixed(2)} / {story.duration}s
         <input
