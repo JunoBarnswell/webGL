@@ -4,6 +4,9 @@ export interface Comparison {
   source: string;
   derived: string;
   rmse: number;
+  heatmap: string;
+  maxChannelError: number;
+  changedPixels: number;
   sourceStats: unknown;
   derivedStats: unknown;
   environment: {
@@ -49,15 +52,41 @@ export async function compareDocuments(
     return context.getImageData(0, 0, canvas.width, canvas.height);
   };
   const [a, b] = await Promise.all([pixels(source), pixels(derived)]);
-  let sum = 0;
-  for (let i = 0; i < a.data.length; i += 4)
-    for (let channel = 0; channel < 3; channel++)
-      sum += (a.data[i + channel] - b.data[i + channel]) ** 2;
+  let sum = 0,
+    maxChannelError = 0,
+    changedPixels = 0;
+  const heat = new ImageData(a.width, a.height);
+  for (let i = 0; i < a.data.length; i += 4) {
+    let peak = 0;
+    for (let channel = 0; channel < 3; channel++) {
+      const difference = Math.abs(a.data[i + channel] - b.data[i + channel]);
+      sum += difference ** 2;
+      peak = Math.max(peak, difference);
+    }
+    maxChannelError = Math.max(maxChannelError, peak);
+    if (peak > 0) changedPixels++;
+    heat.data[i] = Math.min(255, peak * 4);
+    heat.data[i + 1] = Math.min(255, peak);
+    heat.data[i + 2] = 0;
+    heat.data[i + 3] = 255;
+  }
+  const heatCanvas = new OffscreenCanvas(a.width, a.height);
+  heatCanvas.getContext("2d")!.putImageData(heat, 0, 0);
+  const heatBlob = await heatCanvas.convertToBlob({ type: "image/png" });
+  const heatmap = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(heatBlob);
+  });
   const gl = renderer.getContext(),
     info = gl.getExtension("WEBGL_debug_renderer_info");
   return {
     source,
     derived,
+    heatmap,
+    maxChannelError,
+    changedPixels,
     rmse: Math.sqrt(sum / (a.width * a.height * 3)),
     sourceStats,
     derivedStats,

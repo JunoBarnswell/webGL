@@ -789,8 +789,8 @@ graph.floors = [
     calibrated: true,
     north: 0,
     mmPerPixel: 100,
-    imageWidth:32,
-    imageHeight:16,
+    imageWidth: 32,
+    imageHeight: 16,
   },
 ];
 node.floorId = "ground";

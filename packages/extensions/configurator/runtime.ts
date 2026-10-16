@@ -418,7 +418,7 @@ export default class ConfiguratorSystem implements RuntimeSystem {
           descendant(object, slot.object),
         );
         if (slot) {
-          let target:THREE.Object3D = slot.part.root;
+          let target: THREE.Object3D = slot.part.root;
           if (object !== slot.object) {
             const binding = getComponent(
                 this.runtime.entity(targetId)!,
@@ -663,11 +663,13 @@ export default class ConfiguratorSystem implements RuntimeSystem {
                     ":" +
                     field.axis,
                   priority: source.priority,
-                  signature: JSON.stringify(
+                  signature: JSON.stringify([
+                    binding?.mode ?? "set",
                     field.axis < 0
-                      ? transform.rotation
-                      : transform[field.property][field.axis],
-                  ),
+                      ? mapping.transform.rotation
+                      : mapping.transform[field.property][field.axis] /
+                        (field.property === "position" ? units : 1),
+                  ]),
                   source,
                   value: override,
                 });

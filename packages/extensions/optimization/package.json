@@ -1,1 +1,9 @@
-{"name": "@studio/extension-optimization", "private": true, "type": "module", "exports": {"./runtime": "./runtime.ts", "./editor": "./editor.ts"}}
+{
+  "name": "@studio/extension-optimization",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./runtime": "./runtime.ts",
+    "./editor": "./editor.ts"
+  }
+}

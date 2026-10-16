@@ -116,6 +116,7 @@ export interface SceneMaterial {
   envAssetIds: string[];
 }
 export interface SceneSettings {
+  processingReports?: { assetId: string; jobId: string }[];
   releasePolicy?: import("./readiness").ReleasePolicy;
   evidenceAssetIds?: string[];
   sprintMultiplier: number;

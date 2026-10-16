@@ -16,6 +16,10 @@ export interface ProcessingJob {
   error: string;
   createdAt: string;
   updatedAt: string;
+  leaseEpoch: number;
+  attempt: number;
+  ownerId: string;
+  leaseUntil: string | null;
 }
 export interface ProcessingResult {
   report: Record<string, unknown>;
@@ -57,10 +61,12 @@ export function JobMonitor({
   services,
   jobs,
   onApply,
+  onAdmit,
 }: {
   services: ExtensionPanelProps["services"];
   jobs: ProcessingJob[];
   onApply?: (job: ProcessingJob, result: ProcessingResult) => Promise<void>;
+  onAdmit?: (job: ProcessingJob) => Promise<void>;
 }) {
   const current = useRef(onApply);
   current.current = onApply;
@@ -100,17 +106,34 @@ export function JobMonitor({
                 重试为新作业
               </button>
             )}
-            {job.status === "Succeeded" && job.resultJson && onApply && (
-              <button
-                onClick={() =>
-                  void services.run("使用处理结果", () =>
-                    current.current!(job, JSON.parse(job.resultJson!)),
-                  )
-                }
-              >
-                应用结果
-              </button>
-            )}
+            {job.status === "Succeeded" &&
+              job.resultJson &&
+              onApply &&
+              JSON.parse(job.resultJson).assets.some(
+                (asset: SceneAsset) => asset.kind === "model",
+              ) && (
+                <button
+                  onClick={() =>
+                    void services.run("使用处理结果", () =>
+                      current.current!(job, JSON.parse(job.resultJson!)),
+                    )
+                  }
+                >
+                  应用结果
+                </button>
+              )}
+            {job.status === "Succeeded" &&
+              job.resultJson &&
+              onAdmit &&
+              JSON.parse(job.resultJson).report.budget?.status === "met" && (
+                <button
+                  onClick={() =>
+                    void services.run("固定预算报告", () => onAdmit(job))
+                  }
+                >
+                  固定源资产预算报告
+                </button>
+              )}
           </div>
           {job.error && <p role="alert">{job.error}</p>}
           <details>
@@ -118,7 +141,8 @@ export function JobMonitor({
             <code>
               输入 {job.sourceSha256}
               <br />
-              策略 {job.settingsHash}
+              策略 {job.settingsHash} · 尝试 {job.attempt} / 令牌{" "}
+              {job.leaseEpoch}
             </code>
             <pre>{JSON.parse(job.logsJson).join("\n")}</pre>
             {job.resultJson && (

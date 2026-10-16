@@ -1,4 +1,10 @@
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import {
+  modelSnapshot,
+  compareModelSnapshots,
+  modelMetrics,
+  evaluateBudget,
+} from "./model-analysis.mjs";
+import { readFile, writeFile, mkdir, stat, readdir } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -49,6 +55,16 @@ const json = async (file) => {
     );
   return JSON.parse(bytes.toString());
 };
+const folderBytes = async (directory) => {
+  let bytes = 0;
+  for (const item of await readdir(directory, { withFileTypes: true })) {
+    const file = path.join(directory, item.name);
+    bytes += item.isDirectory()
+      ? await folderBytes(file)
+      : (await stat(file)).size;
+  }
+  return bytes;
+};
 const identities = (data) => [
   ...modelIdentities(
     data.nodes ?? [],
@@ -66,7 +82,7 @@ let report = {
     sourceAssetId: task.sourceAssetId,
     sourceSha256: task.sourceSha256,
     settingsHash: task.settingsHash,
-    workerVersion: "2.2.0",
+    workerVersion: "2.3.0",
     dependencies: { gltfTransform: "4.2.1", meshoptimizer: "0.23.0" },
     warnings: [],
     identityReport: null,
@@ -159,44 +175,11 @@ if (task.operation === "ifc") {
     .getRoot()
     .listNodes()
     .map((node) => node.getMatrix());
-  const diagnostics = (doc) => {
-    const r = doc.getRoot(),
-      primitives = r.listMeshes().flatMap((m) => m.listPrimitives());
-    let triangles = 0,
-      vertices = 0;
-    for (const p of primitives) {
-      vertices += p.getAttribute("POSITION")?.getCount() ?? 0;
-      triangles +=
-        (p.getIndices()?.getCount() ??
-          p.getAttribute("POSITION")?.getCount() ??
-          0) / 3;
-    }
-    const textures = r.listTextures().map((t) => ({
-      name: t.getName(),
-      mime: t.getMimeType(),
-      size: t.getSize(),
-      bytes: t.getImage()?.byteLength ?? 0,
-    }));
-    return {
-      nodes: r.listNodes().length,
-      meshes: r.listMeshes().length,
-      materials: r.listMaterials().length,
-      triangles,
-      vertices,
-      estimatedDrawCalls: primitives.length,
-      textures,
-      textureBytes: textures.reduce((s, t) => s + t.bytes, 0),
-      estimatedGpuTextureBytes: textures.reduce(
-        (s, t) => s + (t.size ? (t.size[0] * t.size[1] * 4 * 4) / 3 : 0),
-        0,
-      ),
-      note: "Draw calls and GPU bytes are estimates; actual telemetry is measured in the browser",
-      extensions: r.listExtensionsUsed().map((e) => e.extensionName),
-    };
-  };
+  const sourceSnapshot = modelSnapshot(document);
+  const diagnostics = modelMetrics;
   report.before = {
     ...diagnostics(document),
-    bytes: (await stat(input)).size,
+    bytes: await folderBytes(path.join(root, "input")),
     sourceIdentityCount: sourceIds.length,
     unresolvedSourceIds: sourceIds.filter((id) => id.startsWith("unresolved:")),
   };
@@ -328,8 +311,15 @@ if (task.operation === "ifc") {
     if (!report.materialVariantsPreserved)
       throw Error("Optimizer changed source material variant bindings");
     report.geometryUnchanged = sourceGeometryHash === geometryHash(roundtrip);
+    report.modelDiff = compareModelSnapshots(
+      sourceSnapshot,
+      modelSnapshot(roundtrip),
+      { allowTopologyReorder: task.settings.useMeshopt !== false },
+    );
+    if (report.modelDiff.errors.length)
+      throw Error(report.modelDiff.errors.join("; "));
     report.after = {
-      ...diagnostics(document),
+      ...diagnostics(roundtrip),
       bytes: (await stat(destination)).size,
     };
     outputs = [{ kind: "model", entry: "derived.glb", files: ["derived.glb"] }];
@@ -368,6 +358,20 @@ if (task.operation === "ifc") {
     });
   }
 }
+if (task.operation === "ifc")
+  report.after = {
+    ...modelMetrics(await io.read(path.join(output, "derived.glb"))),
+    bytes: (await stat(path.join(output, "derived.glb"))).size,
+  };
+else if (task.operation === "diagnose")
+  report.before.bytes = await folderBytes(path.join(root, "input"));
+report.sourceBudget = report.before
+  ? evaluateBudget(report.before, task.settings.budget ?? {})
+  : null;
+report.budget = evaluateBudget(
+  report.after ?? report.before,
+  task.settings.budget ?? {},
+);
 stage("Ready for upload", 0.95);
 await writeFile(
   path.join(output, "report.json"),
