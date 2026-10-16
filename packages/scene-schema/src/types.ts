@@ -372,6 +372,7 @@ export interface PublishedManifest {
   document: SceneDocument;
 }
 export interface FieldSchema {
+  "x-unit"?: boolean;
   "x-runtime-binding"?: string;
   "x-resets"?: string[];
   "x-options"?: import("./field-options").FieldOptionsRule;

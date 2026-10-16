@@ -1,0 +1,1058 @@
+{
+  "version": 1,
+  "conversion": "SI = value * scale + offset",
+  "units": [
+    {
+      "id": "1",
+      "quantity": "ratio",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "",
+        "ratio",
+        "NUMBER"
+      ]
+    },
+    {
+      "id": "%",
+      "quantity": "ratio",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.01,
+      "offset": 0,
+      "aliases": [
+        "percent"
+      ]
+    },
+    {
+      "id": "rad",
+      "quantity": "angle",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "RADIAN"
+      ]
+    },
+    {
+      "id": "deg",
+      "quantity": "angle",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.017453292519943295,
+      "offset": 0,
+      "aliases": [
+        "°",
+        "DEGREE"
+      ]
+    },
+    {
+      "id": "mm",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": [
+        "MILLIMETRE",
+        "MILLIMETER"
+      ]
+    },
+    {
+      "id": "cm",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.01,
+      "offset": 0,
+      "aliases": [
+        "CENTIMETRE",
+        "CENTIMETER"
+      ]
+    },
+    {
+      "id": "m",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "METRE",
+        "METER"
+      ]
+    },
+    {
+      "id": "km",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "KILOMETRE",
+        "KILOMETER"
+      ]
+    },
+    {
+      "id": "um",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1e-06,
+      "offset": 0,
+      "aliases": [
+        "µm",
+        "MICROMETRE"
+      ]
+    },
+    {
+      "id": "in",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.0254,
+      "offset": 0,
+      "aliases": [
+        "inch",
+        "INCH"
+      ]
+    },
+    {
+      "id": "ft",
+      "quantity": "length",
+      "dimension": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.3048,
+      "offset": 0,
+      "aliases": [
+        "foot",
+        "FOOT"
+      ]
+    },
+    {
+      "id": "mm2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1e-06,
+      "offset": 0,
+      "aliases": [
+        "mm^2",
+        "SQUARE_MILLIMETRE"
+      ]
+    },
+    {
+      "id": "cm2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.0001,
+      "offset": 0,
+      "aliases": [
+        "cm^2",
+        "SQUARE_CENTIMETRE"
+      ]
+    },
+    {
+      "id": "m2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "m^2",
+        "SQUARE_METRE",
+        "SQUARE_METER"
+      ]
+    },
+    {
+      "id": "km2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000000.0,
+      "offset": 0,
+      "aliases": [
+        "km^2",
+        "SQUARE_KILOMETRE"
+      ]
+    },
+    {
+      "id": "ft2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.09290304,
+      "offset": 0,
+      "aliases": [
+        "ft^2",
+        "SQUARE_FOOT"
+      ]
+    },
+    {
+      "id": "in2",
+      "quantity": "area",
+      "dimension": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.00064516,
+      "offset": 0,
+      "aliases": [
+        "in^2",
+        "SQUARE_INCH"
+      ]
+    },
+    {
+      "id": "mm3",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1e-09,
+      "offset": 0,
+      "aliases": [
+        "mm^3",
+        "CUBIC_MILLIMETRE"
+      ]
+    },
+    {
+      "id": "cm3",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1e-06,
+      "offset": 0,
+      "aliases": [
+        "cm^3",
+        "CUBIC_CENTIMETRE"
+      ]
+    },
+    {
+      "id": "m3",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "m^3",
+        "CUBIC_METRE",
+        "CUBIC_METER"
+      ]
+    },
+    {
+      "id": "L",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": [
+        "l",
+        "litre",
+        "LITRE",
+        "liter"
+      ]
+    },
+    {
+      "id": "mL",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1e-06,
+      "offset": 0,
+      "aliases": [
+        "ml",
+        "millilitre"
+      ]
+    },
+    {
+      "id": "ft3",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.028316846592,
+      "offset": 0,
+      "aliases": [
+        "ft^3",
+        "CUBIC_FOOT"
+      ]
+    },
+    {
+      "id": "galUS",
+      "quantity": "volume",
+      "dimension": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.003785411784,
+      "offset": 0,
+      "aliases": [
+        "US gallon"
+      ]
+    },
+    {
+      "id": "Pa",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "PASCAL"
+      ]
+    },
+    {
+      "id": "kPa",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "KILOPASCAL"
+      ]
+    },
+    {
+      "id": "MPa",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000000.0,
+      "offset": 0,
+      "aliases": [
+        "MEGAPASCAL"
+      ]
+    },
+    {
+      "id": "bar",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 100000.0,
+      "offset": 0,
+      "aliases": [
+        "BAR"
+      ]
+    },
+    {
+      "id": "mbar",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 100,
+      "offset": 0,
+      "aliases": [
+        "MILLIBAR"
+      ]
+    },
+    {
+      "id": "psi",
+      "quantity": "pressure",
+      "dimension": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 6894.757293168,
+      "offset": 0,
+      "aliases": [
+        "PSI"
+      ]
+    },
+    {
+      "id": "m3/s",
+      "quantity": "volumeFlow",
+      "dimension": [
+        3,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "m^3/s",
+        "CUBIC_METRE_PER_SECOND"
+      ]
+    },
+    {
+      "id": "m3/h",
+      "quantity": "volumeFlow",
+      "dimension": [
+        3,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.0002777777777777778,
+      "offset": 0,
+      "aliases": [
+        "m^3/h"
+      ]
+    },
+    {
+      "id": "L/s",
+      "quantity": "volumeFlow",
+      "dimension": [
+        3,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": [
+        "l/s"
+      ]
+    },
+    {
+      "id": "L/min",
+      "quantity": "volumeFlow",
+      "dimension": [
+        3,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1.6666666666666667e-05,
+      "offset": 0,
+      "aliases": [
+        "l/min"
+      ]
+    },
+    {
+      "id": "cfm",
+      "quantity": "volumeFlow",
+      "dimension": [
+        3,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.0004719474432,
+      "offset": 0,
+      "aliases": [
+        "ft3/min"
+      ]
+    },
+    {
+      "id": "K",
+      "quantity": "temperature",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "KELVIN"
+      ]
+    },
+    {
+      "id": "degC",
+      "quantity": "temperature",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 273.15,
+      "aliases": [
+        "°C",
+        "C",
+        "CELSIUS",
+        "DEGREE_CELSIUS"
+      ]
+    },
+    {
+      "id": "degF",
+      "quantity": "temperature",
+      "dimension": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "scale": 0.5555555555555556,
+      "offset": 255.3722222222222,
+      "aliases": [
+        "°F",
+        "F",
+        "FAHRENHEIT"
+      ]
+    },
+    {
+      "id": "kg",
+      "quantity": "mass",
+      "dimension": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "KILOGRAM"
+      ]
+    },
+    {
+      "id": "g",
+      "quantity": "mass",
+      "dimension": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": [
+        "GRAM"
+      ]
+    },
+    {
+      "id": "t",
+      "quantity": "mass",
+      "dimension": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "tonne"
+      ]
+    },
+    {
+      "id": "lb",
+      "quantity": "mass",
+      "dimension": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.45359237,
+      "offset": 0,
+      "aliases": [
+        "pound"
+      ]
+    },
+    {
+      "id": "s",
+      "quantity": "time",
+      "dimension": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "SECOND"
+      ]
+    },
+    {
+      "id": "min",
+      "quantity": "time",
+      "dimension": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 60,
+      "offset": 0,
+      "aliases": [
+        "minute"
+      ]
+    },
+    {
+      "id": "h",
+      "quantity": "time",
+      "dimension": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 3600,
+      "offset": 0,
+      "aliases": [
+        "hour"
+      ]
+    },
+    {
+      "id": "ms",
+      "quantity": "time",
+      "dimension": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": [
+        "MILLISECOND"
+      ]
+    },
+    {
+      "id": "m/s",
+      "quantity": "velocity",
+      "dimension": [
+        1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "METRE_PER_SECOND"
+      ]
+    },
+    {
+      "id": "mm/s",
+      "quantity": "velocity",
+      "dimension": [
+        1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.001,
+      "offset": 0,
+      "aliases": []
+    },
+    {
+      "id": "km/h",
+      "quantity": "velocity",
+      "dimension": [
+        1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 0.2777777777777778,
+      "offset": 0,
+      "aliases": []
+    },
+    {
+      "id": "N",
+      "quantity": "force",
+      "dimension": [
+        1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "NEWTON"
+      ]
+    },
+    {
+      "id": "kN",
+      "quantity": "force",
+      "dimension": [
+        1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "KILONEWTON"
+      ]
+    },
+    {
+      "id": "W",
+      "quantity": "power",
+      "dimension": [
+        2,
+        1,
+        -3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "WATT"
+      ]
+    },
+    {
+      "id": "kW",
+      "quantity": "power",
+      "dimension": [
+        2,
+        1,
+        -3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "KILOWATT"
+      ]
+    },
+    {
+      "id": "MW",
+      "quantity": "power",
+      "dimension": [
+        2,
+        1,
+        -3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000000.0,
+      "offset": 0,
+      "aliases": [
+        "MEGAWATT"
+      ]
+    },
+    {
+      "id": "J",
+      "quantity": "energy",
+      "dimension": [
+        2,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "offset": 0,
+      "aliases": [
+        "JOULE"
+      ]
+    },
+    {
+      "id": "kJ",
+      "quantity": "energy",
+      "dimension": [
+        2,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 1000,
+      "offset": 0,
+      "aliases": [
+        "KILOJOULE"
+      ]
+    },
+    {
+      "id": "kWh",
+      "quantity": "energy",
+      "dimension": [
+        2,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale": 3600000,
+      "offset": 0,
+      "aliases": []
+    }
+  ]
+}

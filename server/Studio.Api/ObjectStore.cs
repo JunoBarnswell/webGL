@@ -33,7 +33,7 @@ public sealed class ObjectStore : IDisposable
     }
     public static bool ValidPath(string path) => path.Length is > 0 and <= 1024 && !path.Any(c => char.IsControl(c) || "\\:?#%".Contains(c)) && !path.StartsWith('/') && path.Split('/').All(p => p is not ("" or "." or ".."));
     public static string Mime(string path) => Path.GetExtension(path).ToLowerInvariant() switch {
-        ".json" or ".gltf" => "application/json", ".glb" => "model/gltf-binary", ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", ".mp3" => "audio/mpeg", ".wav" => "audio/wav", ".ogg" => "audio/ogg", _ => "application/octet-stream"
+        ".json" or ".gltf" => "application/json", ".glb" => "model/gltf-binary", ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", ".mp3" => "audio/mpeg", ".wav" => "audio/wav", ".ogg" => "audio/ogg", ".mp4" => "video/mp4", ".webm" => "video/webm", _ => "application/octet-stream"
     };
     public async Task Put(string key, Stream stream, string type, string sha256, CancellationToken ct)
     {

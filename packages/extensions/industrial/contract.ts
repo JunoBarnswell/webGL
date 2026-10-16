@@ -6,7 +6,7 @@ export function validate(document: SceneDocument, publish: boolean): string[] {
     for (const c of e.components)
       if (c.enabled && c.type === "studio.industrial.Review") {
         const data = c.data as unknown as IndustrialReview;
-        errors.push(...validateReview(data));
+        errors.push(...validateReview(data, publish));
         if (
           publish &&
           data.semanticAssetId &&

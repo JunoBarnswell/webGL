@@ -26,6 +26,7 @@ export type * from "./types";
 export * from "./extensions";
 import { extensionErrors, requiredExtension } from "./extensions";
 export * from "./ui";
+export * from "./units";
 export { walkActions } from "./experience-validation";
 export { schema as documentSchema };
 

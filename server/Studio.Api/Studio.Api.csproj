@@ -14,6 +14,8 @@
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
     <EmbeddedResource Include="../../packages/scene-schema/extension-catalog.json" LogicalName="extension-catalog.json" />
+    <EmbeddedResource Include="../../packages/scene-schema/unit-catalog.json" LogicalName="unit-catalog.json" />
+    <Content Include="../../packages/scene-schema/unit-catalog.json" Link="workers/unit-catalog.json" CopyToOutputDirectory="PreserveNewest" />
     <RdXmlFile Include="rd.xml" />
     <EmbeddedResource Include="../../packages/scene-schema/scene-document.schema.json" LogicalName="scene-document.schema.json" />
     <Content Include="../../workers/*" Link="workers/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

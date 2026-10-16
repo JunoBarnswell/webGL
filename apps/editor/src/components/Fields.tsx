@@ -1,6 +1,6 @@
 import { ActionList } from "./ActionList";
 import type { BehaviorAction } from "@studio/scene-schema";
-import { fieldOptions } from "@studio/scene-schema";
+import { fieldOptions, unitCatalog } from "@studio/scene-schema";
 import { useStudio } from "../state/studio";
 import type { DocumentPath } from "@studio/editor-core";
 import type { Vec3 } from "@studio/scene-schema";
@@ -200,7 +200,7 @@ export function Field({
         assetKind={field["x-asset-kind"] ?? ""}
       />
     );
-  if (field.enum)
+  if (field.enum || field["x-unit"])
     return (
       <label className="field">
         <span>{title}</span>
@@ -209,9 +209,17 @@ export function Field({
           value={String(value)}
           onChange={(event) => onChange(event.target.value)}
         >
-          {field.enum.map((option) => (
+          {(
+            field.enum ?? [
+              ...new Set([
+                "",
+                ...unitCatalog.units.map((unit) => unit.id),
+                String(value ?? ""),
+              ]),
+            ]
+          ).map((option) => (
             <option key={option} value={option}>
-              {option}
+              {option || "自动 / 无量纲"}
             </option>
           ))}
         </select>

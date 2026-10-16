@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import {
   getComponent,
@@ -19,7 +19,13 @@ import {
   type SemanticPage,
   type Measurement,
   measure,
+  effectiveClassFields,
+  classCompleteness,
+  type PropertyTemplate,
+  type AssetClass,
+  type SemanticSystem,
 } from "./core";
+import { TopologyView } from "./TopologyView";
 import type IndustrialSystem from "./runtime";
 export function IndustrialPanel(props: ExtensionPanelProps) {
   const domain = useDomainEntity<IndustrialReview>(
@@ -35,6 +41,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
     [scrollTop, setScrollTop] = useState(0),
     [classId, setClassId] = useState(""),
     [sourceClassId, setSourceClassId] = useState(""),
+    [systemId, setSystemId] = useState(""),
     [mapping, setMapping] = useState<{
       count: number;
       emptyCount: number;
@@ -52,6 +59,44 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
   );
   const selectedClass =
     data?.classes.find((c) => c.id === classId) ?? data?.classes[0];
+  const effective = useMemo(() => {
+    try {
+      return {
+        fields:
+          data && selectedClass
+            ? effectiveClassFields(
+                data.classes,
+                selectedClass.id,
+                data.propertyTemplates,
+              )
+            : [],
+        error: "",
+      };
+    } catch (error) {
+      return { fields: [], error: String(error) };
+    }
+  }, [data?.classes, data?.propertyTemplates, selectedClass]);
+  const completeness = useMemo(
+    () =>
+      new Map(
+        records?.items.map((record) => {
+          try {
+            return [
+              record.sourceElementId,
+              classCompleteness(
+                record,
+                data?.classes ?? [],
+                record.classId,
+                data?.propertyTemplates,
+              ),
+            ] as const;
+          } catch {
+            return [record.sourceElementId, null] as const;
+          }
+        }),
+      ),
+    [records, data?.classes, data?.propertyTemplates],
+  );
   const measuring = props.services.activeTool === "industrial.measure",
     setMeasuring = (value: boolean) =>
       props.services.activateTool(value ? "industrial.measure" : "");
@@ -182,6 +227,17 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
       "/assets/" + job.sourceAssetId,
     );
     const nodes = await props.services.prepareModel(model);
+    const metadata = semantic.files.includes("semantic-model.json")
+      ? (JSON.parse(
+          new TextDecoder().decode(
+            await props.services.assetBytes(semantic.id, "semantic-model.json"),
+          ),
+        ) as {
+          classes: AssetClass[];
+          systems: SemanticSystem[];
+          propertyTemplates: PropertyTemplate[];
+        })
+      : null;
     props.command({
       label: "原子导入 IFC 几何与来源属性",
       mutate(doc) {
@@ -190,10 +246,16 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
             doc.assets.push(asset);
         doc.entities.push(...nodes);
         if (entity) {
-          getComponent(
+          const review = getComponent(
             doc.entities.find((e) => e.id === entity.id)!,
             "studio.industrial.Review",
-          )!.data.semanticAssetId = semantic.id;
+          )!.data as unknown as IndustrialReview;
+          review.semanticAssetId = semantic.id;
+          if (metadata) {
+            review.classes = metadata.classes;
+            review.systems = metadata.systems;
+            review.propertyTemplates = metadata.propertyTemplates;
+          }
         }
       },
     });
@@ -256,6 +318,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
         {[
           ["inventory", "资产清单"],
           ["mapping", "分类与映射"],
+          ["systems", "系统与端口"],
           ["filters", "筛选与着色"],
           ["section", "剖切与测量"],
           ["views", "保存视图"],
@@ -337,6 +400,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
                         <th>名称</th>
                         <th>来源 ID</th>
                         <th>分类</th>
+                        <th>必填完整性</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -387,6 +451,11 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
                               <td>{r.name}</td>
                               <td>{r.sourceElementId}</td>
                               <td>{r.classId}</td>
+                              <td>
+                                {completeness.get(r.sourceElementId)
+                                  ? `${completeness.get(r.sourceElementId)!.present}/${completeness.get(r.sourceElementId)!.required}${completeness.get(r.sourceElementId)!.complete ? " ✓" : " 待完善"}`
+                                  : "分类未配置"}
+                              </td>
                             </tr>
                           ))}
                       </>
@@ -453,9 +522,101 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
               </section>
             </div>
           )}
+          {tab === "systems" && (
+            <section>
+              <select
+                aria-label="工业系统"
+                value={systemId || data.systems?.[0]?.id || ""}
+                onChange={(event) => setSystemId(event.target.value)}
+              >
+                {data.systems?.map((system) => (
+                  <option value={system.id} key={system.id}>
+                    {system.name}
+                  </option>
+                ))}
+              </select>
+              {data.systems
+                ?.filter(
+                  (system) => system.id === (systemId || data.systems?.[0]?.id),
+                )
+                .map((system) => (
+                  <TopologyView
+                    key={system.id}
+                    system={system}
+                    select={(sourceId) => {
+                      const ids = props.document.entities
+                        .filter(
+                          (e) =>
+                            getComponent(e, "ModelNode")?.data
+                              .sourceElementId === sourceId,
+                        )
+                        .map((e) => e.id);
+                      props.select(ids);
+                      props.focus(ids);
+                      props.runtime?.visual.highlight(
+                        "inventory:selection",
+                        ids,
+                      );
+                    }}
+                  />
+                ))}
+              {domain.fields(["systems"])}
+            </section>
+          )}
           {tab === "mapping" && (
             <section>
-              {domain.fields(["semanticAssetId", "classes"])}
+              {domain.fields([
+                "semanticAssetId",
+                "propertyTemplates",
+                "classes",
+              ])}
+              <button
+                onClick={() =>
+                  mutate("添加设备属性模板", (review) => {
+                    (review.propertyTemplates ??= []).push({
+                      id: crypto.randomUUID(),
+                      name: "设备运行参数",
+                      fields: [
+                        {
+                          id: "pressure",
+                          name: "压力",
+                          dataType: "number",
+                          unit: "Pa",
+                          precision: 2,
+                          required: true,
+                          sourcePath: "Pressure",
+                          sourceUnit: "kPa",
+                          emptyPolicy: "reject",
+                          defaultValue: "",
+                        },
+                        {
+                          id: "flow",
+                          name: "流量",
+                          dataType: "number",
+                          unit: "m3/s",
+                          precision: 4,
+                          required: false,
+                          sourcePath: "Flow",
+                          sourceUnit: "L/min",
+                          emptyPolicy: "keep",
+                          defaultValue: "",
+                        },
+                      ],
+                    });
+                  })
+                }
+              >
+                添加设备属性模板
+              </button>
+              <p>
+                有效继承字段 {effective.fields.length}{" "}
+                项；继承的必填约束继续生效。映射保留原值、原单位、路径和来源修订。
+              </p>
+              {effective.error && (
+                <p className="danger" role="alert">
+                  {effective.error}
+                </p>
+              )}
               <label>
                 来源分类（留空映射全部）
                 <input
@@ -478,7 +639,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
               </label>
               <div className="button-group">
                 <button
-                  disabled={!data.classes.length}
+                  disabled={!data.classes.length || Boolean(effective.error)}
                   onClick={() =>
                     void props.services.run("字段映射预检", async () =>
                       setMapping(
@@ -488,7 +649,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
                             method: "POST",
                             body: JSON.stringify({
                               classId: selectedClass!.id,
-                              fields: selectedClass!.fields,
+                              fields: effective.fields,
                               sourceClassId,
                               apply: false,
                             }),
@@ -501,7 +662,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
                   预览全量映射
                 </button>
                 <button
-                  disabled={!data.classes.length}
+                  disabled={!data.classes.length || Boolean(effective.error)}
                   onClick={() =>
                     void props.services.run(
                       "应用映射为派生属性修订",
@@ -512,7 +673,7 @@ export function IndustrialPanel(props: ExtensionPanelProps) {
                           method: "POST",
                           body: JSON.stringify({
                             classId: selectedClass!.id,
-                            fields: selectedClass!.fields,
+                            fields: effective.fields,
                             sourceClassId,
                             apply: true,
                           }),

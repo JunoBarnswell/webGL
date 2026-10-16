@@ -19,6 +19,18 @@ import {
   revisionFromInstance,
 } from "@studio/editor-core";
 import { freeze } from "immer";
+import { unitCatalog, strictNumber } from "@studio/scene-schema";
+import {
+  convertUnit,
+  mapProperties,
+  effectiveClassFields,
+  classCompleteness,
+  systemTopology,
+  type PropertyDefinition,
+  type SemanticRecord,
+  type SemanticSystem,
+  type AssetClass,
+} from "../packages/extensions/industrial/core";
 import {
   emptyProject,
   newTourNode,
@@ -611,6 +623,200 @@ pass(
   "Compiled 100-track × 100-clip pure sampling: 500 random seeks, independent output, repeatable loops, keyframe split invariance, ripple and VTT; synthetic Node CPU P95 " +
     seekP95.toFixed(3) +
     " ms",
+);
+const close = (actual: number, expected: number) =>
+  assert.ok(
+    Math.abs(actual - expected) <= 1e-9 * Math.max(1, Math.abs(expected)),
+    actual + " != " + expected,
+  );
+for (const unit of unitCatalog.units)
+  close(convertUnit(3, unit.id, unit.id), 3);
+for (const [from, to, value, expected] of [
+  ["m2", "mm2", 1, 1e6],
+  ["m³", "L", 1, 1000],
+  ["kPa", "Pa", 101.325, 101325],
+  ["L/min", "m3/s", 60, 0.001],
+  ["degC", "degF", -40, -40],
+  ["degF", "degC", 32, 0],
+  ["K", "degC", 273.15, 0],
+] as const)
+  close(convertUnit(value, from, to), expected);
+assert.throws(() => convertUnit(1, "m", "m2"));
+assert.throws(() => convertUnit(1, "unknown", "unknown"));
+for (const bad of [
+  " ",
+  "0x10",
+  "Infinity",
+  "NaN",
+  "1_000",
+  "3,2",
+  null,
+  true,
+  {},
+  [],
+])
+  assert.throws(() => strictNumber(bad));
+close(strictNumber(" 1.2e-3 "), 0.0012);
+const pressureField: PropertyDefinition = {
+  id: "pressure",
+  name: "压力",
+  dataType: "number",
+  unit: "Pa",
+  precision: 3,
+  required: true,
+  sourcePath: "Pressure",
+  sourceUnit: "",
+  emptyPolicy: "reject",
+  defaultValue: "",
+};
+const semanticRecord: SemanticRecord = {
+  id: "device",
+  sourceElementId: "external:device",
+  name: "Device",
+  classId: "device",
+  modelRevision: "model-r1",
+  links: [],
+  properties: {
+    Pressure: { value: 101.325, unit: "kPa", source: { original: true } },
+    Temperature: { value: 20, unit: "degC" },
+    Flow: { value: 60, unit: "L/min" },
+  },
+};
+const mappingFields = [
+  pressureField,
+  {
+    ...pressureField,
+    id: "temperature",
+    name: "温度",
+    sourcePath: "Temperature",
+    unit: "K",
+  },
+  {
+    ...pressureField,
+    id: "flow",
+    name: "流量",
+    sourcePath: "Flow",
+    unit: "m3/s",
+  },
+];
+const mapped = mapProperties(semanticRecord, mappingFields);
+assert.deepEqual(mapped.errors, []);
+close((mapped.properties.pressure as { value: number }).value, 101325);
+assert.deepEqual((mapped.properties.pressure as { source: unknown }).source, {
+  path: "Pressure",
+  rawValue: 101.325,
+  rawUnit: "kPa",
+  modelRevision: "model-r1",
+  sourceElementId: "external:device",
+  origin: "source",
+  upstream: { original: true },
+});
+const defaultMapped = mapProperties({ ...semanticRecord, properties: {} }, [
+  {
+    ...pressureField,
+    sourceUnit: "kPa",
+    emptyPolicy: "default",
+    defaultValue: "123",
+  },
+]);
+close((defaultMapped.properties.pressure as { value: number }).value, 123);
+assert.ok(
+  mapProperties({ ...semanticRecord, properties: { Pressure: " " } }, [
+    { ...pressureField, sourceUnit: "Pa" },
+  ]).errors.length,
+);
+assert.equal(
+  (semanticRecord.properties.Pressure as { value: number }).value,
+  101.325,
+);
+const classifications: AssetClass[] = [
+  {
+    id: "base",
+    code: "BASE",
+    name: "基础设备",
+    parentId: "",
+    fields: [pressureField],
+  },
+  {
+    id: "device",
+    code: "DEVICE",
+    name: "设备",
+    parentId: "base",
+    fields: [{ ...pressureField, unit: "kPa", required: false }],
+  },
+];
+assert.equal(effectiveClassFields(classifications, "device")[0].required, true);
+assert.equal(
+  classCompleteness(
+    { ...semanticRecord, properties: mapped.properties },
+    classifications,
+  ).complete,
+  true,
+);
+assert.deepEqual(
+  classCompleteness({ ...semanticRecord, properties: {} }, classifications)
+    .missing,
+  ["pressure"],
+);
+assert.throws(() =>
+  effectiveClassFields(
+    [{ ...classifications[0], parentId: "device" }, classifications[1]],
+    "device",
+  ),
+);
+assert.throws(() =>
+  effectiveClassFields(
+    [
+      classifications[0],
+      { ...classifications[1], fields: [{ ...pressureField, unit: "mm" }] },
+    ],
+    "device",
+  ),
+);
+const system: SemanticSystem = {
+  id: "sys",
+  name: "System",
+  type: "pipe",
+  elementIds: ["a", "b"],
+  ports: [
+    {
+      id: "p1",
+      name: "Source",
+      elementId: "a",
+      direction: "out",
+      type: "fluid",
+      systemId: "sys",
+    },
+    {
+      id: "p2",
+      name: "Sink",
+      elementId: "b",
+      direction: "in",
+      type: "fluid",
+      systemId: "sys",
+    },
+  ],
+  connections: [
+    {
+      id: "c",
+      fromPortId: "p1",
+      toPortId: "p2",
+      kind: "feeds",
+      direction: "forward",
+    },
+  ],
+};
+assert.deepEqual(systemTopology(system).errors, []);
+assert.ok(
+  systemTopology({
+    ...system,
+    connections: [
+      { ...system.connections[0], fromPortId: "p2", toPortId: "p1" },
+    ],
+  }).errors.length,
+);
+pass(
+  "Shared dimensioned SI/IFC units, affine temperatures, strict numbers, original-value provenance, inherited completeness and typed port topology",
 );
 if (!process.argv.includes("--pure")) {
   const config = JSON.parse(await readFile(".local/config.json", "utf8")),
