@@ -422,7 +422,7 @@ const mapped = mapProperties(
       required: true,
       sourcePath: "length",
       sourceUnit: "m",
-      emptyPolicy: "error",
+      emptyPolicy: "reject",
       defaultValue: "",
     },
   ],
@@ -1016,7 +1016,7 @@ const field = {
   sourcePath: "length",
   precision: 2,
   required: true,
-  emptyPolicy: "error",
+  emptyPolicy: "reject",
   defaultValue: "",
 };
 const preflight = await api("/semantics/" + semantic.id + "/map", "POST", {
