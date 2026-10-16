@@ -1,3 +1,5 @@
+import runtime from "../runtime-version.json";
+export const runtimeVersion = runtime.version;
 import catalog from "../extension-catalog.json";
 import type { SceneDocument } from "./types";
 export { catalog as extensionCatalog };
@@ -23,7 +25,7 @@ export function orderExtensions(
     if (
       !/^\d+\.\d+\.\d+$/.test(manifest.version) ||
       !/^\d+\.\d+\.\d+$/.test(manifest.minRuntimeVersion) ||
-      compareVersions(manifest.minRuntimeVersion, "2.2.0") > 0 ||
+      compareVersions(manifest.minRuntimeVersion, runtimeVersion) > 0 ||
       manifest.permissions.length
     )
       throw Error("不支持的扩展版本/权限 " + manifest.id);

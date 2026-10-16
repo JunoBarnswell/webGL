@@ -55,24 +55,32 @@ public sealed class LibraryService(Database database,DocumentContract contract)
     public void AssertCatalogPins(JsonElement scene){using var db=database.Open();foreach(var entity in scene.GetProperty("entities").EnumerateArray())foreach(var c in entity.GetProperty("components").EnumerateArray())if(DocumentContract.Text(c,"type")=="studio.configurator.Catalog"&&c.GetProperty("enabled").GetBoolean()){
         var data=c.GetProperty("data");var version=DocumentContract.Text(data,"libraryVersionId");if(version=="")continue;var source=Version(db,"catalog",DocumentContract.Text(data,"catalogId"),version);if(!JsonElement.DeepEquals(Parse(source.Content),data))throw new ApiException(422,"目录已修改，请先保存目录新修订再发布");
     }}
-    public void Bind(SqlSugarClient db,string ownerType,string ownerId,JsonElement scene,string? ownerPrefabId=null) {
-        db.Ado.ExecuteCommand("DELETE FROM LibraryReferences WHERE OwnerType=@type AND OwnerId=@id",P("type",ownerType),P("id",ownerId));
-        var seen=new HashSet<string>();
+    private (string Kind,string Id,string Version)[] ReadPins(SqlSugarClient db,JsonElement scene,string? ownerPrefabId=null,bool locked=false) {
+        var occurrences=new List<(string Kind,string Id,string Version,string Root,JsonElement Snapshot)>();
         void Visit(JsonElement document,List<string> chain) {
             if(!document.TryGetProperty("prefabs",out var instances))return;
             foreach(var instance in instances.EnumerateArray()) {
-                var id=DocumentContract.Text(instance,"prefabId");var revision=DocumentContract.Text(instance,"revisionId");
-                if(chain.Contains(id)||chain.Count>=8)throw new ApiException(422,"模板依赖循环或过深");
-                var stored=Parse(Version(db,"prefab",id,revision).Content);
-                if(DocumentContract.Text(stored,"rootLocalId")!=DocumentContract.Text(instance,"rootLocalId")||!JsonElement.DeepEquals(stored.GetProperty("document"),instance.GetProperty("source")))throw new ApiException(422,"固定模板源与不可变版本不一致");
-                if(seen.Add(id+":"+revision))db.Ado.ExecuteCommand("INSERT INTO LibraryReferences(OwnerType,OwnerId,Kind,LibraryId,VersionId) VALUES(@type,@owner,'prefab',@id,@version)",P("type",ownerType),P("owner",ownerId),P("id",id),P("version",revision));
+                var id=DocumentContract.Text(instance,"prefabId");if(chain.Contains(id)||chain.Count>=8)throw new ApiException(422,"模板依赖循环或过深");
+                occurrences.Add(("prefab",id,DocumentContract.Text(instance,"revisionId"),DocumentContract.Text(instance,"rootLocalId"),instance.GetProperty("source")));
                 Visit(instance.GetProperty("source"),[..chain,id]);
             }
         }
         Visit(scene,ownerPrefabId==null?[]:[ownerPrefabId]);
-        foreach(var entity in contract.Compile(scene).GetProperty("entities").EnumerateArray())foreach(var c in entity.GetProperty("components").EnumerateArray())if(DocumentContract.Text(c,"type")=="studio.configurator.Catalog"){
-            var data=c.GetProperty("data");var version=DocumentContract.Text(data,"libraryVersionId");if(version=="")continue;var catalogId=DocumentContract.Text(data,"catalogId");_=Version(db,"catalog",catalogId,version);db.Ado.ExecuteCommand("INSERT IGNORE INTO LibraryReferences(OwnerType,OwnerId,Kind,LibraryId,VersionId) VALUES(@type,@owner,'catalog',@id,@version)",P("type",ownerType),P("owner",ownerId),P("id",catalogId),P("version",version));
+        foreach(var entity in contract.Compile(scene).GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray())if(DocumentContract.Text(component,"type")=="studio.configurator.Catalog") {
+            var data=component.GetProperty("data");var version=DocumentContract.Text(data,"libraryVersionId");if(version!="")occurrences.Add(("catalog",DocumentContract.Text(data,"catalogId"),version,"",default));
         }
+        var pins=occurrences.Select(o=>(o.Kind,o.Id,o.Version)).Distinct().OrderBy(o=>o.Kind,StringComparer.Ordinal).ThenBy(o=>o.Id,StringComparer.Ordinal).ThenBy(o=>o.Version,StringComparer.Ordinal).ToArray();
+        foreach(var pin in pins) {
+            if(locked&&db.Ado.SqlQuery<LibraryHeadRow>("SELECT * FROM LibraryHeads WHERE Kind=@kind AND Id=@id FOR UPDATE",P("kind",pin.Kind),P("id",pin.Id)).Count!=1)throw new ApiException(422,"引用的资源库对象已删除");
+            var stored=Parse(Version(db,pin.Kind,pin.Id,pin.Version).Content);
+            foreach(var occurrence in occurrences.Where(o=>o.Kind==pin.Kind&&o.Id==pin.Id&&o.Version==pin.Version))if(pin.Kind=="prefab"&&(DocumentContract.Text(stored,"rootLocalId")!=occurrence.Root||!JsonElement.DeepEquals(stored.GetProperty("document"),occurrence.Snapshot)))throw new ApiException(422,"固定模板源与不可变版本不一致");
+        }
+        return pins;
+    }
+    public void AssertPins(JsonElement scene) {using var db=database.Open();_=ReadPins(db,scene);AssertCatalogPins(contract.Compile(scene));}
+    public void Bind(SqlSugarClient db,string ownerType,string ownerId,JsonElement scene,string? ownerPrefabId=null) {
+        db.Ado.ExecuteCommand("DELETE FROM LibraryReferences WHERE OwnerType=@type AND OwnerId=@id",P("type",ownerType),P("id",ownerId));
+        foreach(var pin in ReadPins(db,scene,ownerPrefabId,true))db.Ado.ExecuteCommand("INSERT IGNORE INTO LibraryReferences(OwnerType,OwnerId,Kind,LibraryId,VersionId) VALUES(@type,@owner,@kind,@id,@version)",P("type",ownerType),P("owner",ownerId),P("kind",pin.Kind),P("id",pin.Id),P("version",pin.Version));
 
         if(ownerType=="library")foreach(var asset in contract.Compile(scene).GetProperty("assets").EnumerateArray()) {
             var id=DocumentContract.Text(asset,"id");var ready=db.Ado.SqlQuery<AssetRow>("SELECT * FROM Assets WHERE Id=@id FOR UPDATE",P("id",id)).SingleOrDefault();if(ready?.Status!="Ready")throw new ApiException(422,"模板依赖资源未就绪");

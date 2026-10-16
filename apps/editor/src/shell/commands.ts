@@ -33,6 +33,15 @@ export function execute(id: string): void {
     .catch((error) => useStudio.getState().set({ message: String(error) }));
 }
 const edit = (c: CommandContext) => c.editingAllowed;
+commands.register({
+  id: "studio.readiness",
+  title: "发布检查",
+  shortcuts: [],
+  category: "工程",
+  scope: "global",
+  enabled: edit,
+  execute: () => useStudio.getState().checkReadiness(),
+});
 const viewport = (
   id: string,
   title: string,
@@ -126,14 +135,12 @@ for (const [index, workspace, title] of [
   [5, "interface", "界面设计"],
 ] as [number, Workspace, string][])
   viewport("workspace." + workspace, title, [String(index)], () => {
-    useStudio
-      .getState()
-      .set({
-        workspace,
-        domainTool: "",
-        placingHotspot: false,
-        pickEntity: null,
-      });
+    useStudio.getState().set({
+      workspace,
+      domainTool: "",
+      placingHotspot: false,
+      pickEntity: null,
+    });
     usePreferences.getState().patch({ leftOpen: true });
   });
 commands.register({
@@ -360,14 +367,12 @@ for (const panel of extensionPanels)
       shortcuts: [],
       enabled: edit,
       execute: () => {
-        useStudio
-          .getState()
-          .set({
-            workspace: panel.workspace!.id,
-            domainTool: "",
-            placingHotspot: false,
-            pickEntity: null,
-          });
+        useStudio.getState().set({
+          workspace: panel.workspace!.id,
+          domainTool: "",
+          placingHotspot: false,
+          pickEntity: null,
+        });
         usePreferences.getState().patch({ leftOpen: true });
       },
     });

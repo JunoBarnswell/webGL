@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import {
   createDocument,
+  releaseReadiness,
+  summarizeReadiness,
+  type ReleaseReadinessReport,
   sourceDocument,
   type SceneDocument,
   type Transform,
@@ -27,6 +30,9 @@ export type Workspace =
   | (string & {});
 type SaveState = "saved" | "dirty" | "saving" | "offline" | "conflict";
 interface StudioState {
+  releaseReport: ReleaseReadinessReport | null;
+  reportPending: boolean;
+  checkReadiness: () => Promise<void>;
   session: EditorSession | null;
   domainTool: string;
   draggingPrefab: import("@studio/scene-schema").PrefabRevision | null;
@@ -112,6 +118,46 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saveQueue = Promise.resolve();
 let sessionGeneration = 0;
 export const useStudio = create<StudioState>((set, get) => ({
+  releaseReport: null,
+  reportPending: false,
+  async checkReadiness() {
+    const { document, revision, editingLibrary } = get();
+    if (!document || editingLibrary) return;
+    const local = releaseReadiness(document);
+    set({ releaseReport: local, reportPending: true });
+    try {
+      const report = await request<ReleaseReadinessReport>(
+        "/scenes/" + document.sceneId + "/readiness",
+        {
+          method: "POST",
+          body: JSON.stringify({ expectedRevision: revision, document }),
+        },
+      );
+      if (get().document === document) set({ releaseReport: report });
+    } catch (error) {
+      if (get().document === document)
+        set({
+          releaseReport: summarizeReadiness("scene", document.sceneId, [
+            ...local.checks,
+            {
+              code:
+                error instanceof ApiError && error.status === 409
+                  ? "revision"
+                  : "service",
+              status: "unverified",
+              severity: "error",
+              message: String(error),
+              path: "",
+              ownerId: "",
+              sceneId: document.sceneId,
+              details: error instanceof ApiError ? error.details : [],
+            },
+          ]),
+        });
+    } finally {
+      set({ reportPending: false });
+    }
+  },
   domainTool: "",
   draggingPrefab: null,
   previewController: null,
@@ -342,6 +388,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     unsubscribe = session.subscribe((change, label) => {
       set({
         document: change.after,
+        releaseReport: null,
         saveState: get().saveState === "conflict" ? "conflict" : "dirty",
       });
       void get()

@@ -118,7 +118,7 @@ public sealed class DocumentContract
         }
         var environmentCount=document.GetProperty("settings").GetProperty("environmentAssetIds").GetArrayLength();
         if(environmentCount!=0&&environmentCount!=6||document.GetProperty("materials").EnumerateArray().Any(m=>m.GetProperty("envAssetIds").GetArrayLength() is not (0 or 6)))errors.Add("环境立方体必须提供完整六面资源");
-        foreach (var reference in References(document, schema)) if (reference.Id != "" && !groups[reference.Kind].Contains(reference.Id)) errors.Add("无效的 " + reference.Kind + " 引用 " + reference.Id);
+        foreach (var reference in References(document, schema)) if (reference.Id != "" && groups.ContainsKey(reference.Kind) && !groups[reference.Kind].Contains(reference.Id)) errors.Add("无效的 " + reference.Kind + " 引用 " + reference.Id);
         foreach (var asset in document.GetProperty("assets").EnumerateArray()) {
             var files = asset.GetProperty("files").EnumerateArray().Select(x => x.GetString()!).ToArray();
             if (!files.Contains(Text(asset, "entry")) || files.Any(x => !ObjectStore.ValidPath(x))) errors.Add(Text(asset, "name") + " 资源包路径非法");
@@ -177,21 +177,40 @@ public sealed class DocumentContract
             if (spec.TryGetProperty("minLength", out var min) && text.Length < min.GetInt32() || spec.TryGetProperty("maxLength", out var max) && text.Length > max.GetInt32()) errors.Add(path + " 文本长度无效");
         }
     }
-    private IEnumerable<(string Kind, string Id)> References(JsonElement value, JsonElement raw)
-    {
-        var spec = Resolve(raw);
+    public static string RuntimeVersion=>Catalog.GetProperty("runtimeBuild").GetString()!;
+    public sealed record ReferenceEdge(string Kind,string Id,string Path,string SceneId="",string OwnerId="",string OwnerKind="",string ComponentType="",string ModelRevision="",string SourceElementId="",string LibraryRevision="");
+    public ReferenceEdge[] ReferenceEdges(JsonElement document) {
+        var scene=Text(document,"sceneId");var entities=document.GetProperty("entities").EnumerateArray().ToDictionary(e=>Text(e,"id"));
+        return References(document,schema).Select(edge=>{
+            var revision="";var source="";var libraryRevision="";
+            if(edge.OwnerKind=="entities"&&entities.TryGetValue(edge.OwnerId,out var entity)) {
+                var binding=entity.GetProperty("components").EnumerateArray().FirstOrDefault(c=>Text(c,"type")=="ModelNode"&&c.GetProperty("enabled").GetBoolean());
+                if(binding.ValueKind!=JsonValueKind.Undefined){revision=Text(binding.GetProperty("data"),"meshRevision");source=Text(binding.GetProperty("data"),"sourceElementId");}
+                if(document.TryGetProperty("prefabs",out var instances))foreach(var instance in instances.EnumerateArray())if(instance.GetProperty("bindings").GetProperty("entity").EnumerateObject().Any(p=>p.Value.GetString()==edge.OwnerId)){libraryRevision=Text(instance,"revisionId");break;}
+            }
+            return edge with {SceneId=scene,ModelRevision=revision,SourceElementId=source,LibraryRevision=libraryRevision};
+        }).ToArray();
+    }
+    private IEnumerable<ReferenceEdge> References(JsonElement value,JsonElement raw,string path="",string owner="",string ownerKind="",string component="",JsonElement parent=default,string propertyKey="") {
+        var spec=Resolve(raw);
         if(spec.TryGetProperty("x-reference-scope",out var scope)&&scope.GetString()=="local")yield break;
-        if (value.ValueKind == JsonValueKind.String && spec.TryGetProperty("x-reference", out var kind)) yield return (kind.GetString()!, value.GetString()!);
-        if (spec.TryGetProperty("oneOf", out var alternatives)) {
-            foreach (var alternative in alternatives.EnumerateArray()) {
-                var check = new List<string>(); Check(value, alternative, "$", check);
-                if (check.Count == 0) foreach (var reference in References(value, alternative)) yield return reference;
+        if(value.ValueKind==JsonValueKind.Object&&Regex.IsMatch(path,@"^/(entities|materials|behaviors|contents|viewpoints|tours|ui/nodes)/\d+$")){owner=Text(value,"id");ownerKind=path.Split('/')[1];component="";}
+        if(value.ValueKind==JsonValueKind.Object&&Regex.IsMatch(path,@"/components/\d+$"))component=Text(value,"type");
+        var kind=spec.TryGetProperty("x-reference",out var referenceKind)?referenceKind.GetString()!:"";
+        if(kind==""&&parent.ValueKind==JsonValueKind.Object){
+            if(propertyKey=="sourceId"&&Text(parent,"sourceKind") is not ("scene" or "key"))kind=Text(parent,"sourceKind");
+            if(propertyKey=="key"&&Text(parent,"type")=="compare"&&Text(parent,"source")=="variable")kind="variable";
+            if(propertyKey=="targetId")kind=Text(parent,"kind") switch {"audioControls" or "animationControls" or "panoramaControls" or "configurator" or "storyboard" or "industrial"=>"entity","viewpointList"=>"viewpoint","tourControls"=>"tour",_=>""};
+        }
+        if(kind!=""&&value.ValueKind==JsonValueKind.String&&value.GetString()!="")yield return new(kind,value.GetString()!,path,OwnerId:owner,OwnerKind:ownerKind,ComponentType:component);
+        if(spec.TryGetProperty("oneOf",out var alternatives)) {
+            foreach(var alternative in alternatives.EnumerateArray()) {var errors=new List<string>();Check(value,alternative,"$",errors);if(errors.Count==0){foreach(var edge in References(value,alternative,path,owner,ownerKind,component,parent,propertyKey))yield return edge;break;}}
+        } else if(value.ValueKind==JsonValueKind.Object&&spec.TryGetProperty("properties",out var properties)) {
+            foreach(var property in properties.EnumerateObject()) {
+                var hasPredicate=property.Value.TryGetProperty("x-visible-when",out var predicate)||property.Value.TryGetProperty("x-reference-when",out predicate);
+                if(hasPredicate&&(!value.TryGetProperty(Text(predicate,"field"),out var discriminator)||!predicate.GetProperty("values").EnumerateArray().Any(item=>(item.ValueKind==JsonValueKind.String?item.GetString():item.GetRawText())==(discriminator.ValueKind==JsonValueKind.String?discriminator.GetString():discriminator.GetRawText()))))continue;
+                if(value.TryGetProperty(property.Name,out var child))foreach(var edge in References(child,property.Value,path+"/"+property.Name.Replace("~","~0").Replace("/","~1"),owner,ownerKind,component,value,property.Name))yield return edge;
             }
-        } else if (value.ValueKind == JsonValueKind.Object && spec.TryGetProperty("properties", out var properties)) {
-            foreach (var property in properties.EnumerateObject()) {
-                if(property.Value.TryGetProperty("x-reference-when",out var predicate)&&(!value.TryGetProperty(Text(predicate,"field"),out var discriminator)||!predicate.GetProperty("values").EnumerateArray().Any(item=>JsonElement.DeepEquals(item,discriminator))))continue;
-                if(value.TryGetProperty(property.Name,out var child))foreach(var reference in References(child,property.Value))yield return reference;
-            }
-        } else if (value.ValueKind == JsonValueKind.Array && spec.TryGetProperty("items", out var items)) foreach (var child in value.EnumerateArray()) foreach (var reference in References(child, items)) yield return reference;
+        } else if(value.ValueKind==JsonValueKind.Array&&spec.TryGetProperty("items",out var items)) {var index=0;foreach(var child in value.EnumerateArray()){foreach(var edge in References(child,items,path+"/"+index,owner,ownerKind,component))yield return edge;index++;}}
     }
 }

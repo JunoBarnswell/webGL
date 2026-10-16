@@ -7,7 +7,7 @@ using static Studio.Database;
 
 namespace Studio;
 
-public sealed class StudioService(Database database, DocumentContract contract, ObjectStore objects, IMemoryCache cache, LibraryService library, SemanticService semantics)
+public sealed class StudioService(Database database, DocumentContract contract, ObjectStore objects, IMemoryCache cache, LibraryService library, ReleaseReadinessService readiness)
 {
     private static JsonElement Parse(string json) => JsonDocument.Parse(json).RootElement.Clone();
     private static DraftResponse Draft(SceneRow row) => new(row.ProjectId, row.Id, row.Revision, DocumentContract.Migrate(Parse(row.Document)), row.PublishedVersionId);
@@ -94,58 +94,24 @@ public sealed class StudioService(Database database, DocumentContract contract, 
         var version = db.Ado.SqlQuery<VersionRow>("SELECT * FROM Versions WHERE Id=@version AND SceneId=@scene", P("version", versionId), P("scene", sceneId)).SingleOrDefault() ?? throw new ApiException(404, "历史版本不存在");
         return Save(sceneId, new(revision, Parse(version.Document)));
     }
+    public Task<ReleaseReadinessReport> Readiness(string id,CancellationToken ct)=>readiness.Check(id,Read(id).Document,ct);
+    public Task<ReleaseReadinessReport> PreviewReadiness(string id,SaveRequest request,CancellationToken ct) {
+        var draft=Read(id);
+        if(draft.Revision!=request.ExpectedRevision)throw new ApiException(409,"云端草稿修订已变化，本地检查不会覆盖草稿");
+        if(DocumentContract.Text(request.Document,"sceneId")!=id)throw new ApiException(422,"检查文档与场景不一致");
+        return readiness.Check(id,request.Document,ct);
+    }
     public async Task<PreparedScene> PreparePublication(string id, long revision, CancellationToken ct, JsonElement? sourceOverride = null)
     {
         var draft = Read(id); if (draft.Revision != revision) throw new ApiException(409, "发布草稿版本已变化");
         if(sourceOverride.HasValue)draft=draft with {Document=sourceOverride.Value};
         var authoringDocument=draft.Document;
-        contract.Assert(draft.Document, true);
-        draft = draft with { Document = contract.Compile(draft.Document) };
-        library.AssertCatalogPins(draft.Document);
-        foreach(var entity in draft.Document.GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray())if(DocumentContract.Text(component,"type")=="studio.industrial.Review"&&component.GetProperty("enabled").GetBoolean()&&DocumentContract.Text(component.GetProperty("data"),"semanticAssetId") is {Length:>0} dataset)await semantics.Index(dataset,ct);
-        var assets = draft.Document.GetProperty("assets").EnumerateArray().ToArray();
-        var errors = new List<string>();
-        foreach (var asset in assets) {
-            try {
-                var stored=objects.VerifyMetadata(asset);
-                await objects.Confirm(stored,ct);
-            } catch (ApiException e) { errors.Add(e.Message); }
-        }
-        if(errors.Count==0) {
-            var definitions=new Dictionary<string,JsonElement>();
-            foreach(var entity in draft.Document.GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray()) {
-                var type=DocumentContract.Text(component,"type");if(!component.GetProperty("enabled").GetBoolean() || type is not ("Model" or "Avatar"))continue;
-                var data=component.GetProperty("data");var assetId=DocumentContract.Text(data,"assetId");
-                if(!definitions.ContainsKey(assetId))definitions[assetId]=await objects.ModelDefinition(objects.Get(assetId),ct);
-            }
-            var entities=draft.Document.GetProperty("entities").EnumerateArray().ToDictionary(e=>DocumentContract.Text(e,"id"));
-            foreach(var entity in entities.Values)foreach(var component in entity.GetProperty("components").EnumerateArray()) {
-                if(!component.GetProperty("enabled").GetBoolean())continue;
-                var type=DocumentContract.Text(component,"type");if(type is not ("ModelNode" or "Animation"))continue;
-                var data=component.GetProperty("data");var model=entities[DocumentContract.Text(data,"modelEntityId")];
-                var source=model.GetProperty("components").EnumerateArray().First(c=>DocumentContract.Text(c,"type")=="Model").GetProperty("data");
-                var definition=definitions[DocumentContract.Text(source,"assetId")];
-                if(type=="ModelNode"&&(!definition.TryGetProperty("nodes",out var nodes)||data.GetProperty("nodeIndex").GetInt32()>=nodes.GetArrayLength()))errors.Add(DocumentContract.Text(entity,"name")+" glTF 节点索引不存在");
-                if(type=="Animation") {
-                    var clips=definition.TryGetProperty("animations",out var animations)?animations.EnumerateArray().Select((a,i)=>a.TryGetProperty("name",out var name)?name.GetString()!:"animation_"+i).ToArray():[];
-                    if(!clips.Contains(DocumentContract.Text(data,"clip")))errors.Add(DocumentContract.Text(entity,"name")+" 动画片段不存在");
-                }
-            }
-        }
-        foreach(var entity in draft.Document.GetProperty("entities").EnumerateArray())foreach(var component in entity.GetProperty("components").EnumerateArray())if(DocumentContract.Text(component,"type")=="studio.configurator.Catalog"&&component.GetProperty("enabled").GetBoolean()){
-            foreach(var group in component.GetProperty("data").GetProperty("groups").EnumerateArray()){
-                var mappings=group.GetProperty("options").EnumerateArray().SelectMany(o=>o.GetProperty("visuals").EnumerateArray()).Concat(group.TryGetProperty("visuals",out var numericVisuals)?numericVisuals.EnumerateArray().ToArray():Array.Empty<JsonElement>());
-                foreach(var mapping in mappings){var op=DocumentContract.Text(mapping,"operation");if(op=="swapPart"&&objects.Get(DocumentContract.Text(mapping,"assetId")).Kind!="model")errors.Add("部件替换资源必须是模型");if(op!="variant")continue;
-                    var target=draft.Document.GetProperty("entities").EnumerateArray().First(e=>DocumentContract.Text(e,"id")==DocumentContract.Text(mapping,"targetId"));var node=target.GetProperty("components").EnumerateArray().FirstOrDefault(c=>DocumentContract.Text(c,"type")=="ModelNode");if(node.ValueKind!=JsonValueKind.Undefined)target=draft.Document.GetProperty("entities").EnumerateArray().First(e=>DocumentContract.Text(e,"id")==DocumentContract.Text(node.GetProperty("data"),"modelEntityId"));
-                    var model=target.GetProperty("components").EnumerateArray().FirstOrDefault(c=>DocumentContract.Text(c,"type")=="Model"&&c.GetProperty("enabled").GetBoolean());if(model.ValueKind==JsonValueKind.Undefined){errors.Add("材质变体目标必须属于启用的 GLTF 模型");continue;}
-                    var definition=await objects.ModelDefinition(objects.Get(DocumentContract.Text(model.GetProperty("data"),"assetId")),ct);var name=DocumentContract.Text(mapping,"variant");if(!definition.TryGetProperty("extensions",out var extensions)||!extensions.TryGetProperty("KHR_materials_variants",out var variants)||!variants.TryGetProperty("variants",out var variantList)||variantList.ValueKind!=JsonValueKind.Array||!variantList.EnumerateArray().Any(v=>DocumentContract.Text(v,"name")==name))errors.Add("GLTF 材质变体不存在："+name);
-                }
-            }
-        }
-        if (errors.Count > 0) throw new ApiException(422, "发布依赖校验失败", errors.ToArray());
+        var report=await readiness.Check(id,draft.Document,ct);
+        if(!report.Ready)throw new ApiException(report.Checks.Any(c=>c.Code=="resource-unavailable"||c.Code=="resource"&&c.Status=="unverified")?503:422,"发布就绪检查未通过",report.Checks.Where(c=>c.Severity=="error"&&c.Status!="pass").SelectMany(c=>c.Details.Prepend(c.Message)).ToArray());
+        draft=draft with {Document=contract.Compile(draft.Document)};
         var versionId = Id(); var now = Now(); var key = "manifests/" + id + "/" + versionId + ".json";
         var compiled = JsonNode.Parse(draft.Document.GetRawText())!.AsObject(); compiled.Remove("prefabs");
-        var manifest = new ManifestResponse(versionId,now,Parse(compiled.ToJsonString()),"2.2.0",DocumentContract.CatalogHash);
+        var manifest = new ManifestResponse(versionId,now,Parse(compiled.ToJsonString()),DocumentContract.RuntimeVersion,DocumentContract.CatalogHash,report);
         await objects.PutManifest(key, JsonSerializer.SerializeToUtf8Bytes(manifest, ApiJson.Default.ManifestResponse), ct);
         return new(draft, manifest, key, authoringDocument);
     }

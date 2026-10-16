@@ -12,6 +12,7 @@ import type { VisualOverride } from "../../scene-runtime/src/systems/VisualState
 import type { GpuResource } from "../../scene-runtime/src/AssetStore";
 import {
   defaultConfiguration,
+  compileRuleGraph,
   resolveConfiguration,
   type ProductCatalog,
   type ConfigurationResult,
@@ -22,6 +23,7 @@ interface Part {
 }
 interface Product {
   catalog: ProductCatalog;
+  compiled: import("./rules").RuleIR;
   result: ConfigurationResult;
   nonce: number;
   parts: Map<string, Part>;
@@ -38,6 +40,7 @@ export default class ConfiguratorSystem implements RuntimeSystem {
         const catalog = component.data as unknown as ProductCatalog;
         this.products.set(entity.id, {
           catalog,
+          compiled: compileRuleGraph(catalog),
           result: resolveConfiguration(catalog, defaultConfiguration(catalog)),
           nonce: 0,
           parts: new Map(),
@@ -128,7 +131,10 @@ export default class ConfiguratorSystem implements RuntimeSystem {
     };
     await this.apply(
       id,
-      resolveConfiguration(p.catalog, next, p.result.numericValues),
+      resolveConfiguration(p.catalog, next, p.result.numericValues, {
+        compiled: p.compiled,
+        intent: { groupId, optionId },
+      }),
     );
   }
   async setNumber(id: string, groupId: string, value: number): Promise<void> {
@@ -139,10 +145,15 @@ export default class ConfiguratorSystem implements RuntimeSystem {
       throw Error("配置数值属性不存在");
     await this.apply(
       id,
-      resolveConfiguration(p.catalog, p.result.selections, {
-        ...p.result.numericValues,
-        [groupId]: value,
-      }),
+      resolveConfiguration(
+        p.catalog,
+        p.result.selections,
+        {
+          ...p.result.numericValues,
+          [groupId]: value,
+        },
+        { compiled: p.compiled, intent: { groupId, value } },
+      ),
     );
   }
   async apply(id: string, result: ConfigurationResult): Promise<void> {
@@ -263,17 +274,19 @@ export default class ConfiguratorSystem implements RuntimeSystem {
       this.runtime.visual.setScope(
         "configuration:" + id,
         overrides,
-        20,
+        "configuration",
         generation,
       );
       p.result = result;
       this.publish(id, p);
       const camera = mappings.find((m) => m.operation === "camera");
-      if (camera)
+      if (camera && this.runtime.cameraOwnership.canAcquire("configuration"))
         await this.runtime.flyToPose(
           camera.camera,
           0.6,
           this.runtime.playAbort.signal,
+          undefined,
+          "configuration",
         );
     } catch (error) {
       if (nonce === p.nonce) {

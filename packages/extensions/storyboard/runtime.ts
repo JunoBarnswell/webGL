@@ -102,11 +102,14 @@ export default class StoryboardSystem implements RuntimeSystem {
       } else if (track.channel === "camera") {
         if (this.runtime.cameraOwnership.owner !== this.owner(id)) {
           s.camera ??= this.runtime.getCameraPose();
-          s.lease = this.runtime.cameraOwnership.acquire(this.owner(id), () =>
-            this.stop(id, false),
+          s.lease = this.runtime.cameraOwnership.acquire(
+            this.owner(id),
+            "storyboard",
+            () => this.stop(id, false),
           );
         }
-        this.runtime.applyCameraPose(sample.camera);
+        if (s.lease && this.runtime.cameraOwnership.isCurrent(s.lease))
+          this.runtime.applyCameraPose(sample.camera);
       } else if (track.channel === "caption" && sample.active)
         caption = sample.clip.text;
       else if (track.channel === "content" && sample.active)
@@ -131,7 +134,7 @@ export default class StoryboardSystem implements RuntimeSystem {
     }
     for (const audio of s.audio) if (!activeAudio.has(audio)) audio.pause();
     s.audio = activeAudio;
-    this.runtime.visual.setScope(this.owner(id), overrides, 50);
+    this.runtime.visual.setScope(this.owner(id), overrides, "storyboard");
     if (
       content ||
       this.runtime.getSnapshot().extensions[this.id + ":" + id]?.content

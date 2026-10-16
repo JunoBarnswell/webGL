@@ -1,17 +1,12 @@
 import { extensionValidators } from "../../extensions/validators";
 import { compilePrefabs } from "./prefab";
 export * from "./prefab";
-import { fieldActive } from "./field-rules";
 export { fieldActive, editField } from "./field-rules";
 import { validateSemanticComponents } from "./semantic-validation";
 import Ajv from "ajv";
 import schema from "../scene-document.schema.json";
 import { createUiDocument } from "./ui";
-import {
-  experienceReferences,
-  validateExperience,
-  walkActions,
-} from "./experience-validation";
+import { validateExperience } from "./experience-validation";
 import type {
   ActionDefinition,
   Behavior,
@@ -31,7 +26,7 @@ export type * from "./types";
 export * from "./extensions";
 import { extensionErrors, requiredExtension } from "./extensions";
 export * from "./ui";
-export { walkActions, conditionReferences } from "./experience-validation";
+export { walkActions } from "./experience-validation";
 export { schema as documentSchema };
 
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -174,73 +169,13 @@ export function getComponent(
   );
 }
 
-function fieldReferences(
-  value: JsonValue | undefined,
-  field: FieldSchema,
-  visit: (kind: string, id: string) => void,
-): void {
-  if (typeof value === "string" && field["x-reference"] && value)
-    visit(field["x-reference"], value);
-  if (Array.isArray(value) && field.items)
-    value.forEach((item) => fieldReferences(item, field.items!, visit));
-  if (
-    value &&
-    !Array.isArray(value) &&
-    typeof value === "object" &&
-    field.properties
-  ) {
-    for (const [key, nested] of Object.entries(field.properties))
-      fieldReferences(value[key], nested, visit);
-  }
-}
-
-export function entityReferences(
-  entity: Entity,
-): { kind: string; id: string }[] {
-  const references: { kind: string; id: string }[] = [];
-  for (const component of entity.components) {
-    const definition = componentDefinitions.find(
-      (d) => d.type === component.type,
-    );
-    for (const [key, field] of Object.entries(definition?.fields ?? {}))
-      if (fieldActive(field, component.data))
-        fieldReferences(component.data[key], field, (kind, id) =>
-          references.push({ kind, id }),
-        );
-  }
-  return references;
-}
-
-export function documentReferences(
-  document: SceneDocument,
-): { kind: string; id: string }[] {
-  const references: { kind: string; id: string }[] = [];
-  const visit = (kind: string, id: string) => references.push({ kind, id });
-  for (const entity of document.entities)
-    references.push(...entityReferences(entity));
-  const action = (a: BehaviorAction) => {
-    const definition = actionDefinitions.find((d) => d.type === a.type);
-    for (const [key, field] of Object.entries(definition?.fields ?? {}))
-      fieldReferences(a.data[key], field, visit);
-  };
-  for (const behavior of document.behaviors)
-    walkActions(behavior.actions, action);
-  for (const node of document.ui.nodes)
-    if (node.action) walkActions([node.action], action);
-  fieldReferences(
-    document.settings as unknown as JsonValue,
-    schema.$defs.settings as unknown as FieldSchema,
-    visit,
-  );
-  for (const material of document.materials)
-    fieldReferences(
-      material as unknown as JsonValue,
-      schema.$defs.material as unknown as FieldSchema,
-      visit,
-    );
-  experienceReferences(document, actionDefinitions, visit);
-  return references;
-}
+export {
+  documentReferenceEdges as documentReferences,
+  entityReferenceEdges as entityReferences,
+} from "./references";
+export * from "./references";
+export * from "./readiness";
+import { documentReferenceEdges as documentReferences } from "./references";
 
 export function validateDocument(value: unknown, forPublish = false): string[] {
   if (!validateShape(value))

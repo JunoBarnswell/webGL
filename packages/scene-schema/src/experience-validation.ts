@@ -16,66 +16,6 @@ export function walkActions(
     if (action.else) walkActions(action.else, visit);
   }
 }
-export function conditionReferences(
-  condition: Condition,
-  visit: (kind: string, id: string) => void,
-): void {
-  if (condition.type === "compare") {
-    if (condition.source === "variable" && condition.key)
-      visit("variable", condition.key);
-  } else
-    condition.conditions.forEach((child) => conditionReferences(child, visit));
-}
-export function experienceReferences(
-  doc: SceneDocument,
-  definitions: ActionDefinition[],
-  visit: (kind: string, id: string) => void,
-): void {
-  const reference = (kind: string, id: string | null) => {
-    if (id) visit(kind, id);
-  };
-  for (const c of doc.contents) {
-    reference("asset", c.imageAssetId);
-    reference("entity", c.audioEntityId);
-    reference("layout", c.layoutId);
-  }
-  for (const v of doc.viewpoints) {
-    reference("entity", v.anchorId);
-    reference("asset", v.thumbnailAssetId);
-  }
-  for (const t of doc.tours)
-    for (const stop of t.stops) reference("viewpoint", stop.viewpointId);
-  const action = (a: BehaviorAction) => {
-    const definition = definitions.find((d) => d.type === a.type);
-    if (definition?.target) reference(definition.target, a.targetId);
-    if (a.condition) conditionReferences(a.condition, visit);
-  };
-  for (const b of doc.behaviors) {
-    if (!["scene", "key"].includes(b.sourceKind))
-      reference(b.sourceKind, b.sourceId);
-    conditionReferences(b.condition, visit);
-    walkActions(b.actions, action);
-  }
-  for (const node of doc.ui.nodes) {
-    reference("layout", node.layoutId);
-    reference("ui", node.parentId);
-    reference("asset", node.assetId);
-    if (node.action) walkActions([node.action], action);
-    const kind = (
-      {
-        tourControls: "tour",
-        viewpointList: "viewpoint",
-        audioControls: "entity",
-        animationControls: "entity",
-        panoramaControls: "entity",
-        configurator: "entity",
-        storyboard: "entity",
-        industrial: "entity",
-      } as Record<string, string>
-    )[node.kind];
-    if (kind) reference(kind, node.targetId);
-  }
-}
 export function validateExperience(
   doc: SceneDocument,
   definitions: ActionDefinition[],

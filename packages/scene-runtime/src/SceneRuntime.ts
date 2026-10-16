@@ -1,4 +1,4 @@
-import { CameraOwnership } from "./CameraOwnership";
+import { CameraOwnership, type CameraRole } from "./CameraOwnership";
 import { VisualStateSystem } from "./systems/VisualStateSystem";
 import * as THREE from "three";
 import { ShowroomEngine } from "@o2vr/engine";
@@ -55,6 +55,7 @@ export type Instance = {
   artworkTask?: number;
 };
 type Flight = {
+  lease: number;
   time: number;
   duration: number;
   from: THREE.Vector3;
@@ -88,6 +89,7 @@ export class SceneRuntime {
   readonly index = new EntityIndex();
   readonly capabilities = new Map<string, unknown>();
   readonly cameraOwnership = new CameraOwnership();
+  private manualCameraLease = 0;
   readonly spatial: SpatialSystem;
   readonly visual: VisualStateSystem;
   readonly graph: SceneGraphSystem;
@@ -199,10 +201,20 @@ export class SceneRuntime {
         void this.emit("tourEnd", id, "tour");
       },
     );
-    this.navigation.onInterrupt = () => {
-      this.cameraOwnership.reset();
-      this.tour.pause();
-      this.cancelFlight();
+    this.navigation.onInterrupt = (active) => {
+      if (active) {
+        if (this.cameraOwnership.owner !== "manual")
+          this.manualCameraLease = this.cameraOwnership.acquire(
+            "manual",
+            "manual",
+            () => this.navigation.clearInput(),
+          );
+        this.tour.pause();
+        this.cancelFlight();
+      } else {
+        this.cameraOwnership.release(this.manualCameraLease);
+        this.manualCameraLease = 0;
+      }
     };
     this.cleanup.push(
       engine.onUpdate((dt: number) => this.update(dt)),
@@ -1033,7 +1045,6 @@ export class SceneRuntime {
     });
   }
   cancelFlight(): void {
-    this.cameraOwnership.releaseOwner("flight");
     if (this.flight) {
       const flight = this.flight;
       this.flight = null;
@@ -1070,11 +1081,18 @@ export class SceneRuntime {
     duration: number,
     signal: AbortSignal,
     arrived?: () => void,
+    role: CameraRole = "flight",
   ): Promise<void> {
+    if (!this.cameraOwnership.canAcquire(role))
+      return Promise.reject(
+        new Error("相机由 " + this.cameraOwnership.owner + " 控制"),
+      );
     this.tour.pause();
     this.cancelFlight();
-    const lease = this.cameraOwnership.acquire("flight", () =>
-      this.cancelFlight(),
+    const lease = this.cameraOwnership.acquire(
+      role === "flight" ? "flight" : "camera:" + role,
+      role,
+      () => this.cancelFlight(),
     );
     const camera = this.engine.camera.clone();
     camera.position.fromArray(pose.position);
@@ -1083,6 +1101,7 @@ export class SceneRuntime {
       const cancel = () => this.cancelFlight();
       signal.addEventListener("abort", cancel, { once: true });
       this.flight = {
+        lease,
         time: 0,
         duration: Math.max(0.1, duration),
         from: this.navigation.eye.clone(),
@@ -1178,7 +1197,7 @@ export class SceneRuntime {
             ]
           : [];
       }),
-      30,
+      "display",
     );
   }
   update(dt: number): boolean {
@@ -1197,7 +1216,7 @@ export class SceneRuntime {
     }
     if (active) this.spatial.invalidate();
     if (this.mode !== "play" || !this.document) return active;
-    if (this.flight && this.cameraOwnership.owner === "flight") {
+    if (this.flight && this.cameraOwnership.isCurrent(this.flight.lease)) {
       const flight = this.flight;
       flight.time = Math.min(flight.duration, flight.time + dt);
       const t = flight.time / flight.duration;
@@ -1227,7 +1246,7 @@ export class SceneRuntime {
       active = this.tour.update(dt);
     else if (
       !this.state.getSnapshot().contentId &&
-      this.cameraOwnership.owner === "navigation"
+      ["navigation", "manual"].includes(this.cameraOwnership.owner)
     )
       active = this.navigation.update(dt);
     for (const id of new Set(

@@ -1,8 +1,12 @@
-import { current, isDraft } from "immer";
+import { current, isDraft, original, freeze } from "immer";
 import {
   createDocument,
   assertDocument,
   documentReferences,
+  remapSceneReferences,
+  rewriteDocumentReferences,
+  validateDocument,
+  type ReferenceEdge,
   type Entity,
   type SceneDocument,
 } from "@studio/scene-schema";
@@ -12,7 +16,6 @@ import {
   prefabFieldDiff,
   prefabGroups,
   prefabOverrideKey,
-  remapSceneReferences,
   sourceDocument,
   type PrefabInstance,
   type PrefabRevision,
@@ -438,92 +441,401 @@ export function previewPrefabUpdate(
       });
   return conflicts;
 }
+function preparePrefabRevision(
+  doc: SceneDocument,
+  ids: string[],
+  revision: PrefabRevision,
+  choices: Record<string, "source" | "instance">,
+): SceneDocument {
+  const source = sourceDocument(doc);
+  for (const instance of source.prefabs?.filter((i) => ids.includes(i.id)) ??
+    []) {
+    const conflicts = previewPrefabUpdate(instance, revision);
+    instance.overrides = instance.overrides.filter(
+      (o) => choices[instance.id + ":" + prefabOverrideKey(o)] !== "source",
+    );
+    const next = compilePrefabs(revision.document);
+    for (const conflict of conflicts)
+      if (
+        conflict.key.startsWith("addition:") &&
+        choices[instance.id + ":" + conflict.key] === "source"
+      ) {
+        const removed = new Set([conflict.key.slice(9)]);
+        for (let changed = true; changed; ) {
+          changed = false;
+          for (const e of instance.additions)
+            if (e.parentId && removed.has(e.parentId) && !removed.has(e.id)) {
+              removed.add(e.id);
+              changed = true;
+            }
+        }
+        instance.additions = instance.additions.filter(
+          (e) => !removed.has(e.id),
+        );
+      }
+    for (const conflict of conflicts)
+      if (
+        choices[instance.id + ":" + conflict.key] === "instance" &&
+        ["删除目标", "新增节点的父目标已删除"].includes(conflict.field)
+      ) {
+        const previousDoc = effectivePrefab(instance);
+        let previous = previousDoc.entities.find(
+          (e) => e.id === conflict.localId,
+        );
+        while (
+          previous &&
+          !next.entities.some((e) => e.id === previous!.id) &&
+          !instance.additions.some((e) => e.id === previous!.id)
+        ) {
+          instance.additions.push(previous);
+          previous = previousDoc.entities.find(
+            (e) => e.id === previous!.parentId,
+          );
+        }
+      }
+    instance.source = plain(revision.document);
+    instance.revisionId = revision.revisionId;
+    instance.rootLocalId = revision.rootLocalId;
+    for (const [key, kind] of Object.entries(prefabGroups))
+      for (const item of next[key as keyof typeof prefabGroups] as {
+        id: string;
+      }[])
+        (instance.bindings[kind] ??= {})[item.id] ??= crypto.randomUUID();
+    for (const [key, kind] of [
+      ["nodes", "ui"],
+      ["layouts", "layout"],
+    ])
+      for (const item of next.ui[key as "nodes"])
+        (instance.bindings[kind] ??= {})[item.id] ??= crypto.randomUUID();
+    instance.tombstones = instance.tombstones.filter((id) =>
+      next.entities.some((e) => e.id === id),
+    );
+  }
+  return source;
+}
+
+export interface PrefabTreeChange {
+  instanceId: string;
+  collection: string;
+  localId: string;
+  kind:
+    | "added"
+    | "removed"
+    | "renamed"
+    | "moved"
+    | "component"
+    | "field"
+    | "resource";
+  path: string[];
+  base: unknown;
+  source: unknown;
+}
+export interface PrefabReferenceMigration {
+  kind: string;
+  fromId: string;
+  toId?: string;
+  retain?: boolean;
+}
+export interface PrefabUpdatePlan {
+  prefabId: string;
+  newRevision: string;
+  oldRevisions: Record<string, string>;
+  selectedInstances: string[];
+  conflicts: (PrefabConflict & {
+    instanceId: string;
+    choice?: "source" | "instance";
+  })[];
+  changes: PrefabTreeChange[];
+  impactedReferences: (ReferenceEdge & { resolution: string })[];
+  migrations: PrefabReferenceMigration[];
+  changedEntities: string[];
+  validationErrors: string[];
+  ready: boolean;
+}
+const preparedPrefabPlans = new WeakMap<
+  PrefabUpdatePlan,
+  { base: SceneDocument; source: SceneDocument }
+>();
+export function prefabRevisionDiff(
+  instance: PrefabInstance,
+  revision: PrefabRevision,
+): PrefabTreeChange[] {
+  const base = compilePrefabs(instance.source),
+    next = compilePrefabs(revision.document),
+    changes: PrefabTreeChange[] = [];
+  const group = (
+    collection: string,
+    before: { id: string }[],
+    after: { id: string }[],
+  ) => {
+    const old = new Map(before.map((value) => [value.id, value])),
+      now = new Map(after.map((value) => [value.id, value]));
+    for (const id of new Set([...old.keys(), ...now.keys()])) {
+      const a = old.get(id),
+        b = now.get(id);
+      if (!a || !b)
+        changes.push({
+          instanceId: instance.id,
+          collection,
+          localId: id,
+          kind: a ? "removed" : "added",
+          path: [],
+          base: a ?? null,
+          source: b ?? null,
+        });
+      else if (collection === "entities")
+        for (const field of prefabFieldDiff(a as Entity, b as Entity))
+          changes.push({
+            instanceId: instance.id,
+            collection,
+            localId: id,
+            kind: field.componentType
+              ? "component"
+              : field.path[0] === "name"
+                ? "renamed"
+                : field.path[0] === "parentId"
+                  ? "moved"
+                  : "field",
+            path: [
+              ...(field.componentType ? [field.componentType] : []),
+              ...field.path,
+            ],
+            base: a,
+            source: field.remove ? null : field.value,
+          });
+      else if (!eq(a, b))
+        changes.push({
+          instanceId: instance.id,
+          collection,
+          localId: id,
+          kind: collection === "assets" ? "resource" : "field",
+          path: [],
+          base: a,
+          source: b,
+        });
+    }
+  };
+  for (const key of [...Object.keys(prefabGroups), "assets"] as (
+    | keyof typeof prefabGroups
+    | "assets"
+  )[])
+    group(key, base[key], next[key]);
+  group("ui.nodes", base.ui.nodes, next.ui.nodes);
+  group("ui.layouts", base.ui.layouts, next.ui.layouts);
+  return changes;
+}
+/** Plan generation is pure. Every reference impact is known before any edit is submitted. */
+export function planPrefabUpdate(
+  document: SceneDocument,
+  selectedIds: string[],
+  revision: PrefabRevision,
+  choices: Record<string, "source" | "instance"> = {},
+  migrations: PrefabReferenceMigration[] = [],
+): PrefabUpdatePlan {
+  assertDocument(revision.document);
+  const selected =
+    document.prefabs?.filter((i) => selectedIds.includes(i.id)) ?? [];
+  if (!selected.length || new Set(selectedIds).size !== selected.length)
+    throw Error("升级计划包含已删除或重复的实例");
+  if (selected.some((i) => i.prefabId !== revision.id))
+    throw Error("升级计划不能混合不同来源的模板");
+  const conflicts = selected.flatMap((instance) =>
+    previewPrefabUpdate(instance, revision).map((conflict) => ({
+      ...conflict,
+      instanceId: instance.id,
+      choice: choices[instance.id + ":" + conflict.key],
+    })),
+  );
+  const effectiveChoices = { ...choices };
+  for (const conflict of conflicts)
+    effectiveChoices[conflict.instanceId + ":" + conflict.key] ??= "instance";
+  const source = preparePrefabRevision(
+    document,
+    selectedIds,
+    revision,
+    effectiveChoices,
+  );
+  const preliminary = compilePrefabs(source);
+  const available = new Map<string, Set<string>>();
+  for (const [key, kind] of Object.entries(prefabGroups))
+    available.set(
+      kind,
+      new Set(
+        (preliminary[key as keyof typeof prefabGroups] as { id: string }[]).map(
+          (item) => item.id,
+        ),
+      ),
+    );
+  available.set("asset", new Set(preliminary.assets.map((a) => a.id)));
+  available.set("ui", new Set(preliminary.ui.nodes.map((n) => n.id)));
+  available.set("layout", new Set(preliminary.ui.layouts.map((l) => l.id)));
+  const impacts = documentReferences(preliminary)
+    .filter(
+      (edge) =>
+        available.has(edge.kind) && !available.get(edge.kind)!.has(edge.id),
+    )
+    .map((edge) => ({ ...edge, resolution: "" }));
+  for (const migration of migrations) {
+    if (migration.retain) {
+      if (migration.kind !== "entity" || migration.toId)
+        throw Error("仅实体可保留为本地增项，且不能同时重定向");
+      const oldInstance = selected.find((i) =>
+        Object.values(i.bindings.entity ?? {}).includes(migration.fromId),
+      );
+      if (!oldInstance) throw Error("保留目标不属于选中的模板实例");
+      const instance = source.prefabs!.find((i) => i.id === oldInstance.id)!;
+      const localId = Object.entries(oldInstance.bindings.entity).find(
+        ([, id]) => id === migration.fromId,
+      )![0];
+      const previous = effectivePrefab(oldInstance),
+        next = effectivePrefab(instance),
+        present = new Set(next.entities.map((e) => e.id));
+      let entity = previous.entities.find((e) => e.id === localId);
+      while (entity && !present.has(entity.id)) {
+        instance.additions.push(plain(entity));
+        present.add(entity.id);
+        entity = previous.entities.find((e) => e.id === entity!.parentId);
+      }
+      for (const impact of impacts)
+        if (impact.kind === migration.kind && impact.id === migration.fromId)
+          impact.resolution = "保留为本地增项";
+    }
+  }
+  const beforeRewrite = compilePrefabs(source),
+    redirects: Record<string, Record<string, string>> = {};
+  for (const migration of migrations)
+    if (migration.toId) {
+      if (migration.retain || migration.fromId === migration.toId)
+        throw Error("引用迁移目标无效");
+      const targets =
+        migration.kind === "entity"
+          ? beforeRewrite.entities
+          : migration.kind === "material"
+            ? beforeRewrite.materials
+            : migration.kind === "asset"
+              ? beforeRewrite.assets
+              : migration.kind === "content"
+                ? beforeRewrite.contents
+                : migration.kind === "viewpoint"
+                  ? beforeRewrite.viewpoints
+                  : migration.kind === "tour"
+                    ? beforeRewrite.tours
+                    : migration.kind === "variable"
+                      ? beforeRewrite.variables
+                      : migration.kind === "ui"
+                        ? beforeRewrite.ui.nodes
+                        : migration.kind === "layout"
+                          ? beforeRewrite.ui.layouts
+                          : [];
+      if (!targets.some((target) => target.id === migration.toId))
+        throw Error("引用迁移目标不存在：" + migration.toId);
+      (redirects[migration.kind] ??= {})[migration.fromId] = migration.toId;
+      for (const impact of impacts)
+        if (impact.kind === migration.kind && impact.id === migration.fromId)
+          impact.resolution = migration.toId;
+    }
+  const candidate = rewriteDocumentReferences(beforeRewrite, redirects);
+  capturePrefabEdits(beforeRewrite, candidate);
+  // Old bindings cannot claim ownership of author-authored objects after a source deletion.
+  for (const instance of candidate.prefabs!.filter((i) =>
+    selectedIds.includes(i.id),
+  )) {
+    const effective = effectivePrefab(instance);
+    for (const [key, kind] of Object.entries(prefabGroups)) {
+      const localIds = new Set(
+        (effective[key as keyof typeof prefabGroups] as { id: string }[]).map(
+          (item) => item.id,
+        ),
+      );
+      instance.bindings[kind] = Object.fromEntries(
+        Object.entries(instance.bindings[kind] ?? {}).filter(([id]) =>
+          localIds.has(id),
+        ),
+      );
+    }
+    for (const [key, kind] of [
+      ["nodes", "ui"],
+      ["layouts", "layout"],
+    ] as const) {
+      const ids = new Set(effective.ui[key].map((item) => item.id));
+      instance.bindings[kind] = Object.fromEntries(
+        Object.entries(instance.bindings[kind] ?? {}).filter(([id]) =>
+          ids.has(id),
+        ),
+      );
+    }
+  }
+
+  const validationErrors = validateDocument(candidate);
+  const beforeIds = new Map(document.entities.map((e) => [e.id, e])),
+    afterIds = new Map(candidate.entities.map((e) => [e.id, e]));
+  const plan: PrefabUpdatePlan = freeze(
+    {
+      prefabId: revision.id,
+      newRevision: revision.revisionId,
+      oldRevisions: Object.fromEntries(
+        selected.map((i) => [i.id, i.revisionId]),
+      ),
+      selectedInstances: [...selectedIds],
+      conflicts,
+      changes: selected.flatMap((instance) =>
+        prefabRevisionDiff(instance, revision),
+      ),
+      impactedReferences: impacts,
+      migrations: plain(migrations),
+      changedEntities: [
+        ...new Set([...beforeIds.keys(), ...afterIds.keys()]),
+      ].filter((id) => !eq(beforeIds.get(id), afterIds.get(id))),
+      validationErrors,
+      ready:
+        conflicts.every((c) => Boolean(c.choice)) && !validationErrors.length,
+    },
+    true,
+  );
+  preparedPrefabPlans.set(plan, {
+    base: document,
+    source: sourceDocument(candidate),
+  });
+  return plan;
+}
+export function applyPrefabUpdatePlan(plan: PrefabUpdatePlan): EditorCommand {
+  return {
+    kind: "prefab",
+    label: "执行预制体变更计划",
+    mutate(doc) {
+      const prepared = preparedPrefabPlans.get(plan);
+      if (!prepared || (isDraft(doc) ? original(doc) : doc) !== prepared.base)
+        throw Error("场景已变化，请重新生成预制体升级计划");
+      if (!plan.ready)
+        throw Error(
+          "升级计划未就绪：" +
+            [
+              ...plan.conflicts.filter((c) => !c.choice).map((c) => c.field),
+              ...plan.validationErrors,
+            ].join("；"),
+        );
+      Object.assign(doc, plain(prepared.source));
+      recompilePrefabs(doc);
+    },
+  };
+}
 export function updatePrefabInstances(
   ids: string[],
   revision: PrefabRevision,
   choices: Record<string, "source" | "instance"> = {},
+  migrations: PrefabReferenceMigration[] = [],
 ): EditorCommand {
   return {
     kind: "prefab",
     label: "原子升级预制体实例",
     mutate(doc) {
-      const source = sourceDocument(doc);
-      for (const instance of source.prefabs?.filter((i) =>
-        ids.includes(i.id),
-      ) ?? []) {
-        const conflicts = previewPrefabUpdate(instance, revision);
-        for (const conflict of conflicts)
-          if (!choices[instance.id + ":" + conflict.key])
-            throw Error("覆盖冲突尚未处理：" + conflict.field);
-        instance.overrides = instance.overrides.filter(
-          (o) => choices[instance.id + ":" + prefabOverrideKey(o)] !== "source",
-        );
-        const next = compilePrefabs(revision.document);
-        for (const conflict of conflicts)
-          if (
-            conflict.key.startsWith("addition:") &&
-            choices[instance.id + ":" + conflict.key] === "source"
-          ) {
-            const removed = new Set([conflict.key.slice(9)]);
-            for (let changed = true; changed; ) {
-              changed = false;
-              for (const e of instance.additions)
-                if (
-                  e.parentId &&
-                  removed.has(e.parentId) &&
-                  !removed.has(e.id)
-                ) {
-                  removed.add(e.id);
-                  changed = true;
-                }
-            }
-            instance.additions = instance.additions.filter(
-              (e) => !removed.has(e.id),
-            );
-          }
-        for (const conflict of conflicts)
-          if (
-            choices[instance.id + ":" + conflict.key] === "instance" &&
-            ["删除目标", "新增节点的父目标已删除"].includes(conflict.field)
-          ) {
-            const previousDoc = effectivePrefab(instance);
-            let previous = previousDoc.entities.find(
-              (e) => e.id === conflict.localId,
-            );
-            while (
-              previous &&
-              !next.entities.some((e) => e.id === previous!.id) &&
-              !instance.additions.some((e) => e.id === previous!.id)
-            ) {
-              instance.additions.push(previous);
-              previous = previousDoc.entities.find(
-                (e) => e.id === previous!.parentId,
-              );
-            }
-          }
-        instance.source = plain(revision.document);
-        instance.revisionId = revision.revisionId;
-        instance.rootLocalId = revision.rootLocalId;
-        for (const [key, kind] of Object.entries(prefabGroups))
-          for (const item of next[key as keyof typeof prefabGroups] as {
-            id: string;
-          }[])
-            (instance.bindings[kind] ??= {})[item.id] ??= crypto.randomUUID();
-        for (const [key, kind] of [
-          ["nodes", "ui"],
-          ["layouts", "layout"],
-        ])
-          for (const item of next.ui[key as "nodes"])
-            (instance.bindings[kind] ??= {})[item.id] ??= crypto.randomUUID();
-        instance.tombstones = instance.tombstones.filter((id) =>
-          next.entities.some((e) => e.id === id),
-        );
-      }
-      Object.assign(doc, source);
-      recompilePrefabs(doc);
+      const base = (isDraft(doc) ? original(doc) : doc) as SceneDocument;
+      const plan = planPrefabUpdate(base, ids, revision, choices, migrations);
+      applyPrefabUpdatePlan(plan).mutate(doc);
     },
   };
 }
+
 export function revertPrefabOverride(
   instanceId: string,
   keys?: string[],
