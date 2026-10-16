@@ -21,7 +21,7 @@ Linux x64 / .NET SDK 10.0.402、runtime 10.0.13 Native AOT；Node 24.19.0；Pyth
 | W5 Configurator | 产品档案、单/多选/开关/数值、规则级联与原因、视觉绑定、KHR 材质变体、SwapPart、异步顺序门禁、配置 UI、BOM/SKU 来源、目录修订与固定引用 | 有界求解/数值规则/BOM 契约，两个产品档案与实际运行切换；目录固定引用、脏目录发布拦截、删除门禁及 ZIP 闭包；真实 KHR 变体仅改变目标子树，恢复原材质，错误名称拒绝发布并保留旧指针；并发 SwapPart 共用单次准备并在退出时释放 |
 | W6 优化 | 诊断、预设、无损 Meshopt、ETC1S KTX2、来源身份与节点矩阵门禁、持久队列/日志/取消/重试/缓存、原件及派生修订、同 Canvas 对照与统计 | 真实 Meshopt / toktx 4.4.2 进程、压缩头与浏览器实际压缩纹理解码；源 SHA 与身份、作业取消和原件删除保护；两个几何相同但变体不同的 Mesh 在压缩后分别保留绑定 |
 
-`verify:studio22` 的 9 组契约/原生集成门禁通过，包括目录固定修订、完整资产闭包、版本冲突和并发部件资源所有权。`verify:extensions` 的 19 组门禁及 `verify:experience` 通过，包含 100 次装配往返、标注锚点与修订修复、管线 CSV、空间索引、命令输入所有权、动作取消和资源释放。`verify:contracts` 的 39 个既有 TS / 原生 API 夹具通过。`verify:browser` 验证 100 次保留 Canvas 的布局切换、快捷键/输入法/飞行、预览和响应式布局。`verify:model-revision` 已通过真实 GLTF 版本映射对话框及视口表面修复。`benchmark:studio` 在相同 1920×1080、DPR 1、SwiftShader 下执行四个合成规模，其中 2,000 标注/2,000 部件仍保持一个上下文；完整调度间隔、加载与资源数据保存在 `studio-2/benchmark.json`，不等同于 GPU 帧时或真实汽车性能。
+`verify:studio22` 的 9 组契约/原生集成门禁通过，包括目录固定修订、完整资产闭包、版本冲突和并发部件资源所有权。`verify:extensions` 的 19 组门禁及 `verify:experience` 通过，包含 100 次装配往返、标注锚点与修订修复、管线 CSV、空间索引、命令输入所有权、动作取消和资源释放。`verify:contracts` 的 39 个既有 TS / 原生 API 夹具通过。`verify:browser` 验证 100 次保留 Canvas 的布局切换、快捷键/输入法/飞行、预览和响应式布局。`verify:model-revision` 已通过真实 GLTF 版本映射对话框及视口表面修复，并通过强制重建 Vite 缓存的冷启动检查。共享资产流水线插件预先优化 Worker 的 fflate 依赖，首次操作不再因依赖发现而重载编辑状态。`benchmark:studio` 在相同 1920×1080、DPR 1、SwiftShader 下执行四个合成规模，其中 2,000 标注/2,000 部件仍保持一个上下文；完整调度间隔、加载与资源数据保存在 `studio-2/benchmark.json`，不等同于 GPU 帧时或真实汽车性能。
 
 ## 真实输入
 
@@ -62,7 +62,7 @@ NODE_USE_ENV_PROXY=1 npm run import:showroom
 npm run verify:delivery
 ```
 
-`STUDIO_FAULTS=1` 只停止和恢复本任务的 MinIO 容器；与其他依赖 MinIO 的验收串行执行。已通过 JWT 边界、并发保存恰好一个 409、非法事务不改草稿、缺失依赖/MinIO 中断保留原指针、版本恢复、引用删除保护及取消发布。库和项目冲突不覆盖本地编辑。实际将正在转换 IFC 的 Native AOT 进程终止后，重新运行本轮原生包，作业恢复为 Succeeded，原项目发布指针保持不变（`restart22.json`）。
+`STUDIO_FAULTS=1` 只停止和恢复本任务的 MinIO 容器；与其他依赖 MinIO 的验收串行执行。已通过 JWT 边界、并发保存恰好一个 409、非法事务不改草稿、缺失依赖/MinIO 中断保留原指针、版本恢复、引用删除保护及取消发布。库和项目冲突不覆盖本地编辑。浏览器实际断网后显示 offline，联网重试保存成功；并发写入造成 409 时保留本地修改，刷新后通过 IndexedDB 恢复，远端草稿不被覆盖（`offline22.json`）。实际将正在转换 IFC 的 Native AOT 进程终止后，重新运行本轮原生包，作业恢复为 Succeeded，原项目发布指针保持不变（`restart22.json`）。
 
 最终目录通过自己的 `run.sh` 启动，使用随包的隔离 Node 依赖、IfcOpenShell 和 toktx 实际完成 IFC、Meshopt/KTX2 及双 Mesh 变体保留检查（`bundle22.json`）。工程包重新导出为当前契约版本，包含真实展厅、多场景模板/目录及材质变体样例。
 

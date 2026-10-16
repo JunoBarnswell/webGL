@@ -39,4 +39,6 @@ The header workspace selector registers the same command catalog as keyboard and
 
 Project publication prepares and confirms all dependencies and immutable scene manifests before the database transaction creates the project version and switches its pointer. Restoring a publication creates a new project draft with fixed scene versions. Catalog components retain a stable business revision and an explicit immutable library-version pin; publication rejects inline edits that diverge from that pin. Project ZIPs include all scenes, pinned scene sources, template/catalog revisions and their complete asset closure; they remap project scene/version identities in one import transaction. The old single-document ZIP is recognized only at the external import boundary.
 
+The asset-pipeline Vite plugin owns decoder distribution and pre-optimization of worker-only compression dependencies. The first import must not discover a new dependency and reload the authoring session. Editor and Player use the same plugin.
+
 The Linux bundle carries native API, Editor/Player static files, workers, locked Node dependencies, SQL migration sources and installed converter distributions with their license files. Configuration, staging and persistent service data are excluded. Windows execution remains waived for this delivery.

@@ -1,9 +1,14 @@
 import { readFile } from "node:fs/promises";
 import type { Plugin } from "vite";
 const names = ["basis_transcoder.js", "basis_transcoder.wasm"];
-export function decoderAssets(): Plugin {
+export function assetPipelineAssets(): Plugin {
   return {
-    name: "studio-decoder-assets",
+    name: "studio-asset-pipeline",
+    // The import worker is outside Vite's HTML crawl. Optimize its compression
+    // dependency up front so the first model/archive operation cannot reload UI state.
+    config() {
+      return { optimizeDeps: { include: ["fflate"] } };
+    },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
         const name = request.url?.split("?")[0].split("/").at(-1) ?? "";
