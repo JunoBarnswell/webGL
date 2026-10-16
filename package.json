@@ -25,7 +25,8 @@
     "verify:browser": "tsx scripts/verify-browser.mts",
     "benchmark:studio": "tsx scripts/benchmark-studio.mts",
     "examples:industry": "tsx scripts/create-industry-samples.mts",
-    "verify:delivery": "tsx scripts/verify-delivery.mts"
+    "verify:delivery": "tsx scripts/verify-delivery.mts",
+    "verify:model-revision": "tsx scripts/verify-model-revision.mts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
